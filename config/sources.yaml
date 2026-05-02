@@ -1,0 +1,66 @@
+# Fuentes de noticias bolivianas para web scraping
+# Este archivo define las fuentes y sus selectores CSS
+
+sources:
+  # Radio Fides
+  - name: "RadioFides"
+    url: "https://www.radiofides.com/"
+    category: "general"
+    country: "bolivia"
+    selector: "article.post, article"
+    title_selector: "h2 a, h3 a"
+    url_selector: "a.post-link, a"
+    date_selector: ".post-date, .date, time"
+    image_selector: "img"
+    enabled: true
+    
+  # Unitel
+  - name: "Unitel"
+    url: "https://unitel.bo/"
+    category: "general"
+    country: "bolivia"
+    selector: "article, .noticia-item, .news-item"
+    title_selector: "h2 a, h3 a, .title a"
+    url_selector: "a"
+    date_selector: ".fecha, .date, time"
+    image_selector: "img"
+    enabled: true
+    
+  # Red Uno
+  - name: "RedUno"
+    url: "https://www.reduno.com.bo/"
+    category: "general"
+    country: "bolivia"
+    selector: "div.nota-nota_gen"
+    title_selector: "div.data.titulo h2"
+    url_selector: "div.titulo a"
+    date_selector: "input.nota_fecha_input"
+    date_attr: "data-fecha-a"
+    image_selector: "figure.nota__media img"
+    category_selector: "div.volanta span"
+    category_link_selector: "div.volanta a"
+    enabled: true
+    
+  # Red Bolívar
+  - name: "RedBolivision"
+    url: "https://www.redbolivision.tv.bo/"
+    category: "general"
+    country: "bolivia"
+    selector: "article, .noticia-item, .news-item"
+    title_selector: "h2 a, h3 a"
+    url_selector: "a"
+    date_selector: ".fecha, time"
+    image_selector: "img"
+    enabled: true
+
+# Fuentes adicionales (opcionales)
+additional_sources:
+  - name: "LosTiempos"
+    url: "https://www.lostiempos.com/"
+    category: "general"
+    enabled: false
+    
+  - name: "ElDeber"
+    url: "https://eldeber.com.bo/"
+    category: "general"
+    enabled: false
