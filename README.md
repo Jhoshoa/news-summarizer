@@ -56,7 +56,7 @@ NEWS_API_KEY=your_newsapi_key
 NEWS_API_COUNTRY=bo
 NEWS_API_LANGUAGE=es
 
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/news_summarizer
+DATABASE_URL=postgresql+asyncpg://news_user:news_password@localhost:5432/news_summarizer
 ```
 
 ## Running Locally

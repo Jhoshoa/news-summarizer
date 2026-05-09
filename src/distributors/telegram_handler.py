@@ -1,4 +1,3 @@
-
 from contextlib import suppress
 
 from loguru import logger
@@ -8,11 +7,11 @@ class TelegramHandler:
     """Maneja el bot de Telegram."""
 
     CATEGORIES = {
-        "1": {"name": "Economía", "emoji": "💰"},
-        "2": {"name": "Política", "emoji": "🏛️"},
-        "3": {"name": "Deportes", "emoji": "⚽"},
-        "4": {"name": "Tecnología", "emoji": "💻"},
-        "5": {"name": "Entretenimiento", "emoji": "🎬"},
+        "1": {"name": "Economia", "emoji": "$", "category": "economia"},
+        "2": {"name": "Politica", "emoji": "#", "category": "politica"},
+        "3": {"name": "Deportes", "emoji": "*", "category": "deportes"},
+        "4": {"name": "Tecnologia", "emoji": "@", "category": "tecnologia"},
+        "5": {"name": "Entretenimiento", "emoji": "+", "category": "entretenimiento"},
     }
 
     def __init__(self, db_repository=None, settings=None):
@@ -29,7 +28,7 @@ class TelegramHandler:
         """Procesa mensaje entrante."""
 
         if not update.message:
-            return
+            return None
 
         text = update.message.text.strip().upper()
         chat_id = str(update.message.chat.id)
@@ -53,17 +52,16 @@ class TelegramHandler:
         return await self._handle_selection(update, context, chat_id, text)
 
     async def _handle_start(self, update, context) -> str:
-        text = "📰 *NewsDaily Bolivia* 🇧🇴\n\n"
+        text = "*NewsDaily Bolivia*\n\n"
         text += "Resumen de noticias diarias de Bolivia\n\n"
-        text += "Selecciona las categorías que te interesan:"
+        text += "Selecciona las categorias que te interesan:"
 
         await update.message.reply_text(text, parse_mode="Markdown")
         await self._show_categories(update)
-
         return text
 
-    async def _show_categories(self, update):
-        """Muestra botones de categorías."""
+    async def _show_categories(self, update) -> None:
+        """Muestra botones de categorias."""
 
         try:
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -75,15 +73,17 @@ class TelegramHandler:
             keyboard.append(
                 [
                     InlineKeyboardButton(
-                        f"{cat['emoji']} {cat['name']}", callback_data=f"cat_{key}"
+                        f"{cat['emoji']} {cat['name']}",
+                        callback_data=f"cat_{key}",
                     )
                 ]
             )
-        keyboard.append([InlineKeyboardButton("✅ Todas", callback_data="cat_todas")])
+        keyboard.append([InlineKeyboardButton("Todas", callback_data="cat_todas")])
 
         with suppress(Exception):
             await update.message.reply_text(
-                "Selecciona:", reply_markup=InlineKeyboardMarkup(keyboard)
+                "Selecciona:",
+                reply_markup=InlineKeyboardMarkup(keyboard),
             )
 
     async def _handle_preferences(self, update, context) -> str:
@@ -96,14 +96,14 @@ class TelegramHandler:
             await self.db.unsubscribe(chat_id)
 
         await update.message.reply_text(
-            "✅ Te has dado de baja.\n\nPara volver: /preferencias"
+            "Te has dado de baja. Para volver: /preferencias"
         )
         return "Dado de baja"
 
     async def _handle_help(self, update, context) -> str:
-        text = "📖 *Ayuda*\n\n"
-        text += "/start - Iniciar suscripción\n"
-        text += "/preferencias - Cambiar categorías\n"
+        text = "*Ayuda*\n\n"
+        text += "/start - Iniciar suscripcion\n"
+        text += "/preferencias - Cambiar categorias\n"
         text += "/cancelar - Darse de baja\n"
         text += "/ayuda - Ver ayuda"
 
@@ -111,44 +111,47 @@ class TelegramHandler:
         return text
 
     async def _handle_selection(self, update, context, chat_id: str, text: str) -> str:
-        """Procesa selección de categorías."""
+        """Procesa seleccion de categorias."""
 
         import re
 
-        numbers = re.findall(r"\d+", text)
+        selected_keys = {
+            number
+            for number in re.findall(r"\d+", text)
+            if number in self.CATEGORIES or number == "6"
+        }
 
-        valid = set()
-        for n in numbers:
-            if n in self.CATEGORIES or n == "6":
-                valid.add(n)
+        if not selected_keys:
+            await update.message.reply_text("Seleccion invalida. Usa /preferencias")
+            return "Seleccion invalida"
 
-        if not valid:
-            await update.message.reply_text("Selección inválida. Usa /preferencias")
-            return None
+        if "6" in selected_keys:
+            selected_keys = set(self.CATEGORIES.keys())
 
-        categories = set(self.CATEGORIES.keys()) if "6" in valid else valid
+        categories = {self.CATEGORIES[key]["category"] for key in selected_keys}
 
         if self.db:
             await self.db.save_subscription(
-                telegram_id=chat_id, channel="telegram", categories=categories
+                telegram_id=chat_id,
+                channel="telegram",
+                categories=categories,
             )
 
-        names = []
-        for c in categories:
-            if c in self.CATEGORIES:
-                cat = self.CATEGORIES[c]
-                names.append(f"{cat['emoji']} {cat['name']}")
+        names = [
+            f"{self.CATEGORIES[key]['emoji']} {self.CATEGORIES[key]['name']}"
+            for key in sorted(selected_keys)
+        ]
 
-        text = "✅ *¡Guardado!*\n\n"
-        text += "Te enviaré de:\n"
+        text = "*Guardado!*\n\n"
+        text += "Te enviare resumenes de:\n"
         for name in names:
-            text += f"• {name}\n"
+            text += f"- {name}\n"
 
         await update.message.reply_text(text, parse_mode="Markdown")
-        return "Suscripción guardada"
+        return "Suscripcion guardada"
 
     async def send_message(self, chat_id: str, message: str) -> bool:
-        """Envía mensaje."""
+        """Envia mensaje."""
 
         if not self.app:
             logger.warning(f"Telegram no configurado. Mensaje: {message[:50]}...")
@@ -156,7 +159,9 @@ class TelegramHandler:
 
         try:
             await self.app.bot.send_message(
-                chat_id=chat_id, text=message, parse_mode="Markdown"
+                chat_id=chat_id,
+                text=message,
+                parse_mode="Markdown",
             )
             logger.info(f"Telegram mensaje enviado a {chat_id}")
             return True
@@ -165,7 +170,7 @@ class TelegramHandler:
             return False
 
     async def send_daily_summary(self, chat_id: str, news: list[dict]) -> bool:
-        """Envía el resumen diario."""
+        """Envia el resumen diario."""
 
         message = self._format_summary(news)
         return await self.send_message(chat_id, message)
@@ -173,16 +178,15 @@ class TelegramHandler:
     def _format_summary(self, news: list[dict]) -> str:
         """Formatea el resumen para Telegram."""
 
-        text = "📰 *Resumen de Hoy* 🇧🇴\n\n"
+        text = "*Resumen de Hoy - Bolivia*\n\n"
 
         for i, article in enumerate(news[:10], 1):
             text += f"{i}. *{article.get('title', '')}*\n"
             text += f"   {article.get('summary', '')}\n"
             if article.get("fact"):
-                text += f"   📌 {article.get('fact')}\n"
+                text += f"   Dato: {article.get('fact')}\n"
             text += "\n"
 
         text += "---\n"
-        text += "📍 /preferencias | /cancelar"
-
+        text += "/preferencias | /cancelar"
         return text

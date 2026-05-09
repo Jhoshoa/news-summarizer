@@ -1,3 +1,4 @@
+import asyncio
 
 from loguru import logger
 
@@ -6,11 +7,11 @@ class WhatsAppHandler:
     """Maneja mensajes de WhatsApp via Twilio."""
 
     CATEGORIES = {
-        "1": {"name": "Economía", "emoji": "💰"},
-        "2": {"name": "Política", "emoji": "🏛️"},
-        "3": {"name": "Deportes", "emoji": "⚽"},
-        "4": {"name": "Tecnología", "emoji": "💻"},
-        "5": {"name": "Entretenimiento", "emoji": "🎬"},
+        "1": {"name": "Economia", "emoji": "$", "category": "economia"},
+        "2": {"name": "Politica", "emoji": "#", "category": "politica"},
+        "3": {"name": "Deportes", "emoji": "*", "category": "deportes"},
+        "4": {"name": "Tecnologia", "emoji": "@", "category": "tecnologia"},
+        "5": {"name": "Entretenimiento", "emoji": "+", "category": "entretenimiento"},
     }
 
     def __init__(self, db_repository=None, settings=None):
@@ -27,15 +28,17 @@ class WhatsAppHandler:
                 )
                 logger.info("WhatsApp handler inicializado con Twilio")
             except ImportError:
-                logger.warning("Twilio no está instalado")
+                logger.warning("Twilio no esta instalado")
         else:
             logger.info("WhatsApp handler inicializado sin Twilio (modo desarrollo)")
 
     def handle_message(self, from_number: str, body: str) -> str | None:
         """Procesa mensaje entrante."""
 
-        body = body.strip().upper()
+        if not body:
+            return self._handle_help(from_number)
 
+        body = body.strip().upper()
         handlers = {
             "HOLA": self._handle_start,
             "HI": self._handle_start,
@@ -43,10 +46,16 @@ class WhatsAppHandler:
             "INICIO": self._handle_start,
             "/PREFERENCIAS": self._handle_preferences,
             "/PREFERENCIA": self._handle_preferences,
+            "PREFERENCIAS": self._handle_preferences,
+            "PREFERENCIA": self._handle_preferences,
             "/CANCELAR": self._handle_cancel,
             "/BAJA": self._handle_cancel,
+            "CANCELAR": self._handle_cancel,
+            "BAJA": self._handle_cancel,
             "/AYUDA": self._handle_help,
             "/HELP": self._handle_help,
+            "AYUDA": self._handle_help,
+            "HELP": self._handle_help,
         }
 
         handler = handlers.get(body)
@@ -56,17 +65,16 @@ class WhatsAppHandler:
         return self._handle_selection(from_number, body)
 
     def _handle_start(self, from_number: str) -> str:
-        text = "📰 *NewsDaily Bolivia* 🇧🇴\n\n"
+        text = "*NewsDaily Bolivia*\n\n"
         text += "Resumen de noticias diarias de Bolivia\n\n"
-        text += "Selecciona las categorías que te interesan:\n\n"
+        text += "Selecciona las categorias que te interesan:\n\n"
 
         for key, cat in self.CATEGORIES.items():
-            text += f"{key}️⃣ {cat['emoji']} {cat['name']}\n"
+            text += f"{key}. {cat['emoji']} {cat['name']}\n"
 
-        text += "\n6️⃣ *Todas*\n\n"
-        text += "Responde con los números (ej: *1,3* o *1 3*)\n"
-        text += "O envíe *6* para todas las categorías"
-
+        text += "\n6. Todas\n\n"
+        text += "Responde con los numeros, por ejemplo: 1,3 o 1 3\n"
+        text += "Envia 6 para todas las categorias"
         return text
 
     def _handle_preferences(self, from_number: str) -> str:
@@ -74,65 +82,63 @@ class WhatsAppHandler:
 
     def _handle_cancel(self, from_number: str) -> str:
         if self.db:
-            import asyncio
-
             asyncio.create_task(self.db.unsubscribe(from_number))
 
-        return "✅ Te has dado de baja.\n\nPara volver a suscribirte: envíe *Hola*"
+        return "Te has dado de baja. Para volver a suscribirte, envia Hola."
 
     def _handle_help(self, from_number: str) -> str:
-        text = "📖 *Ayuda*\n\n"
-        text += "*Hola* - Iniciar suscripción\n"
-        text += "*1,2,3...* - Seleccionar categorías\n"
-        text += "*6* - Todas las categorías\n"
-        text += "*preferencias* - Cambiar categorías\n"
-        text += "*cancelar* - Darse de baja\n"
-        text += "*ayuda* - Ver esta ayuda"
-
+        text = "*Ayuda*\n\n"
+        text += "Hola - Iniciar suscripcion\n"
+        text += "1,2,3... - Seleccionar categorias\n"
+        text += "6 - Todas las categorias\n"
+        text += "preferencias - Cambiar categorias\n"
+        text += "cancelar - Darse de baja\n"
+        text += "ayuda - Ver esta ayuda"
         return text
 
     def _handle_selection(self, from_number: str, body: str) -> str:
         import re
 
-        numbers = re.findall(r"\d+", body)
+        selected_keys = {
+            number
+            for number in re.findall(r"\d+", body)
+            if number in self.CATEGORIES or number == "6"
+        }
 
-        valid = set()
-        for n in numbers:
-            if n in self.CATEGORIES or n == "6":
-                valid.add(n)
+        if not selected_keys:
+            return "Seleccion invalida. Envia preferencias para ver opciones."
 
-        if not valid:
-            return "❌ Selección inválida. Envíe *preferencias* para ver opciones."
+        if "6" in selected_keys:
+            selected_keys = set(self.CATEGORIES.keys())
 
-        categories = set(self.CATEGORIES.keys()) if "6" in valid else valid
+        categories = {self.CATEGORIES[key]["category"] for key in selected_keys}
 
         if self.db:
-            import asyncio
-
             asyncio.create_task(
                 self.db.save_subscription(
-                    phone=from_number, channel="whatsapp", categories=categories
+                    phone=from_number,
+                    channel="whatsapp",
+                    categories=categories,
                 )
             )
 
-        names = []
-        for c in categories:
-            if c in self.CATEGORIES:
-                cat = self.CATEGORIES[c]
-                names.append(f"{cat['emoji']} {cat['name']}")
+        names = [
+            f"{self.CATEGORIES[key]['emoji']} {self.CATEGORIES[key]['name']}"
+            for key in sorted(selected_keys)
+        ]
 
-        text = "✅ *¡Guardado!*\n\n"
-        text += "Te enviaré resúmenes de:\n"
+        text = "*Guardado!*\n\n"
+        text += "Te enviare resumenes de:\n"
         for name in names:
-            text += f"• {name}\n"
+            text += f"- {name}\n"
 
         if self.settings:
-            text += f"\n🕐 *Horario:* {self.settings.schedule_summary_morning}"
+            text += f"\nHorario: {self.settings.schedule_summary_morning}"
 
         return text
 
     def send_message(self, to: str, message: str) -> bool:
-        """Envía mensaje de WhatsApp."""
+        """Envia mensaje de WhatsApp."""
 
         if not self.client:
             logger.warning(
@@ -157,7 +163,7 @@ class WhatsAppHandler:
             return False
 
     def send_daily_summary(self, to: str, news: list[dict]) -> bool:
-        """Envía el resumen diario."""
+        """Envia el resumen diario."""
 
         message = self._format_summary(news)
         return self.send_message(to, message)
@@ -165,16 +171,15 @@ class WhatsAppHandler:
     def _format_summary(self, news: list[dict]) -> str:
         """Formatea el resumen para WhatsApp."""
 
-        text = "📰 *Resumen de Hoy* 🇧🇴\n\n"
+        text = "*Resumen de Hoy - Bolivia*\n\n"
 
         for i, article in enumerate(news[:10], 1):
             text += f"{i}. *{article.get('title', '')}*\n"
             text += f"   {article.get('summary', '')}\n"
             if article.get("fact"):
-                text += f"   📌 {article.get('fact')}\n"
+                text += f"   Dato: {article.get('fact')}\n"
             text += "\n"
 
         text += "---\n"
-        text += "📍 *preferencias* | *cancelar*"
-
+        text += "preferencias | cancelar"
         return text

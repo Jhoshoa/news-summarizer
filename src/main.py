@@ -55,7 +55,11 @@ class NewsSummarizerApp:
             logger.info("Modo producción")
 
         try:
-            self.db = Database(self.settings.database_url)
+            self.db = Database(
+                self.settings.database_url,
+                pool_size=self.settings.database_pool_size,
+                max_overflow=self.settings.database_max_overflow,
+            )
             await self.db.init_db()
         except Exception as e:
             logger.warning(f"DB no disponible: {e}. Continuando sin DB.")
