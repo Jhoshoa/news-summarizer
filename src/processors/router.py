@@ -1,5 +1,4 @@
-from datetime import datetime, timedelta
-from typing import Optional
+from datetime import datetime
 
 from loguru import logger
 
@@ -80,7 +79,7 @@ class NewsRanker:
                 published_at = datetime.fromisoformat(
                     published_at.replace("Z", "+00:00")
                 )
-            except:
+            except ValueError:
                 return 0.5
 
         if not isinstance(published_at, datetime):

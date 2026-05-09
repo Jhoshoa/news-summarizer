@@ -1,9 +1,8 @@
 import hashlib
 import re
 import unicodedata
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from datetime import datetime
-from typing import Optional
 
 from loguru import logger
 
@@ -55,25 +54,30 @@ class Deduplicator:
             best_match = None
 
             for idx, seen in enumerate(seen_titles):
-                similarity = SequenceMatcher(None, title_norm, seen).ratio()
+                similarity = SequenceMatcher(None, title_norm, seen["title"]).ratio()
                 if similarity >= self.threshold:
                     is_duplicate = True
-                    if article.get("published_at"):
-                        if (
-                            not seen_titles[idx].get("_latest_time")
-                            or article["published_at"]
-                            > seen_titles[idx]["_latest_time"]
-                        ):
-                            best_match = idx
+                    if article.get("published_at") and (
+                        not seen.get("published_at")
+                        or self._is_newer(article["published_at"], seen["published_at"])
+                    ):
+                        best_match = idx
                     break
 
             if is_duplicate and best_match is not None:
-                seen_titles[best_match] = title_norm
-                seen_titles[best_match]["_latest_time"] = article.get("published_at")
+                seen_titles[best_match] = {
+                    "title": title_norm,
+                    "published_at": article.get("published_at"),
+                }
                 unique[best_match] = article
             elif not is_duplicate:
                 unique.append(article)
-                seen_titles.append(title_norm)
+                seen_titles.append(
+                    {
+                        "title": title_norm,
+                        "published_at": article.get("published_at"),
+                    }
+                )
 
         return unique
 
@@ -87,3 +91,11 @@ class Deduplicator:
         text = re.sub(r"\s+", " ", text).strip()
 
         return text
+
+    def _is_newer(self, candidate: datetime, current: datetime) -> bool:
+        if candidate.tzinfo and not current.tzinfo:
+            current = current.replace(tzinfo=UTC)
+        elif current.tzinfo and not candidate.tzinfo:
+            candidate = candidate.replace(tzinfo=UTC)
+
+        return candidate > current

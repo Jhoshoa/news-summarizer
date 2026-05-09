@@ -1,4 +1,6 @@
-from typing import Optional
+
+from contextlib import suppress
+
 from loguru import logger
 
 
@@ -23,7 +25,7 @@ class TelegramHandler:
         else:
             logger.info("Telegram handler inicializado sin token (modo desarrollo)")
 
-    async def handle_message(self, update, context) -> Optional[str]:
+    async def handle_message(self, update, context) -> str | None:
         """Procesa mensaje entrante."""
 
         if not update.message:
@@ -79,12 +81,10 @@ class TelegramHandler:
             )
         keyboard.append([InlineKeyboardButton("✅ Todas", callback_data="cat_todas")])
 
-        try:
+        with suppress(Exception):
             await update.message.reply_text(
                 "Selecciona:", reply_markup=InlineKeyboardMarkup(keyboard)
             )
-        except:
-            pass
 
     async def _handle_preferences(self, update, context) -> str:
         await self._show_categories(update)
@@ -126,10 +126,7 @@ class TelegramHandler:
             await update.message.reply_text("Selección inválida. Usa /preferencias")
             return None
 
-        if "6" in valid:
-            categories = set(self.CATEGORIES.keys())
-        else:
-            categories = valid
+        categories = set(self.CATEGORIES.keys()) if "6" in valid else valid
 
         if self.db:
             await self.db.save_subscription(

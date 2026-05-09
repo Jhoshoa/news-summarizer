@@ -1,14 +1,14 @@
 from src.collectors import NewsAPICollector, NewsScraper
+from src.db import Database
+from src.distributors import TelegramHandler, WhatsAppHandler
+from src.llm import LLMProvider
 from src.processors import (
     Deduplicator,
     NewsClassifier,
     NewsRanker,
-    NewsSummarizer,
     NewsRewriter,
+    NewsSummarizer,
 )
-from src.distributors import WhatsAppHandler, TelegramHandler
-from src.db import Database
-from src.llm import LLMProvider
 from src.scheduler import NewsScheduler
 
 __all__ = [

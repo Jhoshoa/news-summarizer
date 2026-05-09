@@ -1,17 +1,17 @@
 import asyncio
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from loguru import logger
-import sys
 
-from src.config import Settings, get_settings
-from src.llm import LLMProvider
-from src.db import Database
 from src.collectors import NewsAPICollector, NewsScraper
-from src.processors import Deduplicator, NewsClassifier, NewsRanker, NewsSummarizer, NewsRewriter
-from src.distributors import WhatsAppHandler, TelegramHandler
+from src.config import Settings, get_settings
+from src.db import Database
+from src.distributors import TelegramHandler, WhatsAppHandler
+from src.llm import LLMProvider
+from src.processors import Deduplicator, NewsClassifier, NewsRanker, NewsRewriter, NewsSummarizer
 from src.scheduler import NewsScheduler
 
 
@@ -51,7 +51,6 @@ class NewsSummarizerApp:
         logger.info("=" * 50)
 
         if self.settings.is_production:
-            from gunicorn.app.base import Application
 
             logger.info("Modo producción")
 
@@ -96,6 +95,7 @@ class NewsSummarizerApp:
         logger.info(f"Generando resúmenes ({time_of_day})...")
 
         news = []
+        sent_count = 0
 
         if self.settings.scraper_enabled:
             try:
@@ -104,13 +104,8 @@ class NewsSummarizerApp:
                     timeout=self.settings.scraper_timeout,
                     config_path=self.settings.scraper_config_path,
                 )
-                print(self.settings.categories_list)
-                print(self.settings.scraper_user_agent)
-                print(self.settings.scraper_timeout)
                 scraped = await scraper.fetch_all(categories=self.settings.categories_list)
                 news.extend(scraped)
-                print("===================>>>>>>>>>>>>>>>>>>>>>>>>>>")
-                print(scraped)
                 logger.info(f"Scraped {len(scraped)} noticias")
                 logger.info(f"News sample: {scraped[:2]}")
             except Exception as e:
@@ -135,7 +130,7 @@ class NewsSummarizerApp:
         logger.info(f"Total news collected: {len(news)}")
         if not news:
             logger.warning("No hay noticias para procesar")
-            return
+            return {"collected": 0, "summaries": 0, "sent": 0}
 
         deduplicator = Deduplicator()
         news = deduplicator.deduplicate(news)
@@ -148,7 +143,7 @@ class NewsSummarizerApp:
 
         if not self.llm:
             logger.error("No hay LLM para resumir")
-            return
+            return {"collected": len(news), "summaries": 0, "sent": 0}
 
         summarizer = NewsSummarizer(self.llm)
         summaries = []
@@ -171,14 +166,14 @@ class NewsSummarizerApp:
 
         if not self.db:
             logger.warning("DB no disponible, no se envía nada")
-            return
+            return {"collected": len(news), "summaries": len(summaries), "sent": 0}
 
         logger.info(f"Checking subscribers... DB: {self.db}")
         try:
             subscribers = await self.db.get_active_subscribers()
         except Exception as e:
             logger.error(f"Error obtaining subscribers: {e}")
-            return
+            return {"collected": len(news), "summaries": len(summaries), "sent": 0}
 
         logger.info(f"Active subscribers: {len(subscribers)}")
 
@@ -194,14 +189,18 @@ class NewsSummarizerApp:
 
                 if sub.channel == "whatsapp" and sub.phone:
                     self.whatsapp.send_message(sub.phone, message)
+                    sent_count += 1
                 elif sub.channel == "telegram" and sub.telegram_id:
                     await self.telegram.send_message(sub.telegram_id, message)
+                    sent_count += 1
             except Exception as e:
                 logger.error(f"Error enviando a {sub}: {e}")
 
         logger.info(f"Resúmenes procesados: {len(summaries)}")
         if summaries:
             logger.info(f"Sample summary: {summaries[0]}")
+
+        return {"collected": len(news), "summaries": len(summaries), "sent": sent_count}
 
     def _format_summary(self, news: list[dict]) -> str:
         """Formatea el resumen para envío."""
@@ -285,11 +284,15 @@ async def trigger_summary(time_of_day: str = "manual"):
         raise HTTPException(status_code=500, detail="App no inicializada")
 
     try:
-        await app_instance.send_summaries(time_of_day)
-        return {"status": "success", "message": f"Resumen {time_of_day} enviado"}
+        result = await app_instance.send_summaries(time_of_day)
+        return {
+            "status": "success",
+            "message": f"Resumen {time_of_day} procesado",
+            "result": result,
+        }
     except Exception as e:
         logger.error(f"Error-trigger: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/stats")
@@ -302,7 +305,7 @@ async def get_stats():
     try:
         count = await app_instance.db.get_subscription_count()
         return {"subscribers": count}
-    except:
+    except Exception:
         return {"subscribers": 0}
 
 

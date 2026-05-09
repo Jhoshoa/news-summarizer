@@ -1,19 +1,20 @@
 from datetime import datetime
-from typing import Optional
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    JSON,
-    DateTime,
-    Boolean,
-    select,
-    update as sql_update,
-)
 
 from loguru import logger
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    select,
+)
+from sqlalchemy import (
+    update as sql_update,
+)
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
 
@@ -43,7 +44,7 @@ class Database:
         self.session_maker = sessionmaker(
             self.engine, class_=AsyncSession, expire_on_commit=False
         )
-        logger.info(f"Database inicializada")
+        logger.info("Database inicializada")
 
     async def init_db(self):
         """Crea las tablas."""
@@ -53,8 +54,8 @@ class Database:
 
     async def save_subscription(
         self,
-        phone: Optional[str] = None,
-        telegram_id: Optional[str] = None,
+        phone: str | None = None,
+        telegram_id: str | None = None,
         channel: str = "whatsapp",
         categories: set = None,
     ) -> bool:
@@ -100,13 +101,13 @@ class Database:
         """Obtiene todos los subscribers activos."""
 
         async with self.session_maker() as session:
-            stmt = select(Subscriber).where(Subscriber.is_active == True)
+            stmt = select(Subscriber).where(Subscriber.is_active)
             result = await session.execute(stmt)
             subscribers = list(result.scalars().all())
             logger.info(f"Obtenidos {len(subscribers)} subscribers activos")
             return subscribers
 
-    async def get_subscriber_by_phone(self, phone: str) -> Optional[Subscriber]:
+    async def get_subscriber_by_phone(self, phone: str) -> Subscriber | None:
         """Obtiene un subscriber por teléfono."""
 
         async with self.session_maker() as session:
@@ -116,7 +117,7 @@ class Database:
 
     async def get_subscriber_by_telegram(
         self, telegram_id: str
-    ) -> Optional[Subscriber]:
+    ) -> Subscriber | None:
         """Obtiene un subscriber por telegram ID."""
 
         async with self.session_maker() as session:
@@ -145,7 +146,7 @@ class Database:
         """Cuenta subscribers activos."""
 
         async with self.session_maker() as session:
-            stmt = select(Subscriber).where(Subscriber.is_active == True)
+            stmt = select(Subscriber).where(Subscriber.is_active)
             result = await session.execute(stmt)
             return len(list(result.scalars().all()))
 

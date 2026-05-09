@@ -1,33 +1,33 @@
-from typing import Optional
+import unicodedata
 
 from loguru import logger
 
 
 class NewsClassifier:
-    """Clasifica noticias por categoría usando keywords o IA."""
+    """Clasifica noticias por categoria usando keywords o IA."""
 
     CATEGORIES = {
         "economia": [
             "bolsa",
             "acciones",
-            "dólar",
+            "dolar",
             "peso",
-            "inflación",
+            "inflacion",
             "banco",
             "tasa",
             "crecimiento",
-            "PIB",
+            "pib",
             "trade",
-            "economía",
+            "economia",
             "finanzas",
             "mercado",
-            "inversión",
-            "bursátil",
+            "inversion",
+            "bursatil",
             "accionista",
-            " Bolívar ",
+            "bolivar",
             "sus",
             "ventas",
-            "exportación",
+            "exportacion",
         ],
         "politica": [
             "gobierno",
@@ -36,23 +36,21 @@ class NewsClassifier:
             "presidente",
             "ministro",
             "elecciones",
-            "votación",
+            "votacion",
             "partido",
-            "político",
+            "politico",
             "senado",
-            "cámara",
+            "camara",
             "legislativo",
-            "política",
+            "politica",
             "diputado",
-            "asambleísta",
-            "MAS",
-            "CC",
-            "Bolivia",
-            " Arce ",
-            " Luis ",
+            "asambleista",
+            "mas",
+            "cc",
+            "arce",
+            "luis",
         ],
         "deportes": [
-            "fútbol",
             "futbol",
             "liga",
             "copa",
@@ -61,13 +59,13 @@ class NewsClassifier:
             "equipo",
             "jugador",
             "torneo",
-            "títulos",
+            "titulos",
             "deporte",
             "deportes",
             "nba",
             "fifa",
             "mundial",
-            "selección",
+            "seleccion",
             "liga profesional",
             "club",
             "partido",
@@ -80,11 +78,11 @@ class NewsClassifier:
             "startup",
             "app",
             "inteligencia artificial",
-            "IA ",
+            "ia",
             "software",
             "digital",
-            "innovación",
-            "tecnología",
+            "innovacion",
+            "tecnologia",
             "google",
             "apple",
             "microsoft",
@@ -98,8 +96,8 @@ class NewsClassifier:
         ],
         "entretenimiento": [
             "cine",
-            "música",
-            "película",
+            "musica",
+            "pelicula",
             "serie",
             "actor",
             "actriz",
@@ -110,7 +108,6 @@ class NewsClassifier:
             "netflix",
             "hollywood",
             "estreno",
-            "música",
             "cantante",
             "video",
             "festival",
@@ -124,17 +121,17 @@ class NewsClassifier:
         self.llm = llm_provider
 
     def classify(self, article: dict) -> str:
-        """Clasifica por keywords (método rápido)."""
+        """Clasifica por keywords."""
 
-        title = article.get("title", "").lower()
-        description = article.get("description", "").lower()
-        source = article.get("source", "").lower()
+        title = self._normalize(article.get("title", ""))
+        description = self._normalize(article.get("description", ""))
+        source = self._normalize(article.get("source", ""))
         text = f"{title} {description} {source}"
 
         category_scores = {}
 
         for category, keywords in self.CATEGORIES.items():
-            score = sum(1 for kw in keywords if kw.lower() in text)
+            score = sum(1 for kw in keywords if kw in text)
             if score > 0:
                 category_scores[category] = score
 
@@ -145,38 +142,42 @@ class NewsClassifier:
             )
             return best_category
 
+        existing_category = self._normalize(article.get("category", "general"))
+        if existing_category in self.CATEGORIES:
+            return existing_category
+
         return "general"
 
     async def classify_with_ai(self, article: dict) -> str:
-        """Clasifica con IA cuando hay duda o para mejor precisión."""
+        """Clasifica con IA cuando hay duda o para mejor precision."""
 
         if not self.llm:
             return self.classify(article)
 
-        prompt = f"""Clasifica esta noticia en UNA sola categoría.
+        prompt = f"""Clasifica esta noticia en UNA sola categoria.
 
-Título: {article.get("title")}
-Descripción: {article.get("description", "")[:200]}
+Titulo: {article.get("title")}
+Descripcion: {article.get("description", "")[:200]}
 
-Categorías disponibles: economia, politica, deportes, tecnologia, entretenimiento, general
+Categorias disponibles: economia, politica, deportes, tecnologia, entretenimiento, general
 
-Responde SOLO con el nombre de la categoría (una palabra)."""
+Responde SOLO con el nombre de la categoria (una palabra)."""
 
         try:
             result = await self.llm.chat(prompt, quality="fast")
-            category = result.strip().lower()
+            category = self._normalize(result.strip())
 
             valid_categories = list(self.CATEGORIES.keys()) + ["general"]
             if category in valid_categories:
                 logger.debug(
-                    f"IA clasificó como '{category}': {article.get('title', '')[:50]}"
+                    f"IA clasifico como '{category}': {article.get('title', '')[:50]}"
                 )
                 return category
 
             return "general"
 
         except Exception as e:
-            logger.error(f"Error en clasificación IA: {e}")
+            logger.error(f"Error en clasificacion IA: {e}")
             return self.classify(article)
 
     def classify_batch(self, news: list[dict]) -> list[dict]:
@@ -186,3 +187,9 @@ Responde SOLO con el nombre de la categoría (una palabra)."""
             article["category"] = self.classify(article)
 
         return news
+
+    def _normalize(self, text: object) -> str:
+        normalized = unicodedata.normalize("NFD", str(text).lower())
+        return "".join(
+            char for char in normalized if unicodedata.category(char) != "Mn"
+        )

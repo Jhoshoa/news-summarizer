@@ -1,4 +1,4 @@
-from typing import Optional
+
 from loguru import logger
 
 
@@ -31,7 +31,7 @@ class WhatsAppHandler:
         else:
             logger.info("WhatsApp handler inicializado sin Twilio (modo desarrollo)")
 
-    def handle_message(self, from_number: str, body: str) -> Optional[str]:
+    def handle_message(self, from_number: str, body: str) -> str | None:
         """Procesa mensaje entrante."""
 
         body = body.strip().upper()
@@ -63,7 +63,7 @@ class WhatsAppHandler:
         for key, cat in self.CATEGORIES.items():
             text += f"{key}️⃣ {cat['emoji']} {cat['name']}\n"
 
-        text += f"\n6️⃣ *Todas*\n\n"
+        text += "\n6️⃣ *Todas*\n\n"
         text += "Responde con los números (ej: *1,3* o *1 3*)\n"
         text += "O envíe *6* para todas las categorías"
 
@@ -104,10 +104,7 @@ class WhatsAppHandler:
         if not valid:
             return "❌ Selección inválida. Envíe *preferencias* para ver opciones."
 
-        if "6" in valid:
-            categories = set(self.CATEGORIES.keys())
-        else:
-            categories = valid
+        categories = set(self.CATEGORIES.keys()) if "6" in valid else valid
 
         if self.db:
             import asyncio

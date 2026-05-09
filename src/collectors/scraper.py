@@ -1,15 +1,13 @@
-import httpx
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
 import hashlib
 import re
+from dataclasses import dataclass
+from datetime import datetime
+from urllib.parse import urljoin
 
-
+import httpx
+import yaml
 from bs4 import BeautifulSoup
 from loguru import logger
-import yaml
-from pathlib import Path
 
 
 @dataclass
@@ -116,7 +114,7 @@ class NewsScraper:
 
     def _load_sources_from_config(self, config_path: str):
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
 
             if config and "sources" in config:
@@ -130,15 +128,13 @@ class NewsScraper:
     async def fetch_all(self, categories: list[str] = None) -> list[dict]:
         results = []
 
-        timeout = httpx.Timeout(10.0, connect=5.0)
+        timeout = httpx.Timeout(float(self.timeout), connect=min(10.0, float(self.timeout)))
         async with httpx.AsyncClient(
             headers={"User-Agent": self.user_agent},
             timeout=timeout,
             follow_redirects=True,
         ) as client:
             for source in self.sources:
-                if categories and source.category not in categories:
-                    continue
                 try:
                     news = await self._scrape_source(client, source)
                     results.extend(news)
@@ -167,17 +163,17 @@ class NewsScraper:
                 logger.warning(
                     f"No articles found for {source.name}. HTML length: {len(html)}. Checking selectors: {source.selector}"
                 )
+                articles = self._extract_links_fallback(soup, source)
             return articles
         except Exception as e:
             logger.error(f"Error fetching {source.name}: {e}")
             return []
 
-    def _extract_article(self, article_soup, source: NewsSource) -> Optional[dict]:
+    def _extract_article(self, article_soup, source: NewsSource) -> dict | None:
         try:
             title_elem = article_soup.select_one(source.title_selector)
-            print("------------------------->>>>>>>>>>>>>>>>---------------")
-            print(source.title_selector)
-            print(title_elem)
+            if not title_elem and article_soup.name == "a":
+                title_elem = article_soup
             if not title_elem:
                 return None
             title = title_elem.get_text(strip=True)
@@ -206,6 +202,58 @@ class NewsScraper:
             logger.warning(f"Error extracting article: {e}")
             return None
 
+    def _extract_links_fallback(self, soup: BeautifulSoup, source: NewsSource) -> list[dict]:
+        articles = []
+        seen_urls = set()
+
+        for link in soup.select("a[href]"):
+            title = link.get_text(" ", strip=True)
+            if not title or len(title) < 20:
+                continue
+
+            url = urljoin(source.url, link.get("href", ""))
+            if not self._looks_like_article_url(url, source) or url in seen_urls:
+                continue
+
+            seen_urls.add(url)
+            articles.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "source": source.name,
+                    "category": source.category,
+                    "country": source.country,
+                    "published_at": datetime.now(),
+                    "image": None,
+                    "hash": hashlib.md5(url.encode()).hexdigest(),
+                }
+            )
+
+        logger.info(f"Fallback extracted {len(articles)} noticias de {source.name}")
+        return articles
+
+    def _looks_like_article_url(self, url: str, source: NewsSource) -> bool:
+        if not url.startswith(source.url.rstrip("/")):
+            return False
+
+        blocked_fragments = (
+            "/tag/",
+            "/category/",
+            "/categoria/",
+            "/author/",
+            "/page/",
+            "facebook.com",
+            "instagram.com",
+            "twitter.com",
+            "youtube.com",
+            "tiktok.com",
+        )
+        if any(fragment in url for fragment in blocked_fragments):
+            return False
+
+        path = url.removeprefix(source.url.rstrip("/")).strip("/")
+        return bool(path and len(path) > 8)
+
     def _extract_url(self, article_soup, source: NewsSource) -> str:
         url = ""
         if source.url_selector:
@@ -218,8 +266,8 @@ class NewsScraper:
             title_elem = article_soup.select_one(source.title_selector)
             if title_elem:
                 url = title_elem.get("href", "")
-        if url and not url.startswith("http"):
-            url = source.url.rstrip("/") + url
+        if url:
+            url = urljoin(source.url, url)
         return url
 
     def _extract_date(self, article_soup, source: NewsSource) -> datetime:
@@ -236,18 +284,19 @@ class NewsScraper:
             date_text = date_elem.get_text(strip=True)
         return self._parse_date(date_text)
 
-    def _extract_image(self, article_soup, source: NewsSource) -> Optional[str]:
+    def _extract_image(self, article_soup, source: NewsSource) -> str | None:
         if not source.image_selector:
             return None
         image_elem = article_soup.select_one(source.image_selector)
         if not image_elem:
             return None
-        return (
+        image_url = (
             image_elem.get("src")
             or image_elem.get("data-src")
             or image_elem.get("data-lazy-src")
             or (image_elem.get("srcset", "").split()[0] if image_elem.get("srcset") else None)
         )
+        return urljoin(source.url, image_url) if image_url else None
 
     def _extract_category(self, article_soup, source: NewsSource) -> str:
         if source.category_selector:
@@ -269,7 +318,7 @@ class NewsScraper:
 
         try:
             return parser.parse(date_text, fuzzy=True)
-        except:
+        except Exception:
             return datetime.now()
 
     def _deduplicate(self, news: list[dict]) -> list[dict]:

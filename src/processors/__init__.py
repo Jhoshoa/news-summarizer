@@ -1,8 +1,8 @@
-from .deduplicator import Deduplicator
 from .classifier import NewsClassifier
+from .deduplicator import Deduplicator
 from .ranker import NewsRanker
-from .summarizer import NewsSummarizer
 from .rewriter import NewsRewriter
+from .summarizer import NewsSummarizer
 
 __all__ = [
     "Deduplicator",

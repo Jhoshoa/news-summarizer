@@ -1,7 +1,7 @@
 import asyncio
-from typing import Optional
-from openai import AsyncOpenAI
+
 from loguru import logger
+from openai import AsyncOpenAI
 
 
 class LLMProvider:
@@ -48,7 +48,7 @@ class LLMProvider:
         self,
         prompt: str,
         quality: str = "balanced",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.3,
         max_tokens: int = 4000,
     ) -> str:
@@ -81,7 +81,7 @@ class LLMProvider:
         self,
         prompts: list[str],
         quality: str = "balanced",
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.3,
     ) -> list[str]:
         """Múltiples prompts en paralelo."""
