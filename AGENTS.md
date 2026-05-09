@@ -12,7 +12,7 @@ This Python 3.11+ FastAPI service collects, summarizes, and distributes Bolivian
 - `playwright install chromium`: install the browser for scraping workflows.
 - `python -m src.main`: run the FastAPI app locally.
 - `uvicorn src.main:app --reload`: run with reload at `http://localhost:8000`.
-- `docker-compose up -d`: start Postgres and Redis.
+- `docker-compose up -d`: start Postgres.
 - `pytest`: run the test suite.
 - `ruff check src tests`: lint source and tests.
 - `mypy src`: run static type checks.

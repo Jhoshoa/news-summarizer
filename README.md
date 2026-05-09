@@ -17,7 +17,7 @@ FastAPI service that collects Bolivian news, summarizes it with an LLM, and can 
 - Groq or OpenAI API key for summaries
 - NewsAPI key if you want the NewsAPI collector enabled
 - PostgreSQL only when you want subscriptions and delivery
-- Redis is configured but not required for the current manual summary flow
+- Redis is not used by the current application flow
 
 ## Setup
 
@@ -201,6 +201,18 @@ Without PostgreSQL:
 - `/stats` returns `0`.
 - Delivery is skipped.
 
+## Redis
+
+Redis is intentionally not part of the current setup. The app handles on-demand summary generation through FastAPI and stores subscribers in PostgreSQL, so Redis would not add value right now.
+
+Redis could become useful later if the app adds:
+
+- background job queues for long summary runs
+- rate limiting for public webhooks
+- distributed scheduler locks across multiple app instances
+- cached article fetches to reduce repeated scraping
+- short-lived state for multi-step chat conversations
+
 ## Project Structure
 
 ```text
@@ -248,5 +260,6 @@ Check:
 ## Notes
 
 - Playwright is no longer part of the current runtime setup.
+- Redis is not required unless future queueing, caching, rate limiting, or distributed scheduling is added.
 - `requirements-dev.txt` is optional and exists for linting, typing, tests, and local development checks.
 - Do not commit real `.env` secrets.

@@ -53,8 +53,6 @@ class Settings(BaseSettings):
     database_pool_size: int = Field(default=10, alias="DATABASE_POOL_SIZE")
     database_max_overflow: int = Field(default=20, alias="DATABASE_MAX_OVERFLOW")
 
-    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
-
     schedule_timezone: str = Field(default="America/La_Paz", alias="SCHEDULE_TIMEZONE")
     schedule_summary_morning: str = Field(default="08:00", alias="SCHEDULE_SUMMARY_MORNING")
     schedule_summary_evening: str = Field(default="18:00", alias="SCHEDULE_SUMMARY_EVENING")
