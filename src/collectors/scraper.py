@@ -358,7 +358,7 @@ class NewsScraper:
             if len(content) > len(best_content):
                 best_content = content
 
-        fallback_content = self._extract_readable_text_fallback(soup)
+        fallback_content = self._extract_readable_text_fallback(soup, source)
         if self._count_words(fallback_content) > self._count_words(best_content):
             return fallback_content
 
@@ -405,7 +405,7 @@ class NewsScraper:
             for item in data:
                 yield from self._iter_json_ld_nodes(item)
 
-    def _extract_readable_text_fallback(self, soup: BeautifulSoup) -> str:
+    def _extract_readable_text_fallback(self, soup: BeautifulSoup, source: NewsSource) -> str:
         for excluded in soup.select(self.BODY_EXCLUDE_SELECTOR):
             excluded.decompose()
 
@@ -423,15 +423,24 @@ class NewsScraper:
             return ""
 
         body_lines = []
+        skip_next_line = False
         for line in lines[title_index + 1 :]:
             normalized = self._normalize_text_for_filtering(line)
 
-            if self._is_article_stop_line(normalized):
+            if skip_next_line:
+                skip_next_line = False
+                continue
+            if "te puede interesar" in normalized:
+                skip_next_line = True
+                continue
+            if self._is_article_stop_line(normalized, source):
                 break
             if self._is_noise_line(normalized):
                 continue
             if len(line) < 35:
                 continue
+            if body_lines and self._looks_like_new_article_title(line, source):
+                break
 
             body_lines.append(line)
 
@@ -445,18 +454,34 @@ class NewsScraper:
                 return index
         return None
 
-    def _is_article_stop_line(self, normalized: str) -> bool:
+    def _is_article_stop_line(self, normalized: str, source: NewsSource) -> bool:
         stop_markers = (
             "recibe las noticias",
             "ultimas noticias",
             "últimas noticias",
-            "tambien te puede interesar",
-            "también te puede interesar",
             "siga unitel",
             "sobre unitel",
             "noticias relacionadas",
-            "te puede interesar",
+            "comentarios",
+            "mas leidas",
+            "más leídas",
+            "mas noticias",
+            "más noticias",
+            "programacion",
+            "programación",
+            "temas relacionados",
+            "seguinos en",
+            "terminos y condiciones",
+            "términos y condiciones",
+            "politica de privacidad",
+            "política de privacidad",
         )
+        if source.name.lower() not in {"reduno", "red uno"}:
+            stop_markers += (
+                "tambien te puede interesar",
+                "también te puede interesar",
+                "te puede interesar",
+            )
         return any(marker in normalized for marker in stop_markers)
 
     def _is_noise_line(self, normalized: str) -> bool:
@@ -471,12 +496,26 @@ class NewsScraper:
             "unitel digital",
             "mira aqui",
             "mira aquí",
+            "te puede interesar",
             "direccion de correo",
             "dirección de correo",
             "indica que es obligatorio",
             "real people should not fill",
+            "publicidad",
+            "escuchar esta nota",
+            "mira la programacion",
+            "mira la programación",
         )
         return any(marker in normalized for marker in noise_markers)
+
+    def _looks_like_new_article_title(self, line: str, source: NewsSource) -> bool:
+        if source.name.lower() not in {"redbolivision", "red bolivision"}:
+            return False
+
+        if len(line) > 160:
+            return False
+
+        return not line.endswith((".", ",", ";", ":"))
 
     def _normalize_text_for_filtering(self, text: str) -> str:
         return text.lower().strip()

@@ -12,7 +12,7 @@ sources:
     url_selector: "a.post-link, a"
     date_selector: ".post-date, .date, time"
     image_selector: "img"
-    body_selector: ".entry-content, .post-content, article .content, article p"
+    body_selector: "article .entry-content p, article .post-content p, .entry-content p, .post-content p, article p"
     enabled: true
     
   # Unitel
@@ -39,7 +39,7 @@ sources:
     date_selector: "input.nota_fecha_input"
     date_attr: "data-fecha-a"
     image_selector: "figure.nota__media img"
-    body_selector: "article p, main p, .nota__body p, .nota-contenido p, .nota__content p"
+    body_selector: "main article p, article p, .nota__body p, .nota-contenido p, .nota__content p, .content_nota p"
     category_selector: "div.volanta span"
     category_link_selector: "div.volanta a"
     enabled: true
@@ -54,7 +54,7 @@ sources:
     url_selector: "a"
     date_selector: ".fecha, time"
     image_selector: "img"
-    body_selector: "article p, main p, .entry-content p, .post-content p"
+    body_selector: "article .entry-content p, article .post-content p, .entry-content p, .post-content p, article p, main p"
     enabled: true
 
 # Fuentes adicionales (opcionales)

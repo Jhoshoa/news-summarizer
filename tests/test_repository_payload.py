@@ -56,3 +56,36 @@ def test_summary_row_to_dict_includes_joined_article_source_and_url():
     assert result["source"] == "Example News"
     assert result["url"] == "https://example.com/noticia"
     assert result["article_title"] == "Titulo original"
+
+
+def test_coerce_score_preserves_float_values():
+    db = object.__new__(Database)
+
+    assert db._coerce_score("0.885") == 0.885
+    assert db._coerce_score(0.72) == 0.72
+    assert db._coerce_score(None) == 0.0
+    assert db._coerce_score("not-a-number") == 0.0
+
+
+def test_article_row_to_dict_preserves_float_score():
+    db = object.__new__(Database)
+    article = SimpleNamespace(
+        id=1,
+        title="Titulo",
+        url="https://example.com",
+        description=None,
+        content=None,
+        author=None,
+        image_url=None,
+        published_at=datetime(2026, 5, 10, 12, 0),
+        collected_at=datetime(2026, 5, 10, 12, 1),
+        country="bolivia",
+        url_hash="abc",
+        score=0.885,
+        raw_payload={"score": 0.885},
+    )
+
+    result = db._article_row_to_dict((article, "politica", "Example", "scraper"))
+
+    assert result["score"] == 0.885
+    assert result["raw_payload"]["score"] == 0.885

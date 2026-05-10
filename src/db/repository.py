@@ -10,6 +10,7 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -109,7 +110,7 @@ class NewsArticle(Base):
     published_at = Column(DateTime, nullable=False, index=True)
     collected_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
     raw_payload = Column(JSON, nullable=False, default=dict)
-    score = Column(Integer, nullable=False, default=0)
+    score = Column(Float, nullable=False, default=0.0)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(
@@ -348,7 +349,7 @@ class Database:
                 existing = await self._get_article_by_hash(session, url_hash)
                 payload = self._normalize_payload(article)
                 published_at = self._coerce_datetime(article.get("published_at"))
-                score = int(article.get("score") or 0)
+                score = self._coerce_score(article.get("score"))
 
                 if existing:
                     article["id"] = existing.id
@@ -629,6 +630,12 @@ class Database:
         if isinstance(value, datetime):
             return value.replace(tzinfo=None) if value.tzinfo else value
         return datetime.now()
+
+    def _coerce_score(self, value: Any) -> float:
+        try:
+            return float(value or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
 
     def _article_row_to_dict(self, row: Any) -> dict:
         article, category_name, source_name, source_type = row
