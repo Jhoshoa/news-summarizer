@@ -263,6 +263,7 @@ p {
 .market,
 .mini-indicator,
 .news-card,
+.summary-card,
 .departments-card,
 .weather-card,
 .side-card,
@@ -335,11 +336,16 @@ p {
   gap: 10px;
 }
 
-.news-card {
+.news-card,
+.summary-card {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
   gap: 14px;
   padding: 12px;
+}
+
+.news-card:has(.article-image),
+.summary-card:has(.article-image) {
+  grid-template-columns: 112px minmax(0, 1fr);
 }
 
 .article-image.compact {
@@ -355,15 +361,51 @@ p {
   object-fit: cover;
 }
 
-.news-card h3 {
+.news-card h3,
+.summary-card h3 {
   margin-top: 5px;
   font-size: 1.45rem;
 }
 
-.news-card p {
+.news-card p,
+.summary-card p {
   margin-top: 9px;
   color: #46372d;
   font-size: 0.86rem;
+}
+
+.published-date {
+  display: block;
+  margin-top: 5px;
+  color: #655243;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.detail-date {
+  margin-top: 8px;
+  font-size: 0.86rem;
+}
+
+.summary-card {
+  background: #eadbc5;
+}
+
+.summary-card small,
+.ai-summary small {
+  display: block;
+  margin-top: 8px;
+  color: #655243;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.section-label {
+  color: #00746b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .departments-card,
@@ -421,10 +463,66 @@ p {
   gap: 22px;
 }
 
+.news-browser {
+  display: grid;
+  gap: 18px;
+}
+
+.browser-heading {
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+}
+
+.browser-heading h1 {
+  font-size: clamp(2.2rem, 5vw, 4rem);
+}
+
+.browser-heading p {
+  color: #46372d;
+}
+
+.category-tabs,
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.category-tabs a,
+.pagination a,
+.pagination span {
+  border: 1px solid rgba(38, 24, 15, 0.14);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(251, 247, 239, 0.76);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.category-tabs a.active,
+.pagination a:not(.disabled):hover {
+  color: #fff;
+  background: #00746b;
+}
+
+.pagination a.disabled {
+  pointer-events: none;
+  opacity: 0.42;
+}
+
+.archive-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .detail-article h1 {
   max-width: 720px;
   margin-top: 4px;
-  font-size: clamp(2.6rem, 5vw, 4.45rem);
+  font-size: clamp(2rem, 3.6vw, 3.15rem);
+  line-height: 1.04;
 }
 
 .detail-article .article-image {
@@ -526,11 +624,16 @@ p {
     grid-template-columns: 1fr;
   }
 
-  .news-card {
+  .news-card:has(.article-image),
+  .summary-card:has(.article-image) {
     grid-template-columns: 90px minmax(0, 1fr);
   }
 
+  .archive-list {
+    grid-template-columns: 1fr;
+  }
+
   .detail-article h1 {
-    font-size: 2.45rem;
+    font-size: 2rem;
   }
 }

@@ -5,10 +5,12 @@ import { mockArticles } from "../data/mockNews";
 import {
   useGetArticleByIdQuery,
   useGetEconomicIndicatorsQuery,
+  useGetSummariesQuery,
   useGetWeatherQuery,
   useRefreshEconomicIndicatorsMutation,
 } from "../services/api";
 import { findByExactCode, findIndicator, formatNumber } from "../components/indicators/indicatorUtils";
+import { formatPublishedDate } from "../utils/date";
 
 const getArticleIdFromPath = () => {
   const parts = window.location.pathname.split("/").filter(Boolean);
@@ -19,12 +21,17 @@ const getArticleIdFromPath = () => {
 export const ArticleDetailPage = () => {
   const articleId = getArticleIdFromPath();
   const { data: articleData } = useGetArticleByIdQuery(articleId ?? 1, { skip: articleId === null });
+  const { data: summaryData } = useGetSummariesQuery(
+    articleId ? { article_id: articleId, page_size: 1 } : undefined,
+    { skip: articleId === null },
+  );
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather } = useGetWeatherQuery();
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
 
   const indicators = indicatorsData?.items ?? [];
   const article = articleData ?? mockArticles.find((item) => item.id === articleId) ?? mockArticles[1];
+  const relatedSummary = summaryData?.items[0];
   const officialBuy = findByExactCode(indicators, "bcb_tipo_de_cambio_compra")?.value;
   const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
   const referenceBuy = findByExactCode(
@@ -55,12 +62,16 @@ export const ArticleDetailPage = () => {
       <section className="detail-layout">
         <article className="detail-article">
           <span className="eyebrow">Detalle - {article.category}</span>
+          <time className="published-date detail-date" dateTime={article.published_at}>
+            {formatPublishedDate(article.published_at)}
+          </time>
           <h1>{article.title}</h1>
           <ArticleImage image={article.image} alt={article.title} />
 
           <section className="ai-summary">
             <div className="panel-title">Resumen IA</div>
-            <p>{article.description || article.content}</p>
+            <p>{relatedSummary?.summary || article.description || article.content}</p>
+            {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
           </section>
 
           <p>

@@ -14,6 +14,7 @@ export const Header = ({ compact = false, isRefreshing = false, onRefresh }: Hea
     </a>
     <nav className="nav" aria-label="Navegacion principal">
       <a href="#ultimo">Ultimo</a>
+      <a href="/news">Noticias</a>
       <a href="#indicadores">Indicadores</a>
       {!compact && <a href="#departamentos">Departamentos</a>}
       <a href="#clima">Clima</a>

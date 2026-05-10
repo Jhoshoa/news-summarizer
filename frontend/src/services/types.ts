@@ -57,6 +57,14 @@ export type WeatherLocationsResponse = {
   items: WeatherLocation[];
 };
 
+export type PaginatedResponse<T> = {
+  items: T[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
 export type Article = {
   id: number;
   title: string;
@@ -81,4 +89,9 @@ export type Summary = {
   source?: string | null;
   url?: string | null;
   article_title?: string | null;
+  article_description?: string | null;
+  published_at?: string | null;
+  image?: string | null;
+  summary_date?: string | null;
+  created_at?: string | null;
 };

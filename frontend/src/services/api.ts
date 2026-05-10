@@ -3,6 +3,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
   Article,
   EconomicIndicatorsResponse,
+  PaginatedResponse,
   Summary,
   WeatherLocationsResponse,
   WeatherResponse,
@@ -14,7 +15,19 @@ type GetIndicatorsArgs = {
 
 type GetArticlesArgs = {
   category?: string;
+  source?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
   limit?: number;
+};
+
+type GetSummariesArgs = {
+  category?: string;
+  date?: string;
+  article_id?: number;
+  page?: number;
+  page_size?: number;
 };
 
 export const newsApi = createApi({
@@ -49,12 +62,15 @@ export const newsApi = createApi({
       query: () => "/api/weather/locations",
       providesTags: ["Weather"],
     }),
-    getArticles: builder.query<Article[], GetArticlesArgs | void>({
+    getArticles: builder.query<PaginatedResponse<Article>, GetArticlesArgs | void>({
       query: (args) => ({
         url: "/api/articles",
         params: {
           category: args?.category,
-          limit: args?.limit ?? 20,
+          source: args?.source,
+          q: args?.q,
+          page: args?.page ?? 1,
+          page_size: args?.page_size ?? args?.limit ?? 20,
         },
       }),
       providesTags: ["Articles"],
@@ -63,10 +79,16 @@ export const newsApi = createApi({
       query: (id) => `/api/articles/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Articles", id }],
     }),
-    getSummaries: builder.query<Summary[], { category?: string } | void>({
+    getSummaries: builder.query<PaginatedResponse<Summary>, GetSummariesArgs | void>({
       query: (args) => ({
         url: "/api/summaries",
-        params: args?.category ? { category: args.category } : undefined,
+        params: {
+          category: args?.category,
+          date: args?.date,
+          article_id: args?.article_id,
+          page: args?.page ?? 1,
+          page_size: args?.page_size ?? 20,
+        },
       }),
       providesTags: ["Summaries"],
     }),

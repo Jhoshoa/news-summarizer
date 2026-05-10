@@ -421,6 +421,75 @@ class Database:
 
         return [self._article_row_to_dict(row) for row in rows]
 
+    async def list_articles(
+        self,
+        *,
+        category: str | None = None,
+        source: str | None = None,
+        q: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        offset = (page - 1) * page_size
+
+        filters = [NewsArticle.is_active.is_(True)]
+        if category:
+            filters.append(NewsCategory.name == category.strip().lower())
+        if source:
+            filters.append(func.lower(NewsSource.name) == source.strip().lower())
+        if q:
+            term = f"%{q.strip()}%"
+            filters.append(
+                or_(
+                    NewsArticle.title.ilike(term),
+                    NewsArticle.description.ilike(term),
+                    NewsArticle.content.ilike(term),
+                )
+            )
+
+        async with self.session_maker() as session:
+            total_stmt = (
+                select(func.count(NewsArticle.id))
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(*filters)
+            )
+            total = int(await session.scalar(total_stmt) or 0)
+
+            stmt = (
+                select(NewsArticle, NewsCategory.name, NewsSource.name, NewsSource.source_type)
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(*filters)
+                .order_by(NewsArticle.published_at.desc(), NewsArticle.collected_at.desc())
+                .offset(offset)
+                .limit(page_size)
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+
+        return self._paginated_response(
+            items=[self._article_row_to_dict(row) for row in rows],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    async def get_article_by_id(self, article_id: int) -> dict | None:
+        async with self.session_maker() as session:
+            stmt = (
+                select(NewsArticle, NewsCategory.name, NewsSource.name, NewsSource.source_type)
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(NewsArticle.id == article_id, NewsArticle.is_active.is_(True))
+            )
+            result = await session.execute(stmt)
+            row = result.first()
+
+        return self._article_row_to_dict(row) if row else None
+
     async def save_summaries(
         self,
         summaries: list[dict],
@@ -508,6 +577,88 @@ class Database:
             rows = result.all()
 
         return [self._summary_row_to_dict(row) for row in rows]
+
+    async def list_summaries(
+        self,
+        *,
+        category: str | None = None,
+        summary_date: date | None = None,
+        article_id: int | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        page = max(page, 1)
+        page_size = min(max(page_size, 1), 100)
+        offset = (page - 1) * page_size
+        summary_date = summary_date or date.today()
+
+        filters = [NewsSummary.summary_date == summary_date]
+        if category:
+            filters.append(NewsCategory.name == category.strip().lower())
+        if article_id is not None:
+            filters.append(NewsSummary.article_id == article_id)
+
+        async with self.session_maker() as session:
+            total_stmt = (
+                select(func.count(NewsSummary.id))
+                .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+                .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
+                .outerjoin(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(*filters)
+            )
+            total = int(await session.scalar(total_stmt) or 0)
+
+            stmt = (
+                select(
+                    NewsSummary,
+                    NewsCategory.name,
+                    NewsArticle.url,
+                    NewsArticle.title,
+                    NewsSource.name,
+                    NewsArticle.published_at,
+                    NewsArticle.image_url,
+                    NewsArticle.description,
+                )
+                .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+                .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
+                .outerjoin(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(*filters)
+                .order_by(NewsArticle.published_at.desc(), NewsSummary.created_at.desc())
+                .offset(offset)
+                .limit(page_size)
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+
+        return self._paginated_response(
+            items=[self._summary_row_to_dict(row) for row in rows],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    async def get_summary_by_id(self, summary_id: int) -> dict | None:
+        async with self.session_maker() as session:
+            stmt = (
+                select(
+                    NewsSummary,
+                    NewsCategory.name,
+                    NewsArticle.url,
+                    NewsArticle.title,
+                    NewsSource.name,
+                    NewsArticle.published_at,
+                    NewsArticle.image_url,
+                    NewsArticle.description,
+                )
+                .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+                .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
+                .outerjoin(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(NewsSummary.id == summary_id)
+            )
+            result = await session.execute(stmt)
+            row = result.first()
+
+        return self._summary_row_to_dict(row) if row else None
 
     async def close(self):
         """Cierra el pool de conexiones."""
@@ -646,7 +797,7 @@ class Database:
             "description": article.description,
             "content": article.content,
             "author": article.author,
-            "image": article.image_url,
+            "image": self._public_image_url(article.image_url),
             "published_at": article.published_at,
             "collected_at": article.collected_at,
             "source": source_name,
@@ -664,6 +815,9 @@ class Database:
         article_url = row[2] if len(row) > 2 else None
         article_title = row[3] if len(row) > 3 else None
         source_name = row[4] if len(row) > 4 else None
+        published_at = row[5] if len(row) > 5 else None
+        image_url = self._public_image_url(row[6] if len(row) > 6 else None)
+        article_description = row[7] if len(row) > 7 else None
         return {
             "id": summary.id,
             "article_id": summary.article_id,
@@ -674,10 +828,46 @@ class Database:
             "source": source_name,
             "url": article_url,
             "article_title": article_title,
+            "published_at": published_at,
+            "image": image_url,
+            "article_description": article_description,
             "llm_provider": summary.llm_provider,
             "llm_model": summary.llm_model,
             "summary_date": summary.summary_date,
             "created_at": summary.created_at,
+        }
+
+    def _public_image_url(self, value: str | None) -> str | None:
+        if not value:
+            return None
+
+        image_url = value.strip()
+        normalized = image_url.lower()
+        blocked_hosts = ("tracker.metricool.com",)
+        blocked_patterns = ("/c3po.jpg", "pixel", "tracker", "analytics")
+
+        if any(host in normalized for host in blocked_hosts):
+            return None
+        if any(pattern in normalized for pattern in blocked_patterns):
+            return None
+
+        return image_url
+
+    def _paginated_response(
+        self,
+        *,
+        items: list[dict],
+        total: int,
+        page: int,
+        page_size: int,
+    ) -> dict[str, Any]:
+        total_pages = (total + page_size - 1) // page_size if total else 0
+        return {
+            "items": items,
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "total_pages": total_pages,
         }
 
     async def _find_subscriber(

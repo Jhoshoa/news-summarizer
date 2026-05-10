@@ -6,6 +6,7 @@ import { SecondaryIndicators } from "../components/indicators/SecondaryIndicator
 import { AppShell } from "../components/layout/AppShell";
 import { NewsCard } from "../components/news/NewsCard";
 import { PhoneBrief } from "../components/news/PhoneBrief";
+import { SummaryCard } from "../components/news/SummaryCard";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
 import { departments, mockArticles, mockSummaries } from "../data/mockNews";
 import {
@@ -24,13 +25,14 @@ export const HomePage = () => {
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
 
   const indicators = indicatorsData?.items ?? [];
-  const articles = articlesData?.length ? articlesData : mockArticles;
-  const summaries = summariesData?.length ? summariesData : mockSummaries;
+  const articles = articlesData?.items.length ? articlesData.items : mockArticles;
+  const summaries = summariesData?.items.length ? summariesData.items : mockSummaries;
   const headline = summaries[0]?.title ?? "Bolivia en titulares, contexto y datos locales";
   const p2pBuy = formatNumber(findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value);
   const p2pSell = formatNumber(findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value);
 
   const featuredArticles = useMemo(() => articles.slice(0, 3), [articles]);
+  const featuredSummaries = useMemo(() => summaries.slice(0, 3), [summaries]);
 
   const handleRefresh = () => {
     void refreshIndicators();
@@ -60,7 +62,12 @@ export const HomePage = () => {
 
           <section className="lower-grid">
             <div className="news-list">
-              {featuredArticles.map((article) => (
+              <div className="section-label">Resumenes IA</div>
+              {featuredSummaries.map((summary) => (
+                <SummaryCard key={summary.id ?? summary.title} summary={summary} />
+              ))}
+              <div className="section-label">Mas noticias</div>
+              {featuredArticles.slice(0, 2).map((article) => (
                 <NewsCard key={article.id} article={article} />
               ))}
             </div>
