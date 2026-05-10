@@ -15,9 +15,8 @@ export const Header = ({ compact = false, isRefreshing = false, onRefresh }: Hea
     <nav className="nav" aria-label="Navegacion principal">
       <a href="#ultimo">Ultimo</a>
       <a href="/news">Noticias</a>
-      <a href="#indicadores">Indicadores</a>
+      <a href="/datos">Datos</a>
       {!compact && <a href="#departamentos">Departamentos</a>}
-      <a href="#clima">Clima</a>
       <button className="button" type="button" onClick={onRefresh} disabled={isRefreshing}>
         {isRefreshing ? "Actualizando" : "Actualizar"}
       </button>
