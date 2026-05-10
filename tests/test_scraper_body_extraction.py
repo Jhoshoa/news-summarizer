@@ -107,6 +107,25 @@ def test_extract_body_content_uses_json_ld_article_body_before_css():
     assert "Segundo parrafo desde JSON-LD" in content
 
 
+def test_clean_text_decodes_entities_tags_spacing_and_mojibake():
+    scraper = NewsScraper(sources=[])
+
+    content = scraper._clean_text(
+        "El pa&iacute;s anunci&oacute; &lt;b&gt;nuevas medidas&lt;/b&gt; "
+        "para la ni&#241;ez y la educaci&#xF3;n.&nbsp;&amp;oacute; "
+        "La pol\u00c3\u00adtica incluy\u00c3\u00b3 "
+        "\u00e2\u20ac\u0153di\u00c3\u00a1logo\u00e2\u20ac\u009d.\u200b"
+    )
+
+    assert content == (
+        'El país anunció nuevas medidas para la niñez y la educación. ó '
+        'La política incluyó "diálogo".'
+    )
+    assert "&" not in content
+    assert "<b>" not in content
+    assert "\u200b" not in content
+
+
 def test_extract_body_content_uses_readable_text_fallback_after_title():
     scraper = NewsScraper(sources=[])
     source = NewsSource(
@@ -176,6 +195,92 @@ def test_reduno_fallback_skips_related_blocks_but_keeps_later_body():
     assert "Los manifestantes defendieron" in content
     assert "Multisectores se suman" not in content
     assert "Mas leidas" not in content
+
+
+def test_reduno_listing_extracts_current_article_card_markup():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedUno",
+        url="https://www.reduno.com.bo/noticias/nacionales",
+        selector="article.nota, article.nota_gen, article.nota--general",
+        title_selector="div.titulo a, h2 a, h2",
+        url_selector="div.titulo a",
+        date_selector="input.nota_fecha_input",
+        date_attr="data-fecha-a",
+        image_selector="figure.nota__media img",
+    )
+    soup = BeautifulSoup(
+        """
+        <article class="nota nota--general nota_gen">
+          <div class="volanta"><a>Nacionales</a></div>
+          <figure class="nota__media">
+            <img src="/uploads/reduno.jpg" />
+          </figure>
+          <div class="titulo">
+            <a href="/noticias/magisterio-ratifica-paro-2026510124459">
+              Magisterio Urbano y Rural ratifican el paro de 24 y 48 horas
+            </a>
+          </div>
+          <input class="nota_fecha_input" data-fecha-a="10/05/2026 12:44" />
+        </article>
+        """,
+        "lxml",
+    )
+
+    article = scraper._extract_article(soup.select_one("article"), source)
+
+    assert article["source"] == "RedUno"
+    assert article["title"] == "Magisterio Urbano y Rural ratifican el paro de 24 y 48 horas"
+    assert article["url"] == (
+        "https://www.reduno.com.bo/noticias/magisterio-ratifica-paro-2026510124459"
+    )
+    assert article["image"] == "https://www.reduno.com.bo/uploads/reduno.jpg"
+
+
+def test_reduno_link_fallback_accepts_articles_below_category_path():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedUno",
+        url="https://www.reduno.com.bo/noticias/nacionales",
+    )
+
+    assert scraper._looks_like_article_url(
+        "https://www.reduno.com.bo/noticias/magisterio-ratifica-paro-2026510124459",
+        source,
+    )
+    assert not scraper._looks_like_article_url(
+        "https://www.reduno.com.bo/noticias/nacionales",
+        source,
+    )
+
+
+def test_extract_article_cleans_title_and_category_text():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Example",
+        url="https://example.com/",
+        title_selector="h2 a",
+        url_selector="h2 a",
+        category_selector=".category",
+    )
+    soup = BeautifulSoup(
+        """
+        <article>
+          <span class="category">Pol&iacute;tica&nbsp;nacional</span>
+          <h2>
+            <a href="/news/1">
+              Gobierno anunci&oacute; &lt;b&gt;nuevas medidas&lt;/b&gt; para el pa&iacute;s
+            </a>
+          </h2>
+        </article>
+        """,
+        "lxml",
+    )
+
+    article = scraper._extract_article(soup.select_one("article"), source)
+
+    assert article["title"] == "Gobierno anunció nuevas medidas para el país"
+    assert article["category"] == "Política nacional"
 
 
 def test_radio_fides_fallback_extracts_article_until_dateline():

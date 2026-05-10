@@ -5,7 +5,8 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from difflib import SequenceMatcher
-from urllib.parse import urljoin
+from html import unescape
+from urllib.parse import urljoin, urlparse
 
 import httpx
 import yaml
@@ -217,7 +218,7 @@ class NewsScraper:
                 title_elem = article_soup
             if not title_elem:
                 return None
-            title = title_elem.get_text(strip=True)
+            title = self._clean_text(title_elem.get_text(" ", strip=True))
             if not title or len(title) < 10:
                 return None
 
@@ -250,7 +251,7 @@ class NewsScraper:
         seen_urls = set()
 
         for link in soup.select("a[href]"):
-            title = link.get_text(" ", strip=True)
+            title = self._clean_text(link.get_text(" ", strip=True))
             if not title or len(title) < 20:
                 continue
 
@@ -600,8 +601,60 @@ class NewsScraper:
         return "\n\n".join(paragraphs)
 
     def _clean_text(self, text: str) -> str:
-        text = re.sub(r"\s+", " ", text or "").strip()
+        text = str(text or "")
+        for _ in range(3):
+            unescaped = unescape(text)
+            if unescaped == text:
+                break
+            text = unescaped
+
+        text = self._fix_mojibake(text)
+        if re.search(r"</?[a-zA-Z][^>]*>", text):
+            text = BeautifulSoup(text, "html.parser").get_text(" ", strip=True)
+
+        text = text.replace("\xa0", " ")
+        text = text.replace("\u00ad", "")
+        text = re.sub(r"[\u200b-\u200d\ufeff]", "", text)
+        text = re.sub(r"\s+", " ", text).strip()
         return text
+
+    def _fix_mojibake(self, text: str) -> str:
+        if not any(marker in text for marker in ("Ã", "Â", "â")):
+            return text
+
+        replacements = {
+            "â€œ": '"',
+            "â€\x9d": '"',
+            "â€˜": "'",
+            "â€™": "'",
+            "â€“": "-",
+            "â€”": "-",
+            "â€¦": "...",
+            "Â": "",
+        }
+        candidate = text
+        for broken, fixed_value in replacements.items():
+            candidate = candidate.replace(broken, fixed_value)
+        candidate = re.sub(
+            r"Ã([\x80-\xbf])",
+            lambda match: bytes((0xC3, ord(match.group(1)))).decode("utf-8"),
+            candidate,
+        )
+
+        fixed = None
+        for encoding in ("latin1", "cp1252"):
+            try:
+                fixed = candidate.encode(encoding).decode("utf-8")
+                break
+            except UnicodeError:
+                continue
+
+        if fixed is None:
+            fixed = candidate
+
+        original_markers = sum(text.count(marker) for marker in ("Ã", "Â", "â"))
+        fixed_markers = sum(fixed.count(marker) for marker in ("Ã", "Â", "â"))
+        return fixed if fixed_markers < original_markers else text
 
     def _count_words(self, text: str | None) -> int:
         if not text:
@@ -617,7 +670,10 @@ class NewsScraper:
         return f"{truncated}..."
 
     def _looks_like_article_url(self, url: str, source: NewsSource) -> bool:
-        if not url.startswith(source.url.rstrip("/")):
+        parsed_url = urlparse(url)
+        parsed_source = urlparse(source.url)
+
+        if parsed_url.netloc != parsed_source.netloc:
             return False
 
         blocked_fragments = (
@@ -635,7 +691,11 @@ class NewsScraper:
         if any(fragment in url for fragment in blocked_fragments):
             return False
 
-        path = url.removeprefix(source.url.rstrip("/")).strip("/")
+        path = parsed_url.path.strip("/")
+        source_path = parsed_source.path.strip("/")
+        if source_path and path == source_path:
+            return False
+
         return bool(path and len(path) > 8)
 
     def _extract_url(self, article_soup, source: NewsSource) -> str:
@@ -701,7 +761,7 @@ class NewsScraper:
         if source.category_selector:
             cat_elem = article_soup.select_one(source.category_selector)
             if cat_elem:
-                return cat_elem.get_text(strip=True)
+                return self._clean_text(cat_elem.get_text(" ", strip=True))
         return source.category
 
     def _parse_date(self, date_text: str) -> datetime:
