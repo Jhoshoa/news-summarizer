@@ -1,0 +1,126 @@
+import { AppShell } from "../components/layout/AppShell";
+import { ArticleImage } from "../components/news/ArticleImage";
+import { WeatherPanel } from "../components/weather/WeatherPanel";
+import { mockArticles } from "../data/mockNews";
+import {
+  useGetArticleByIdQuery,
+  useGetEconomicIndicatorsQuery,
+  useGetWeatherQuery,
+  useRefreshEconomicIndicatorsMutation,
+} from "../services/api";
+import { findByExactCode, findIndicator, formatNumber } from "../components/indicators/indicatorUtils";
+
+const getArticleIdFromPath = () => {
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  const id = Number(parts[parts.length - 1]);
+  return Number.isFinite(id) ? id : null;
+};
+
+export const ArticleDetailPage = () => {
+  const articleId = getArticleIdFromPath();
+  const { data: articleData } = useGetArticleByIdQuery(articleId ?? 1, { skip: articleId === null });
+  const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
+  const { data: weather } = useGetWeatherQuery();
+  const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
+
+  const indicators = indicatorsData?.items ?? [];
+  const article = articleData ?? mockArticles.find((item) => item.id === articleId) ?? mockArticles[1];
+  const officialBuy = findByExactCode(indicators, "bcb_tipo_de_cambio_compra")?.value;
+  const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
+  const referenceBuy = findByExactCode(
+    indicators,
+    "bcb_valor_referencial_del_dolar_estadounidense_compra",
+  )?.value;
+  const referenceSell = findByExactCode(
+    indicators,
+    "bcb_valor_referencial_del_dolar_estadounidense_venta",
+  )?.value;
+  const p2pBuy = findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value;
+  const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
+  const ufv = findIndicator(indicators, ["ufv"]);
+  const gold = findIndicator(indicators, ["oro"]);
+  const treMn = findIndicator(indicators, ["tre", "mn"]);
+  const treMe = findIndicator(indicators, ["tre", "me"]);
+
+  const handleRefresh = () => {
+    void refreshIndicators();
+  };
+
+  return (
+    <AppShell
+      compactHeader
+      isRefreshing={isRefreshing || isFetchingIndicators}
+      onRefresh={handleRefresh}
+    >
+      <section className="detail-layout">
+        <article className="detail-article">
+          <span className="eyebrow">Detalle - {article.category}</span>
+          <h1>{article.title}</h1>
+          <ArticleImage image={article.image} alt={article.title} />
+
+          <section className="ai-summary">
+            <div className="panel-title">Resumen IA</div>
+            <p>{article.description || article.content}</p>
+          </section>
+
+          <p>
+            El detalle menciona el articulo completo con fuente, fecha de publicacion y fecha de
+            recoleccion. La experiencia permite comparar el resumen con el texto extraido.
+          </p>
+          <p>
+            Los modulos laterales agregan contexto corto pero valioso: compra y venta del dolar,
+            valor UFV, oro, tasas TRE, clima local y radiacion solar.
+          </p>
+        </article>
+
+        <aside className="detail-sidebar">
+          <section className="side-card">
+            <div className="panel-title">Dolar hoy</div>
+            <dl className="side-values">
+              <div>
+                <dt>Oficial C/V</dt>
+                <dd>
+                  {formatNumber(officialBuy)} / {formatNumber(officialSell)}
+                </dd>
+              </div>
+              <div>
+                <dt>Referencial C/V</dt>
+                <dd>
+                  {formatNumber(referenceBuy)} / {formatNumber(referenceSell)}
+                </dd>
+              </div>
+              <div>
+                <dt>P2P C/V</dt>
+                <dd>
+                  {formatNumber(p2pBuy)} / {formatNumber(p2pSell)}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="side-card">
+            <div className="panel-title">BCB clave</div>
+            <dl className="side-values">
+              <div>
+                <dt>UFV</dt>
+                <dd>{formatNumber(ufv?.value, 5)}</dd>
+              </div>
+              <div>
+                <dt>Oro USD/O.T.F.</dt>
+                <dd>{formatNumber(gold?.value, 2)}</dd>
+              </div>
+              <div>
+                <dt>TRe MN / ME</dt>
+                <dd>
+                  {formatNumber(treMn?.value, 2)} / {formatNumber(treMe?.value, 2)}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <WeatherPanel weather={weather} />
+        </aside>
+      </section>
+    </AppShell>
+  );
+};
