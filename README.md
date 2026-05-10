@@ -7,6 +7,7 @@ FastAPI service that collects Bolivian news, summarizes it with an LLM, and can 
 - Collects news from Bolivian sites listed in `config/sources.yaml`.
 - Uses `httpx + BeautifulSoup + lxml` for scraping. Playwright is not required for the current scraper.
 - Uses NewsAPI as an additional source. Because NewsAPI does not reliably support Bolivia through `top-headlines`, the app falls back to `/v2/everything` searches for Bolivia-related articles.
+- Reuses cached articles and cached summaries from Postgres before collecting again.
 - Deduplicates, classifies, ranks, summarizes, and optionally rewrites news before delivery.
 - Runs without PostgreSQL. Database failures are logged and the API continues.
 - Requires PostgreSQL only for subscribers, saved preferences, `/stats`, and message delivery.
@@ -18,6 +19,7 @@ FastAPI service that collects Bolivian news, summarizes it with an LLM, and can 
 - NewsAPI key if you want the NewsAPI collector enabled
 - PostgreSQL only when you want subscriptions and delivery
 - Redis is not used by the current application flow
+- Cache knobs: `NEWS_CACHE_TTL_MINUTES`, `NEWS_MIN_ARTICLES`, `NEWS_SUMMARY_RETENTION_DAYS`
 
 ## Setup
 
@@ -57,6 +59,9 @@ NEWS_API_COUNTRY=bo
 NEWS_API_LANGUAGE=es
 
 DATABASE_URL=postgresql+asyncpg://news_user:news_password@localhost:5432/news_summarizer
+NEWS_CACHE_TTL_MINUTES=60
+NEWS_MIN_ARTICLES=20
+NEWS_SUMMARY_RETENTION_DAYS=30
 ```
 
 ## Running Locally
@@ -86,7 +91,7 @@ http://localhost:8000
 | GET | `/` | App status |
 | GET | `/health` | Health check |
 | GET | `/stats` | Subscriber count; returns `0` when DB is unavailable |
-| POST | `/trigger/summary` | Collect, process, summarize, and deliver when subscribers exist |
+| POST | `/trigger/summary` | Collect, process, summarize, and deliver when subscribers exist; add `refresh=true` to force a new run |
 | POST | `/webhook/whatsapp` | Twilio WhatsApp webhook |
 
 Manual summary trigger:
@@ -150,14 +155,22 @@ The collector also filters returned articles so Bolivia is mentioned in the titl
 
 `/trigger/summary` runs this flow:
 
-1. Scrape configured sources when `SCRAPER_ENABLED=true`.
-2. Fetch NewsAPI articles when `NEWS_API_KEY` is configured.
-3. Deduplicate by URL and similar titles.
-4. Classify into configured categories.
-5. Rank articles by recency, source trust, and category quality.
-6. Summarize with Groq or OpenAI.
-7. Rewrite summaries for consistent style.
-8. Deliver to active subscribers if PostgreSQL is available.
+1. Check Postgres for cached summaries for today.
+2. Check cached articles within `NEWS_CACHE_TTL_MINUTES`.
+3. If the cache is stale or too small, scrape configured sources and fetch NewsAPI articles.
+4. Upsert the collected articles into Postgres.
+5. Deduplicate by URL and similar titles.
+6. Classify into configured categories.
+7. Rank articles by recency, source trust, and category quality.
+8. Summarize with Groq or OpenAI.
+9. Rewrite summaries for consistent style.
+10. Deliver to active subscribers if PostgreSQL is available.
+
+Cache behavior is controlled by:
+
+- `NEWS_CACHE_TTL_MINUTES`
+- `NEWS_MIN_ARTICLES`
+- `NEWS_SUMMARY_RETENTION_DAYS`
 
 If the DB is not available, the endpoint still returns collection and summary counts, with `sent: 0`.
 

@@ -1,3 +1,19 @@
-from .repository import Database, Subscriber
+from .repository import (
+    CollectionRun,
+    Database,
+    NewsArticle,
+    NewsCategory,
+    NewsSource,
+    NewsSummary,
+    Subscriber,
+)
 
-__all__ = ["Database", "Subscriber"]
+__all__ = [
+    "CollectionRun",
+    "Database",
+    "NewsArticle",
+    "NewsCategory",
+    "NewsSource",
+    "NewsSummary",
+    "Subscriber",
+]

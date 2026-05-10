@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     )
     database_pool_size: int = Field(default=10, alias="DATABASE_POOL_SIZE")
     database_max_overflow: int = Field(default=20, alias="DATABASE_MAX_OVERFLOW")
+    news_cache_ttl_minutes: int = Field(default=60, alias="NEWS_CACHE_TTL_MINUTES")
+    news_min_articles: int = Field(default=20, alias="NEWS_MIN_ARTICLES")
+    news_summary_retention_days: int = Field(
+        default=30, alias="NEWS_SUMMARY_RETENTION_DAYS"
+    )
 
     schedule_timezone: str = Field(default="America/La_Paz", alias="SCHEDULE_TIMEZONE")
     schedule_summary_morning: str = Field(default="08:00", alias="SCHEDULE_SUMMARY_MORNING")

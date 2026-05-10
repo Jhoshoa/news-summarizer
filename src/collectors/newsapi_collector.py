@@ -222,6 +222,8 @@ class NewsAPICollector:
                     "url": url,
                     "description": article.get("description", ""),
                     "source": article.get("source", {}).get("name", "NewsAPI"),
+                    "source_type": "api",
+                    "source_url": self.BASE_URL,
                     "author": article.get("author"),
                     "published_at": published_at,
                     "image": article.get("urlToImage"),
