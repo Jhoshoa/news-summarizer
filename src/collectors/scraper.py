@@ -1,8 +1,10 @@
 import hashlib
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
+from difflib import SequenceMatcher
 from urllib.parse import urljoin
 
 import httpx
@@ -310,7 +312,7 @@ class NewsScraper:
             return article
 
         soup = BeautifulSoup(response.text, "lxml")
-        content = self._extract_body_content(soup, source)
+        content = self._extract_body_content(soup, source, article.get("title"))
         word_count = self._count_words(content)
 
         if not content:
@@ -333,10 +335,23 @@ class NewsScraper:
 
         return article
 
-    def _extract_body_content(self, soup: BeautifulSoup, source: NewsSource) -> str:
+    def _extract_body_content(
+        self,
+        soup: BeautifulSoup,
+        source: NewsSource,
+        article_title: str | None = None,
+    ) -> str:
         json_ld_content = self._extract_json_ld_article_body(soup)
         if json_ld_content:
             return json_ld_content
+
+        title_anchored_content = self._extract_readable_text_fallback(
+            soup,
+            source,
+            article_title=article_title,
+        )
+        if self._count_words(title_anchored_content) >= self.MIN_CONTENT_WORDS:
+            return title_anchored_content
 
         if source.body_selector:
             content = self._extract_content_with_selector(
@@ -344,7 +359,7 @@ class NewsScraper:
                 source,
                 source.body_selector,
             )
-            if content:
+            if self._count_words(content) >= self.MIN_CONTENT_WORDS:
                 return content
 
         selectors = [self.DEFAULT_BODY_SELECTOR]
@@ -405,7 +420,12 @@ class NewsScraper:
             for item in data:
                 yield from self._iter_json_ld_nodes(item)
 
-    def _extract_readable_text_fallback(self, soup: BeautifulSoup, source: NewsSource) -> str:
+    def _extract_readable_text_fallback(
+        self,
+        soup: BeautifulSoup,
+        source: NewsSource,
+        article_title: str | None = None,
+    ) -> str:
         for excluded in soup.select(self.BODY_EXCLUDE_SELECTOR):
             excluded.decompose()
 
@@ -418,7 +438,7 @@ class NewsScraper:
         ]
         lines = [line for line in lines if line]
 
-        title_index = self._find_article_title_line(lines)
+        title_index = self._find_article_title_line(lines, article_title)
         if title_index is None:
             return ""
 
@@ -446,7 +466,22 @@ class NewsScraper:
 
         return "\n\n".join(dict.fromkeys(body_lines))
 
-    def _find_article_title_line(self, lines: list[str]) -> int | None:
+    def _find_article_title_line(
+        self,
+        lines: list[str],
+        article_title: str | None = None,
+    ) -> int | None:
+        if article_title:
+            expected_title = self._normalize_for_match(article_title)
+            for index, line in enumerate(lines):
+                candidate = self._normalize_for_match(line)
+                if not candidate:
+                    continue
+
+                similarity = SequenceMatcher(None, expected_title, candidate).ratio()
+                if similarity >= 0.72 or expected_title in candidate or candidate in expected_title:
+                    return index
+
         for index, line in enumerate(lines):
             if len(line) >= 45 and not self._is_noise_line(
                 self._normalize_text_for_filtering(line)
@@ -519,6 +554,14 @@ class NewsScraper:
 
     def _normalize_text_for_filtering(self, text: str) -> str:
         return text.lower().strip()
+
+    def _normalize_for_match(self, text: str) -> str:
+        normalized = unicodedata.normalize("NFD", str(text).lower())
+        normalized = "".join(
+            char for char in normalized if unicodedata.category(char) != "Mn"
+        )
+        normalized = re.sub(r"[^\w\s]", " ", normalized)
+        return re.sub(r"\s+", " ", normalized).strip()
 
     def _extract_content_with_selector(
         self,

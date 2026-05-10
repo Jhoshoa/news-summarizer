@@ -34,7 +34,7 @@ def test_extract_body_content_uses_source_specific_selector():
               <p>Navigation text that should not be preferred.</p>
               <section class="custom-body">
                 <p>Primer parrafo importante de la noticia con suficiente detalle.</p>
-                <p>Segundo parrafo con mas contexto para el resumen de la noticia.</p>
+                <p>Segundo parrafo con mas contexto para el resumen de la noticia y datos adicionales relevantes para superar el minimo.</p>
               </section>
             </main>
           </body>
@@ -63,7 +63,7 @@ def test_extract_body_content_falls_back_to_generic_article_paragraphs():
           <body>
             <article>
               <p>Primer parrafo generico con informacion suficiente de la noticia.</p>
-              <p>Segundo parrafo generico con detalles adicionales del acontecimiento.</p>
+              <p>Segundo parrafo generico con detalles adicionales del acontecimiento y contexto suficiente para validar el contenido extraido.</p>
             </article>
           </body>
         </html>
@@ -207,6 +207,45 @@ def test_radio_fides_fallback_extracts_article_until_dateline():
     assert "Tras la amenaza de sectores sociales" in content
     assert "La dirigencia vecinal considera" in content
     assert "texto lateral" not in content
+
+
+def test_radio_fides_uses_article_title_anchor_not_repeated_sidebar_excerpt():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RadioFides",
+        url="https://radiofides.com/",
+        body_selector=".entry-content p",
+    )
+    title = (
+        "ESPECIAL: Gobierno anuncia leyes, pero el paquete sobre hidrocarburos, "
+        "inversiones y litio se hace esperar"
+    )
+    soup = BeautifulSoup(
+        f"""
+        <html>
+          <body>
+            <section class="entry-content">
+              <p>La banca ya empieza a utilizar el dolar referencial y muchas veces programamos transacciones con otro valor.</p>
+            </section>
+            <nav>Portada Sociedad Nacional Economia Politica Seguridad</nav>
+            <h1>{title}</h1>
+            <div>Por Radio Fides - 9 mayo, 2026 2 mins de lectura</div>
+            <div>A seis meses de gestion del presidente, el Gobierno mantiene pendiente la presentacion del paquete de leyes estructurales.</div>
+            <div>Las normas comprometidas apuntan a hidrocarburos, inversiones, litio, mineria y energia para la reactivacion del pais.</div>
+            <div>Durante los ultimos meses, distintas autoridades fijaron plazos para el envio de estas iniciativas.</div>
+            <div>/// RCL // LA PAZ ///</div>
+            <div>Articulos relacionados</div>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    content = scraper._extract_body_content(soup, source, title)
+
+    assert "A seis meses de gestion" in content
+    assert "hidrocarburos, inversiones, litio" in content
+    assert "La banca ya empieza" not in content
 
 
 def test_bolivision_fallback_extracts_story_blocks_before_next_title():
