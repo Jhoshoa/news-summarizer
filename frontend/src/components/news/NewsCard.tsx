@@ -7,7 +7,7 @@ type NewsCardProps = {
 };
 
 export const NewsCard = ({ article }: NewsCardProps) => (
-  <article className="news-card">
+  <a className="news-card card-link" href={`/article/${article.id}`}>
     <ArticleImage image={article.image} alt={article.title} compact />
     <div>
       <span className="eyebrow">
@@ -16,10 +16,8 @@ export const NewsCard = ({ article }: NewsCardProps) => (
       <time className="published-date" dateTime={article.published_at}>
         {formatPublishedDate(article.published_at)}
       </time>
-      <h3>
-        <a href={`/article/${article.id}`}>{article.title}</a>
-      </h3>
+      <h3>{article.title}</h3>
       <p>{article.description || article.content}</p>
     </div>
-  </article>
+  </a>
 );

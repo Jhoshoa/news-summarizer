@@ -15,9 +15,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 76% 12%, rgba(251, 247, 239, 0.9), transparent 26rem),
-    linear-gradient(135deg, #f4e9d5 0%, #fbf7ef 52%, #e1d4bd 100%);
+  background: #f4e9d5;
 }
 
 a {
@@ -43,7 +41,6 @@ p {
 
 .app-frame {
   width: min(96vw, 1544px);
-  min-height: calc(100vh - 56px);
   margin: 28px auto;
   overflow: hidden;
   border: 1px solid rgba(38, 24, 15, 0.14);
@@ -219,7 +216,6 @@ p {
     linear-gradient(132deg, #00746b 0%, #234048 42%, #c63b31 100%);
 }
 
-.hero-art::before,
 .article-image::before {
   position: absolute;
   inset: 0;
@@ -235,6 +231,9 @@ p {
   display: grid;
   align-content: start;
   padding: 20px;
+  background:
+    linear-gradient(90deg, rgba(7, 63, 59, 0.92) 0%, rgba(7, 63, 59, 0.58) 42%, rgba(7, 63, 59, 0) 72%),
+    url("/assets/home-bolivia-cover.svg") center / cover;
 }
 
 .hero-art span {
@@ -389,6 +388,23 @@ p {
 
 .summary-card {
   background: #eadbc5;
+}
+
+.card-link {
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.card-link:hover,
+.card-link:focus-visible {
+  border-color: rgba(0, 116, 107, 0.44);
+  box-shadow: 0 12px 24px rgba(38, 24, 15, 0.12);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .summary-card small,
@@ -597,7 +613,6 @@ p {
 @media (max-width: 760px) {
   .app-frame {
     width: 100%;
-    min-height: 100vh;
     margin: 0;
     border-radius: 0;
   }
