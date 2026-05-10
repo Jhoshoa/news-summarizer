@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from loguru import logger
 
+from src.api import create_economic_indicators_router
 from src.collectors import NewsAPICollector, NewsScraper
 from src.config import Settings, get_settings
 from src.db import Database
@@ -410,6 +411,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+app.include_router(create_economic_indicators_router(lambda: app_instance))
 
 
 @app.get("/")

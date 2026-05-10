@@ -1,3 +1,4 @@
+from .indicators import EconomicIndicatorRepository, EconomicIndicatorValue
 from .repository import (
     CollectionRun,
     Database,
@@ -11,6 +12,8 @@ from .repository import (
 __all__ = [
     "CollectionRun",
     "Database",
+    "EconomicIndicatorRepository",
+    "EconomicIndicatorValue",
     "NewsArticle",
     "NewsCategory",
     "NewsSource",
