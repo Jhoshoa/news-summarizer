@@ -54,17 +54,30 @@ Responde en español."""
         for i, article in enumerate(news[:10], 1):
             title = article.get("title", "")
             description = article.get("description", "")
+            url = article.get("url", "")
             source = article.get("source", "")
+            content = article.get("content") or article.get("excerpt") or ""
 
             prompt += f"{i}. {title}\n"
             if description:
                 prompt += f"   {description[:200]}\n"
+            if content:
+                prompt += f"   Detalle: {self._truncate_content(content)}\n"
+            if url:
+                prompt += f"   URL: {url}\n"
             prompt += f"   Fuente: {source}\n\n"
 
         prompt += "\nFormato de respuesta (cada noticia en una línea):"
         prompt += "\nNÚMERO. Título | Resumen | Dato relevante"
 
         return prompt
+
+    def _truncate_content(self, content: str, max_length: int = 900) -> str:
+        content = " ".join(str(content).split())
+        if len(content) <= max_length:
+            return content
+
+        return content[:max_length].rsplit(" ", 1)[0].strip()
 
     def _parse_response(self, response: str, category: str) -> list[dict]:
         """Parsea la respuesta de la IA."""

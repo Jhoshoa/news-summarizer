@@ -12,6 +12,7 @@ sources:
     url_selector: "a.post-link, a"
     date_selector: ".post-date, .date, time"
     image_selector: "img"
+    body_selector: ".entry-content, .post-content, article .content, article p"
     enabled: true
     
   # Unitel
@@ -24,6 +25,7 @@ sources:
     url_selector: "a"
     date_selector: ".fecha, .date, time"
     image_selector: "img"
+    body_selector: "article p, main p, .article-body p, .nota-contenido p"
     enabled: true
     
   # Red Uno
@@ -37,6 +39,7 @@ sources:
     date_selector: "input.nota_fecha_input"
     date_attr: "data-fecha-a"
     image_selector: "figure.nota__media img"
+    body_selector: "article p, main p, .nota__body p, .nota-contenido p, .nota__content p"
     category_selector: "div.volanta span"
     category_link_selector: "div.volanta a"
     enabled: true
@@ -51,6 +54,7 @@ sources:
     url_selector: "a"
     date_selector: ".fecha, time"
     image_selector: "img"
+    body_selector: "article p, main p, .entry-content p, .post-content p"
     enabled: true
 
 # Fuentes adicionales (opcionales)

@@ -602,11 +602,18 @@ class Database:
         return result.scalar_one_or_none()
 
     def _normalize_payload(self, article: dict) -> dict[str, Any]:
-        payload = dict(article)
-        published_at = payload.get("published_at")
-        if isinstance(published_at, datetime):
-            payload["published_at"] = published_at.isoformat()
-        return payload
+        return {key: self._json_safe_value(value) for key, value in article.items()}
+
+    def _json_safe_value(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        if isinstance(value, dict):
+            return {key: self._json_safe_value(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._json_safe_value(item) for item in value]
+        return value
 
     def _coerce_datetime(self, value: Any) -> datetime:
         if isinstance(value, datetime):

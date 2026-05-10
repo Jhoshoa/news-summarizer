@@ -22,6 +22,7 @@ class NewsSource:
     date_selector: str = ".date"
     date_attr: str = None
     image_selector: str = "img"
+    body_selector: str = None
     category_selector: str = None
     category_link_selector: str = None
     enabled: bool = True
@@ -39,6 +40,7 @@ class NewsSource:
             date_selector=data.get("date_selector", ".date"),
             date_attr=data.get("date_attr"),
             image_selector=data.get("image_selector", "img"),
+            body_selector=data.get("body_selector"),
             category_selector=data.get("category_selector"),
             category_link_selector=data.get("category_link_selector"),
             enabled=data.get("enabled", True),
@@ -46,6 +48,33 @@ class NewsSource:
 
 
 class NewsScraper:
+    DEFAULT_BODY_SELECTOR = (
+        "article [itemprop='articleBody'], "
+        "article .entry-content, "
+        "article .post-content, "
+        "article .article-content, "
+        "article .nota-contenido, "
+        "article .news-detail, "
+        "article .single-content, "
+        "article .content, "
+        "main [itemprop='articleBody'], "
+        "main .entry-content, "
+        "main .post-content, "
+        "main .article-content, "
+        "main .nota-contenido, "
+        "main .news-detail, "
+        "main .single-content, "
+        "main .content, "
+        "article p, "
+        "main p"
+    )
+    BODY_EXCLUDE_SELECTOR = (
+        "script, style, noscript, iframe, form, nav, header, footer, aside, "
+        ".ad, .ads, .advertisement, .publicidad, .banner, .share, .social, "
+        ".related, .relacionadas, .tags, .tag, .newsletter, .comments"
+    )
+    MIN_CONTENT_WORDS = 25
+
     DEFAULT_SOURCES = [
         NewsSource(
             name="RadioFides",
@@ -55,6 +84,7 @@ class NewsScraper:
             title_selector="h2 a, h3 a",
             url_selector="a.post-link, a",
             date_selector=".post-date, .date, time",
+            body_selector=".entry-content, .post-content, article .content, article p",
         ),
         NewsSource(
             name="Unitel",
@@ -64,6 +94,7 @@ class NewsScraper:
             title_selector="h2 a, h3 a, .title a",
             url_selector="a",
             date_selector=".fecha, .date, time",
+            body_selector="article p, main p, .article-body p, .nota-contenido p",
         ),
         NewsSource(
             name="RedUno",
@@ -73,6 +104,7 @@ class NewsScraper:
             title_selector="h2 a, h3 a",
             url_selector="a",
             date_selector=".fecha, .date-published, time",
+            body_selector="article p, main p, .nota__body p, .nota-contenido p",
         ),
         NewsSource(
             name="RedBolivision",
@@ -82,6 +114,7 @@ class NewsScraper:
             title_selector="h2 a, h3 a",
             url_selector="a",
             date_selector=".fecha, time",
+            body_selector="article p, main p, .entry-content p, .post-content p",
         ),
     ]
 
@@ -164,7 +197,9 @@ class NewsScraper:
                     f"No articles found for {source.name}. HTML length: {len(html)}. Checking selectors: {source.selector}"
                 )
                 articles = self._extract_links_fallback(soup, source)
-            return articles
+
+            articles = self._deduplicate(articles)
+            return await self._enrich_articles(client, articles, source)
         except Exception as e:
             logger.error(f"Error fetching {source.name}: {e}")
             return []
@@ -235,6 +270,140 @@ class NewsScraper:
 
         logger.info(f"Fallback extracted {len(articles)} noticias de {source.name}")
         return articles
+
+    async def _enrich_articles(
+        self,
+        client: httpx.AsyncClient,
+        articles: list[dict],
+        source: NewsSource,
+    ) -> list[dict]:
+        enriched = []
+
+        for article in articles:
+            try:
+                enriched.append(await self._enrich_article(client, article, source))
+            except Exception as e:
+                logger.warning(f"Error enriching article {article.get('url')}: {e}")
+                enriched.append(article)
+
+        return enriched
+
+    async def _enrich_article(
+        self,
+        client: httpx.AsyncClient,
+        article: dict,
+        source: NewsSource,
+    ) -> dict:
+        url = article.get("url")
+        if not url:
+            return article
+
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
+        except Exception as e:
+            logger.warning(f"Error fetching article detail for {url}: {e}")
+            return article
+
+        soup = BeautifulSoup(response.text, "lxml")
+        content = self._extract_body_content(soup, source)
+        word_count = self._count_words(content)
+
+        if not content:
+            logger.warning(
+                f"No body content extracted for {source.name}: {url}. "
+                f"Selector: {source.body_selector or self.DEFAULT_BODY_SELECTOR}"
+            )
+
+        article["content"] = content or None
+        article["excerpt"] = self._build_excerpt(content) if content else None
+        article["content_word_count"] = word_count
+        article["content_collected_at"] = datetime.now()
+
+        if content and not article.get("description"):
+            article["description"] = article["excerpt"]
+
+        detail_image = self._extract_image(soup, source)
+        if detail_image and not article.get("image"):
+            article["image"] = detail_image
+
+        return article
+
+    def _extract_body_content(self, soup: BeautifulSoup, source: NewsSource) -> str:
+        if source.body_selector:
+            content = self._extract_content_with_selector(
+                soup,
+                source,
+                source.body_selector,
+            )
+            if content:
+                return content
+
+        selectors = [self.DEFAULT_BODY_SELECTOR]
+        best_content = ""
+
+        for selector in selectors:
+            content = self._extract_content_with_selector(soup, source, selector)
+            if self._count_words(content) >= self.MIN_CONTENT_WORDS:
+                return content
+
+            if len(content) > len(best_content):
+                best_content = content
+
+        return best_content
+
+    def _extract_content_with_selector(
+        self,
+        soup: BeautifulSoup,
+        source: NewsSource,
+        selector: str,
+    ) -> str:
+        try:
+            elements = soup.select(selector)
+        except Exception as e:
+            logger.warning(f"Invalid body selector for {source.name}: {selector}. {e}")
+            return ""
+
+        return self._text_from_elements(elements)
+
+    def _text_from_elements(self, elements) -> str:
+        seen = set()
+        paragraphs = []
+
+        for element in elements:
+            for excluded in element.select(self.BODY_EXCLUDE_SELECTOR):
+                excluded.decompose()
+
+            text_nodes = element.select("p, li, blockquote")
+            if not text_nodes:
+                text_nodes = [element]
+
+            for node in text_nodes:
+                text = self._clean_text(node.get_text(" ", strip=True))
+                key = text.lower()
+                if len(text) < 30 or key in seen:
+                    continue
+                seen.add(key)
+                paragraphs.append(text)
+
+        return "\n\n".join(paragraphs)
+
+    def _clean_text(self, text: str) -> str:
+        text = re.sub(r"\s+", " ", text or "").strip()
+        return text
+
+    def _count_words(self, text: str | None) -> int:
+        if not text:
+            return 0
+        return len(re.findall(r"\b\w+\b", text))
+
+    def _build_excerpt(self, content: str, max_length: int = 280) -> str:
+        excerpt = self._clean_text(content)
+        if len(excerpt) <= max_length:
+            return excerpt
+
+        truncated = excerpt[:max_length].rsplit(" ", 1)[0].strip()
+        return f"{truncated}..."
 
     def _looks_like_article_url(self, url: str, source: NewsSource) -> bool:
         if not url.startswith(source.url.rstrip("/")):
