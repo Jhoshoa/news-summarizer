@@ -77,6 +77,81 @@ def test_extract_body_content_falls_back_to_generic_article_paragraphs():
     assert "Segundo parrafo generico" in content
 
 
+def test_extract_body_content_uses_json_ld_article_body_before_css():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Example",
+        url="https://example.com/",
+        body_selector=".missing-selector p",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <head>
+            <script type="application/ld+json">
+              {
+                "@type": "NewsArticle",
+                "articleBody": "Primer parrafo desde JSON-LD con detalles suficientes. Segundo parrafo desde JSON-LD con contexto adicional para resumen."
+              }
+            </script>
+          </head>
+          <body><main><p>Texto corto.</p></main></body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    content = scraper._extract_body_content(soup, source)
+
+    assert "Primer parrafo desde JSON-LD" in content
+    assert "Segundo parrafo desde JSON-LD" in content
+
+
+def test_extract_body_content_uses_readable_text_fallback_after_title():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Unitel",
+        url="https://unitel.bo/",
+        body_selector=".missing-selector p",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <body>
+            <nav>Inicio Politica Seguridad Economia</nav>
+            <h1>"Utilizan un taladro para colocar fierros sobre la via": Ministro denuncia danos en la ruta La Paz - Oruro</h1>
+            <h2>El ministro presento un video en el que se ve a una persona que utiliza un taladro para danar el asfalto.</h2>
+            <span>Publicacion: Hace 28 minutos</span>
+            <span>Unitel Digital</span>
+            <div>El ministro de Obras Publicas denuncio este domingo que personas fueron captadas ocasionando danos a la carretera.</div>
+            <div>Segun la autoridad, transportistas enviaron imagenes donde se observa a una persona utilizando un taladro para perforar el asfalto.</div>
+            <div>MIRA AQUI: Otra noticia relacionada</div>
+            <div>Recibe las noticias de ultimo momento en tu email</div>
+            <div>Este texto de newsletter no debe aparecer.</div>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    content = scraper._extract_body_content(soup, source)
+
+    assert "El ministro de Obras Publicas denuncio" in content
+    assert "transportistas enviaron imagenes" in content
+    assert "newsletter" not in content
+
+
+def test_extract_image_ignores_logo_urls():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(name="Unitel", url="https://unitel.bo/")
+    soup = BeautifulSoup(
+        '<html><body><img src="https://cdn2.unitel.bo/unitel/v2-resources/vu/img/logo-unitel.png" /></body></html>',
+        "lxml",
+    )
+
+    assert scraper._extract_image(soup, source) is None
+
+
 @pytest.mark.asyncio
 async def test_enrich_article_adds_content_excerpt_word_count_and_description():
     detail_html = """

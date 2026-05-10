@@ -69,8 +69,9 @@ Mejora la claridad sin cambiar los hechos."""
         """Parsea la respuesta reescrita."""
 
         rewritten = []
+        original_index = 0
 
-        for i, line in enumerate(response.split("\n")):
+        for line in response.split("\n"):
             line = line.strip()
             if not line or not line[0].isdigit():
                 continue
@@ -79,18 +80,13 @@ Mejora la claridad sin cambiar los hechos."""
             if len(parts) > 1 and "|" in parts[1]:
                 subparts = parts[1].split("|")
 
-                rewritten.append(
-                    {
-                        "title": subparts[0].strip()[:100],
-                        "summary": subparts[1].strip()[:200],
-                        "category": original[i].get("category", "general")
-                        if i < len(original)
-                        else "general",
-                        "fact": original[i].get("fact", "")
-                        if i < len(original)
-                        else "",
-                    }
-                )
+                base = dict(original[original_index]) if original_index < len(original) else {}
+                base["title"] = subparts[0].strip()[:100]
+                base["summary"] = subparts[1].strip()[:200]
+                base["category"] = base.get("category", "general")
+                base["fact"] = base.get("fact", "")
+                rewritten.append(base)
+                original_index += 1
 
         if not rewritten:
             return original

@@ -125,8 +125,9 @@ class NewsClassifier:
 
         title = self._normalize(article.get("title", ""))
         description = self._normalize(article.get("description", ""))
+        content = self._normalize(article.get("content", ""))
         source = self._normalize(article.get("source", ""))
-        text = f"{title} {description} {source}"
+        text = f"{title} {description} {content[:2000]} {source}"
 
         category_scores = {}
 

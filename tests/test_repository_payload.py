@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from types import SimpleNamespace
 
 from src.db.repository import Database
 
@@ -25,3 +26,33 @@ def test_normalize_payload_serializes_datetime_values_recursively():
             "snapshots": ["2026-05-10T12:32:00"],
         },
     }
+
+
+def test_summary_row_to_dict_includes_joined_article_source_and_url():
+    db = object.__new__(Database)
+    summary = SimpleNamespace(
+        id=1,
+        article_id=123,
+        title="Resumen",
+        summary="Texto resumido",
+        fact="Dato",
+        llm_provider="groq",
+        llm_model="model",
+        summary_date=date(2026, 5, 10),
+        created_at=datetime(2026, 5, 10, 12, 0),
+    )
+
+    row = (
+        summary,
+        "politica",
+        "https://example.com/noticia",
+        "Titulo original",
+        "Example News",
+    )
+
+    result = db._summary_row_to_dict(row)
+
+    assert result["article_id"] == 123
+    assert result["source"] == "Example News"
+    assert result["url"] == "https://example.com/noticia"
+    assert result["article_title"] == "Titulo original"

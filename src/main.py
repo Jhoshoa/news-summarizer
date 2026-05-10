@@ -109,6 +109,7 @@ class NewsSummarizerApp:
         used_cached_summaries = False
         collection_stats = {"scraper": 0, "newsapi": 0, "inserted": 0, "updated": 0}
         collection_run_id: int | None = None
+        collected_fresh_articles = False
 
         if self.db:
             try:
@@ -126,41 +127,22 @@ class NewsSummarizerApp:
                         logger.info(f"Reusing {len(news)} cached articles")
                     else:
                         news, collection_stats, collection_run_id = await self._collect_news(categories)
-                        if news:
-                            try:
-                                db_stats = await self.db.upsert_articles(news)
-                                collection_stats["inserted"] += db_stats["inserted"]
-                                collection_stats["updated"] += db_stats["updated"]
-                                news = await self.db.get_recent_articles(
-                                    categories, since=since, limit=200
-                                )
-                            except Exception as e:
-                                if collection_run_id is not None:
-                                    await self.db.finish_collection_run(
-                                        collection_run_id,
-                                        status="failed",
-                                        scraper_count=collection_stats["scraper"],
-                                        newsapi_count=collection_stats["newsapi"],
-                                        inserted_count=collection_stats["inserted"],
-                                        updated_count=collection_stats["updated"],
-                                        error_message=str(e),
-                                    )
-                                raise
-                        if collection_run_id is not None:
-                            await self.db.finish_collection_run(
-                                collection_run_id,
-                                status="success" if news else "partial",
-                                scraper_count=collection_stats["scraper"],
-                                newsapi_count=collection_stats["newsapi"],
-                                inserted_count=collection_stats["inserted"],
-                                updated_count=collection_stats["updated"],
-                            )
+                        collected_fresh_articles = True
             except Exception as e:
                 logger.error(f"Cache/DB error: {e}")
 
         if not used_cached_summaries:
             if not news:
                 logger.warning("No hay noticias para procesar")
+                if self.db and collection_run_id is not None:
+                    await self.db.finish_collection_run(
+                        collection_run_id,
+                        status="partial",
+                        scraper_count=collection_stats["scraper"],
+                        newsapi_count=collection_stats["newsapi"],
+                        inserted_count=collection_stats["inserted"],
+                        updated_count=collection_stats["updated"],
+                    )
                 return {
                     "collected": 0,
                     "summaries": len(summaries),
@@ -177,7 +159,37 @@ class NewsSummarizerApp:
             news = classifier.classify_batch(news)
 
             ranker = NewsRanker()
-            news = ranker.rank(news, limit=20)
+            news = ranker.rank(news)
+
+            if self.db and collected_fresh_articles:
+                try:
+                    db_stats = await self.db.upsert_articles(news)
+                    collection_stats["inserted"] += db_stats["inserted"]
+                    collection_stats["updated"] += db_stats["updated"]
+                except Exception as e:
+                    if collection_run_id is not None:
+                        await self.db.finish_collection_run(
+                            collection_run_id,
+                            status="failed",
+                            scraper_count=collection_stats["scraper"],
+                            newsapi_count=collection_stats["newsapi"],
+                            inserted_count=collection_stats["inserted"],
+                            updated_count=collection_stats["updated"],
+                            error_message=str(e),
+                        )
+                    raise
+
+            news = news[:20]
+
+            if self.db and collection_run_id is not None:
+                await self.db.finish_collection_run(
+                    collection_run_id,
+                    status="success" if news else "partial",
+                    scraper_count=collection_stats["scraper"],
+                    newsapi_count=collection_stats["newsapi"],
+                    inserted_count=collection_stats["inserted"],
+                    updated_count=collection_stats["updated"],
+                )
 
             if not self.llm:
                 logger.error("No hay LLM para resumir")

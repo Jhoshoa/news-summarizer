@@ -351,6 +351,7 @@ class Database:
                 score = int(article.get("score") or 0)
 
                 if existing:
+                    article["id"] = existing.id
                     existing.title = title
                     existing.url = url
                     existing.description = article.get("description")
@@ -367,25 +368,26 @@ class Database:
                     existing.is_active = True
                     updated += 1
                 else:
-                    session.add(
-                        NewsArticle(
-                            title=title,
-                            url=url,
-                            url_hash=url_hash,
-                            description=article.get("description"),
-                            content=article.get("content"),
-                            author=article.get("author"),
-                            image_url=article.get("image"),
-                            source_id=source.id,
-                            category_id=category.id,
-                            country=article.get("country"),
-                            published_at=published_at,
-                            collected_at=datetime.utcnow(),
-                            raw_payload=payload,
-                            score=score,
-                            is_active=True,
-                        )
+                    news_article = NewsArticle(
+                        title=title,
+                        url=url,
+                        url_hash=url_hash,
+                        description=article.get("description"),
+                        content=article.get("content"),
+                        author=article.get("author"),
+                        image_url=article.get("image"),
+                        source_id=source.id,
+                        category_id=category.id,
+                        country=article.get("country"),
+                        published_at=published_at,
+                        collected_at=datetime.utcnow(),
+                        raw_payload=payload,
+                        score=score,
+                        is_active=True,
                     )
+                    session.add(news_article)
+                    await session.flush()
+                    article["id"] = news_article.id
                     inserted += 1
 
             await session.commit()
@@ -482,8 +484,16 @@ class Database:
 
         async with self.session_maker() as session:
             stmt = (
-                select(NewsSummary, NewsCategory.name)
+                select(
+                    NewsSummary,
+                    NewsCategory.name,
+                    NewsArticle.url,
+                    NewsArticle.title,
+                    NewsSource.name,
+                )
                 .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+                .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
+                .outerjoin(NewsSource, NewsArticle.source_id == NewsSource.id)
                 .where(
                     NewsCategory.name.in_(categories),
                     NewsSummary.summary_date == summary_date,
@@ -642,7 +652,11 @@ class Database:
         }
 
     def _summary_row_to_dict(self, row: Any) -> dict:
-        summary, category_name = row
+        summary = row[0]
+        category_name = row[1]
+        article_url = row[2] if len(row) > 2 else None
+        article_title = row[3] if len(row) > 3 else None
+        source_name = row[4] if len(row) > 4 else None
         return {
             "id": summary.id,
             "article_id": summary.article_id,
@@ -650,6 +664,9 @@ class Database:
             "title": summary.title,
             "summary": summary.summary,
             "fact": summary.fact,
+            "source": source_name,
+            "url": article_url,
+            "article_title": article_title,
             "llm_provider": summary.llm_provider,
             "llm_model": summary.llm_model,
             "summary_date": summary.summary_date,

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -94,7 +95,10 @@ class NewsScraper:
             title_selector="h2 a, h3 a, .title a",
             url_selector="a",
             date_selector=".fecha, .date, time",
-            body_selector="article p, main p, .article-body p, .nota-contenido p",
+            body_selector=(
+                "main article p, main section p, "
+                ".article-body p, .nota-contenido p, .news-detail p"
+            ),
         ),
         NewsSource(
             name="RedUno",
@@ -330,6 +334,10 @@ class NewsScraper:
         return article
 
     def _extract_body_content(self, soup: BeautifulSoup, source: NewsSource) -> str:
+        json_ld_content = self._extract_json_ld_article_body(soup)
+        if json_ld_content:
+            return json_ld_content
+
         if source.body_selector:
             content = self._extract_content_with_selector(
                 soup,
@@ -350,7 +358,128 @@ class NewsScraper:
             if len(content) > len(best_content):
                 best_content = content
 
+        fallback_content = self._extract_readable_text_fallback(soup)
+        if self._count_words(fallback_content) > self._count_words(best_content):
+            return fallback_content
+
         return best_content
+
+    def _extract_json_ld_article_body(self, soup: BeautifulSoup) -> str:
+        candidates = []
+
+        for script in soup.select("script[type='application/ld+json']"):
+            raw_json = script.string or script.get_text(strip=True)
+            if not raw_json:
+                continue
+
+            try:
+                data = json.loads(raw_json)
+            except json.JSONDecodeError:
+                continue
+
+            candidates.extend(self._iter_json_ld_nodes(data))
+
+        text_parts = []
+        for node in candidates:
+            node_type = node.get("@type")
+            node_types = node_type if isinstance(node_type, list) else [node_type]
+            if not any(item in ("NewsArticle", "Article", "ReportageNewsArticle") for item in node_types):
+                continue
+
+            article_body = node.get("articleBody")
+            if article_body:
+                text_parts.append(str(article_body))
+            elif node.get("description"):
+                text_parts.append(str(node["description"]))
+
+        return self._clean_text("\n\n".join(text_parts))
+
+    def _iter_json_ld_nodes(self, data):
+        if isinstance(data, dict):
+            yield data
+            graph = data.get("@graph")
+            if isinstance(graph, list):
+                for item in graph:
+                    yield from self._iter_json_ld_nodes(item)
+        elif isinstance(data, list):
+            for item in data:
+                yield from self._iter_json_ld_nodes(item)
+
+    def _extract_readable_text_fallback(self, soup: BeautifulSoup) -> str:
+        for excluded in soup.select(self.BODY_EXCLUDE_SELECTOR):
+            excluded.decompose()
+
+        for excluded in soup.select("nav, header, footer, aside"):
+            excluded.decompose()
+
+        lines = [
+            self._clean_text(line)
+            for line in soup.get_text("\n", strip=True).splitlines()
+        ]
+        lines = [line for line in lines if line]
+
+        title_index = self._find_article_title_line(lines)
+        if title_index is None:
+            return ""
+
+        body_lines = []
+        for line in lines[title_index + 1 :]:
+            normalized = self._normalize_text_for_filtering(line)
+
+            if self._is_article_stop_line(normalized):
+                break
+            if self._is_noise_line(normalized):
+                continue
+            if len(line) < 35:
+                continue
+
+            body_lines.append(line)
+
+        return "\n\n".join(dict.fromkeys(body_lines))
+
+    def _find_article_title_line(self, lines: list[str]) -> int | None:
+        for index, line in enumerate(lines):
+            if len(line) >= 45 and not self._is_noise_line(
+                self._normalize_text_for_filtering(line)
+            ):
+                return index
+        return None
+
+    def _is_article_stop_line(self, normalized: str) -> bool:
+        stop_markers = (
+            "recibe las noticias",
+            "ultimas noticias",
+            "últimas noticias",
+            "tambien te puede interesar",
+            "también te puede interesar",
+            "siga unitel",
+            "sobre unitel",
+            "noticias relacionadas",
+            "te puede interesar",
+        )
+        return any(marker in normalized for marker in stop_markers)
+
+    def _is_noise_line(self, normalized: str) -> bool:
+        noise_markers = (
+            "facebook",
+            "twitter",
+            "whatsapp",
+            "instagram",
+            "tiktok",
+            "publicacion:",
+            "publicación:",
+            "unitel digital",
+            "mira aqui",
+            "mira aquí",
+            "direccion de correo",
+            "dirección de correo",
+            "indica que es obligatorio",
+            "real people should not fill",
+        )
+        return any(marker in normalized for marker in noise_markers)
+
+    def _normalize_text_for_filtering(self, text: str) -> str:
+        return text.lower().strip()
 
     def _extract_content_with_selector(
         self,
@@ -469,7 +598,22 @@ class NewsScraper:
             or image_elem.get("data-lazy-src")
             or (image_elem.get("srcset", "").split()[0] if image_elem.get("srcset") else None)
         )
-        return urljoin(source.url, image_url) if image_url else None
+        if not image_url:
+            return None
+
+        image_url = urljoin(source.url, image_url)
+        return None if self._is_non_article_image(image_url) else image_url
+
+    def _is_non_article_image(self, image_url: str) -> bool:
+        normalized = image_url.lower()
+        blocked_fragments = (
+            "logo",
+            "favicon",
+            "icon",
+            "placeholder",
+            "avatar",
+        )
+        return any(fragment in normalized for fragment in blocked_fragments)
 
     def _extract_category(self, article_soup, source: NewsSource) -> str:
         if source.category_selector:
