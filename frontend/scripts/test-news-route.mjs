@@ -1,27 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import vm from "node:vm";
-import ts from "typescript";
+import { loadTsModule } from "./load-ts-module.mjs";
 
 const sourcePath = join(process.cwd(), "src", "utils", "newsRoute.ts");
-const source = readFileSync(sourcePath, "utf8");
-const transpiled = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2020,
-  },
-}).outputText;
-
-const module = { exports: {} };
-vm.runInNewContext(transpiled, {
-  URLSearchParams,
-  Date,
-  Number,
-  exports: module.exports,
-  module,
-});
-
 const {
   buildNewsHref,
   getCategory,
@@ -29,7 +10,7 @@ const {
   getDateValidationMessage,
   getSelectedDate,
   isValidDateValue,
-} = module.exports;
+} = loadTsModule(sourcePath);
 
 assert.equal(getCurrentPage("?page=3"), 3);
 assert.equal(getCurrentPage("?page=0"), 1);

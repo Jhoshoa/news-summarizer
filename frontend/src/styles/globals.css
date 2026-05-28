@@ -108,6 +108,13 @@ p {
   font-weight: 800;
 }
 
+.nav a[aria-current="page"] {
+  color: #00746b;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+
 .button {
   min-height: 34px;
   border: 0;
@@ -122,6 +129,60 @@ p {
 .button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.navigation-trail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 26px;
+  border-bottom: 1px solid rgba(38, 24, 15, 0.1);
+  background: rgba(234, 219, 197, 0.42);
+}
+
+.back-button {
+  min-height: 30px;
+  border: 1px solid rgba(38, 24, 15, 0.14);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(251, 247, 239, 0.82);
+  color: #140c08;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.back-button:hover,
+.back-button:focus-visible {
+  border-color: rgba(0, 116, 107, 0.44);
+  color: #00746b;
+  outline: none;
+}
+
+.breadcrumbs {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  color: #655243;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.breadcrumbs a {
+  color: #00746b;
+}
+
+.breadcrumbs a::after {
+  margin-left: 8px;
+  color: #655243;
+  content: "/";
+}
+
+.breadcrumbs span[aria-current="page"] {
+  color: #140c08;
 }
 
 .page {
@@ -935,9 +996,14 @@ p {
   }
 
   .topbar,
-  .footer {
+  .footer,
+  .navigation-trail {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .breadcrumbs {
+    justify-content: flex-start;
   }
 
   .nav,

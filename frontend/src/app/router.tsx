@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import {
+  type AnchorHTMLAttributes,
   createContext,
   type MouseEvent,
   type ReactNode,
@@ -17,16 +18,14 @@ type RouterLocation = {
 
 type RouterContextValue = {
   location: RouterLocation;
+  back: (fallback?: string) => void;
   navigate: (to: string) => void;
   replace: (to: string) => void;
 };
 
-type LinkProps = {
-  children: ReactNode;
-  className?: string;
+type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
   "aria-label"?: string;
   href: string;
-  target?: string;
 };
 
 const RouterContext = createContext<RouterContextValue | null>(null);
@@ -56,9 +55,28 @@ const normalizeHref = (href: string) => {
 
 export const RouterProvider = ({ children }: { children: ReactNode }) => {
   const [location, setLocation] = useState(getCurrentLocation);
+  const [appHistoryIndex, setAppHistoryIndex] = useState(() => {
+    const state = window.history.state as { appHistoryIndex?: number } | null;
+    return state?.appHistoryIndex ?? 0;
+  });
 
   useEffect(() => {
-    const handlePopState = () => setLocation(getCurrentLocation());
+    const state = window.history.state as { appHistoryIndex?: number } | null;
+    if (state?.appHistoryIndex === undefined) {
+      window.history.replaceState(
+        { ...(state ?? {}), appHistoryIndex: 0 },
+        "",
+        `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const state = window.history.state as { appHistoryIndex?: number } | null;
+      setAppHistoryIndex(state?.appHistoryIndex ?? 0);
+      setLocation(getCurrentLocation());
+    };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
@@ -69,24 +87,39 @@ export const RouterProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    window.history.pushState(null, "", next);
+    const nextIndex = appHistoryIndex + 1;
+    window.history.pushState({ appHistoryIndex: nextIndex }, "", next);
+    setAppHistoryIndex(nextIndex);
     setLocation(getCurrentLocation());
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [appHistoryIndex]);
 
   const replace = useCallback((to: string) => {
     const next = normalizeHref(to);
-    window.history.replaceState(null, "", next);
+    window.history.replaceState({ appHistoryIndex }, "", next);
     setLocation(getCurrentLocation());
-  }, []);
+  }, [appHistoryIndex]);
+
+  const back = useCallback(
+    (fallback = "/") => {
+      if (appHistoryIndex > 0) {
+        window.history.back();
+        return;
+      }
+
+      navigate(fallback);
+    },
+    [appHistoryIndex, navigate],
+  );
 
   const value = useMemo(
     () => ({
       location,
+      back,
       navigate,
       replace,
     }),
-    [location, navigate, replace],
+    [location, back, navigate, replace],
   );
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;

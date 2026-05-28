@@ -5,6 +5,7 @@ import { ArticleDetailPage } from "./pages/ArticleDetailPage";
 import { DataPage } from "./pages/DataPage";
 import { HomePage } from "./pages/HomePage";
 import { NewsPage } from "./pages/NewsPage";
+import { getNavigationState } from "./utils/navigation";
 
 const App = () => {
   const { location } = useRouter();
@@ -13,6 +14,7 @@ const App = () => {
   const isNewsRoute = location.pathname.startsWith("/news");
   const isDataRoute = location.pathname.startsWith("/datos");
   const compactHeader = isArticleRoute || isNewsRoute || isDataRoute;
+  const navigationState = getNavigationState(location.pathname);
 
   let page = <HomePage />;
 
@@ -25,7 +27,14 @@ const App = () => {
   }
 
   return (
-    <AppShell compactHeader={compactHeader} isRefreshing={isRefreshing} onRefresh={onRefresh}>
+    <AppShell
+      activePath={navigationState.activePath}
+      backFallback={navigationState.backFallback}
+      breadcrumbs={navigationState.breadcrumbs}
+      compactHeader={compactHeader}
+      isRefreshing={isRefreshing}
+      onRefresh={onRefresh}
+    >
       {page}
     </AppShell>
   );
