@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
+import { usePageRefreshControl } from "../app/refreshControl";
 import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
 import { findByExactCode, formatNumber } from "../components/indicators/indicatorUtils";
 import { SecondaryIndicators } from "../components/indicators/SecondaryIndicators";
-import { AppShell } from "../components/layout/AppShell";
 import {
   useGetEconomicIndicatorsQuery,
   useGetWeatherLocationsQuery,
@@ -165,12 +165,21 @@ export const DataPage = () => {
   const elevation = getNumber(weather?.raw_payload.elevation);
   const timezone = String(weather?.raw_payload.timezone ?? "America/La_Paz");
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     void refreshIndicators();
-  };
+  }, [refreshIndicators]);
+
+  const refreshControl = useMemo(
+    () => ({
+      isRefreshing: isRefreshing || isFetchingIndicators,
+      onRefresh: handleRefresh,
+    }),
+    [handleRefresh, isFetchingIndicators, isRefreshing],
+  );
+  usePageRefreshControl(refreshControl);
 
   return (
-    <AppShell compactHeader isRefreshing={isRefreshing || isFetchingIndicators} onRefresh={handleRefresh}>
+    <>
       <section className="data-page">
         <header className="data-hero">
           <div>
@@ -300,6 +309,6 @@ export const DataPage = () => {
           </section>
         )}
       </section>
-    </AppShell>
+    </>
   );
 };

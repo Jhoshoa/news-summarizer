@@ -1,4 +1,7 @@
-import { AppShell } from "../components/layout/AppShell";
+import { useCallback, useMemo } from "react";
+
+import { usePageRefreshControl } from "../app/refreshControl";
+import { useRouter } from "../app/router";
 import { ArticleImage } from "../components/news/ArticleImage";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
 import { mockArticles } from "../data/mockNews";
@@ -12,14 +15,15 @@ import {
 import { findByExactCode, findIndicator, formatNumber } from "../components/indicators/indicatorUtils";
 import { formatPublishedDate } from "../utils/date";
 
-const getArticleIdFromPath = () => {
-  const parts = window.location.pathname.split("/").filter(Boolean);
+const getArticleIdFromPath = (pathname: string) => {
+  const parts = pathname.split("/").filter(Boolean);
   const id = Number(parts[parts.length - 1]);
   return Number.isFinite(id) ? id : null;
 };
 
 export const ArticleDetailPage = () => {
-  const articleId = getArticleIdFromPath();
+  const { location } = useRouter();
+  const articleId = getArticleIdFromPath(location.pathname);
   const { data: articleData } = useGetArticleByIdQuery(articleId ?? 1, { skip: articleId === null });
   const { data: summaryData } = useGetSummariesQuery(
     articleId ? { article_id: articleId, page_size: 1 } : undefined,
@@ -50,16 +54,21 @@ export const ArticleDetailPage = () => {
   const treMe = findIndicator(indicators, ["tre", "me"]);
   const articleBody = article.content || article.description || "";
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     void refreshIndicators();
-  };
+  }, [refreshIndicators]);
+
+  const refreshControl = useMemo(
+    () => ({
+      isRefreshing: isRefreshing || isFetchingIndicators,
+      onRefresh: handleRefresh,
+    }),
+    [handleRefresh, isFetchingIndicators, isRefreshing],
+  );
+  usePageRefreshControl(refreshControl);
 
   return (
-    <AppShell
-      compactHeader
-      isRefreshing={isRefreshing || isFetchingIndicators}
-      onRefresh={handleRefresh}
-    >
+    <>
       <section className="detail-layout">
         <article className="detail-article">
           <span className="eyebrow">Detalle - {article.category}</span>
@@ -132,6 +141,6 @@ export const ArticleDetailPage = () => {
           <WeatherPanel weather={weather} />
         </aside>
       </section>
-    </AppShell>
+    </>
   );
 };

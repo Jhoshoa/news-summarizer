@@ -1,9 +1,9 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
+import { usePageRefreshControl } from "../app/refreshControl";
 import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
 import { findByExactCode, formatNumber } from "../components/indicators/indicatorUtils";
 import { SecondaryIndicators } from "../components/indicators/SecondaryIndicators";
-import { AppShell } from "../components/layout/AppShell";
 import { NewsCard } from "../components/news/NewsCard";
 import { PhoneBrief } from "../components/news/PhoneBrief";
 import { SummaryCard } from "../components/news/SummaryCard";
@@ -36,20 +36,26 @@ export const HomePage = () => {
   const featuredArticles = useMemo(() => articles.slice(0, 3), [articles]);
   const featuredSummaries = useMemo(() => summaries.slice(0, 3), [summaries]);
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     void Promise.all([
       refreshIndicators().unwrap(),
       triggerSummary({ refresh: true, time_of_day: "manual" }).unwrap(),
     ]).catch((error) => {
       console.error("Error actualizando portada", error);
     });
-  };
+  }, [refreshIndicators, triggerSummary]);
+
+  const refreshControl = useMemo(
+    () => ({
+      isRefreshing: isRefreshing || isFetchingIndicators || isTriggeringSummary,
+      onRefresh: handleRefresh,
+    }),
+    [handleRefresh, isFetchingIndicators, isRefreshing, isTriggeringSummary],
+  );
+  usePageRefreshControl(refreshControl);
 
   return (
-    <AppShell
-      isRefreshing={isRefreshing || isFetchingIndicators || isTriggeringSummary}
-      onRefresh={handleRefresh}
-    >
+    <>
       <section className="home-layout">
         <PhoneBrief
           headline={headline}
@@ -96,6 +102,6 @@ export const HomePage = () => {
           </section>
         </section>
       </section>
-    </AppShell>
+    </>
   );
 };

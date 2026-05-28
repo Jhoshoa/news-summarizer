@@ -1,3 +1,4 @@
+import { Link } from "../../app/router";
 import type { Summary } from "../../services/types";
 import { formatPublishedDate } from "../../utils/date";
 import { ArticleImage } from "./ArticleImage";
@@ -8,9 +9,8 @@ type SummaryCardProps = {
 
 export const SummaryCard = ({ summary }: SummaryCardProps) => {
   const href = summary.article_id ? `/article/${summary.article_id}` : summary.url || "#";
-
-  return (
-    <a className="summary-card card-link" href={href}>
+  const content = (
+    <>
       <ArticleImage image={summary.image} alt={summary.title} compact />
       <div>
         <span className="eyebrow">
@@ -23,6 +23,20 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
         <p>{summary.summary}</p>
         {summary.fact && <small>{summary.fact}</small>}
       </div>
+    </>
+  );
+
+  if (summary.article_id) {
+    return (
+      <Link className="summary-card card-link" href={href}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <a className="summary-card card-link" href={href}>
+      {content}
     </a>
   );
 };

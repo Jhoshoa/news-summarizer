@@ -1,4 +1,6 @@
-export const Footer = () => (
+import { memo } from "react";
+
+const FooterComponent = () => (
   <footer className="footer">
     <div className="footer-links">
       <a href="#fuentes">Fuentes</a>
@@ -22,3 +24,5 @@ export const Footer = () => (
     </div>
   </footer>
 );
+
+export const Footer = memo(FooterComponent);
