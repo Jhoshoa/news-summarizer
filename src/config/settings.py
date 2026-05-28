@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     telegram_webhook_url: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_URL")
 
     database_url: str = Field(
-        default="postgresql+asyncpg://user:pass@localhost:5432/news_summarizer",
+        default="postgresql+asyncpg://user:pass@localhost:5433/news_summarizer",
         alias="DATABASE_URL",
     )
     database_pool_size: int = Field(default=10, alias="DATABASE_POOL_SIZE")

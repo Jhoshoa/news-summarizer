@@ -95,3 +95,20 @@ export type Summary = {
   summary_date?: string | null;
   created_at?: string | null;
 };
+
+export type TriggerSummaryResponse = {
+  status: string;
+  message: string;
+  result: {
+    collected: number;
+    processed: number;
+    summaries: number;
+    sent: number;
+    collection_stats?: {
+      scraper: number;
+      newsapi: number;
+      inserted: number;
+      updated: number;
+    };
+  };
+};

@@ -1,7 +1,7 @@
 import { AppShell } from "../components/layout/AppShell";
 import { NewsCard } from "../components/news/NewsCard";
 import { mockArticles } from "../data/mockNews";
-import { useGetArticlesQuery } from "../services/api";
+import { useGetArticlesQuery, useTriggerSummaryMutation } from "../services/api";
 
 const getCurrentPage = () => {
   const params = new URLSearchParams(window.location.search);
@@ -27,13 +27,19 @@ export const NewsPage = () => {
   const page = getCurrentPage();
   const category = getCategory();
   const { data, isFetching } = useGetArticlesQuery({ page, page_size: 12, category });
+  const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
   const articles = data?.items.length ? data.items : mockArticles;
   const totalPages = data?.total_pages ?? 1;
   const hasPrevious = page > 1;
   const hasNext = page < totalPages;
+  const handleRefresh = () => {
+    void triggerSummary({ refresh: true, time_of_day: "manual" }).unwrap().catch((error) => {
+      console.error("Error actualizando noticias", error);
+    });
+  };
 
   return (
-    <AppShell compactHeader>
+    <AppShell compactHeader isRefreshing={isFetching || isTriggeringSummary} onRefresh={handleRefresh}>
       <section className="news-browser">
         <div className="browser-heading">
           <span className="eyebrow">Archivo de noticias</span>

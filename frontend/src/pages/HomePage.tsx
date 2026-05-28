@@ -15,6 +15,7 @@ import {
   useGetSummariesQuery,
   useGetWeatherQuery,
   useRefreshEconomicIndicatorsMutation,
+  useTriggerSummaryMutation,
 } from "../services/api";
 
 export const HomePage = () => {
@@ -23,6 +24,7 @@ export const HomePage = () => {
   const { data: articlesData } = useGetArticlesQuery({ limit: 8 });
   const { data: summariesData } = useGetSummariesQuery();
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
+  const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
 
   const indicators = indicatorsData?.items ?? [];
   const articles = articlesData?.items.length ? articlesData.items : mockArticles;
@@ -35,11 +37,19 @@ export const HomePage = () => {
   const featuredSummaries = useMemo(() => summaries.slice(0, 3), [summaries]);
 
   const handleRefresh = () => {
-    void refreshIndicators();
+    void Promise.all([
+      refreshIndicators().unwrap(),
+      triggerSummary({ refresh: true, time_of_day: "manual" }).unwrap(),
+    ]).catch((error) => {
+      console.error("Error actualizando portada", error);
+    });
   };
 
   return (
-    <AppShell isRefreshing={isRefreshing || isFetchingIndicators} onRefresh={handleRefresh}>
+    <AppShell
+      isRefreshing={isRefreshing || isFetchingIndicators || isTriggeringSummary}
+      onRefresh={handleRefresh}
+    >
       <section className="home-layout">
         <PhoneBrief
           headline={headline}

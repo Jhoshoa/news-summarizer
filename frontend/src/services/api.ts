@@ -5,6 +5,7 @@ import type {
   EconomicIndicatorsResponse,
   PaginatedResponse,
   Summary,
+  TriggerSummaryResponse,
   WeatherLocationsResponse,
   WeatherResponse,
 } from "./types";
@@ -28,6 +29,11 @@ type GetSummariesArgs = {
   article_id?: number;
   page?: number;
   page_size?: number;
+};
+
+type TriggerSummaryArgs = {
+  refresh?: boolean;
+  time_of_day?: string;
 };
 
 export const newsApi = createApi({
@@ -92,6 +98,17 @@ export const newsApi = createApi({
       }),
       providesTags: ["Summaries"],
     }),
+    triggerSummary: builder.mutation<TriggerSummaryResponse, TriggerSummaryArgs | void>({
+      query: (args) => ({
+        url: "/trigger/summary",
+        method: "POST",
+        params: {
+          time_of_day: args?.time_of_day ?? "manual",
+          refresh: args?.refresh ?? true,
+        },
+      }),
+      invalidatesTags: ["Articles", "Summaries"],
+    }),
   }),
 });
 
@@ -103,4 +120,5 @@ export const {
   useGetArticlesQuery,
   useGetArticleByIdQuery,
   useGetSummariesQuery,
+  useTriggerSummaryMutation,
 } = newsApi;

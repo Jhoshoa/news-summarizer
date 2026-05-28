@@ -13,10 +13,8 @@ export const Header = ({ compact = false, isRefreshing = false, onRefresh }: Hea
       <span>Noticias Bolivia IA</span>
     </a>
     <nav className="nav" aria-label="Navegacion principal">
-      <a href="#ultimo">Ultimo</a>
       <a href="/news">Noticias</a>
       <a href="/datos">Datos</a>
-      {!compact && <a href="#departamentos">Departamentos</a>}
       <button className="button" type="button" onClick={onRefresh} disabled={isRefreshing}>
         {isRefreshing ? "Actualizando" : "Actualizar"}
       </button>

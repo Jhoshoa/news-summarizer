@@ -58,7 +58,8 @@ NEWS_API_KEY=your_newsapi_key
 NEWS_API_COUNTRY=bo
 NEWS_API_LANGUAGE=es
 
-DATABASE_URL=postgresql+asyncpg://news_user:news_password@localhost:5432/news_summarizer
+POSTGRES_HOST_PORT=5433
+DATABASE_URL=postgresql+asyncpg://news_user:news_password@localhost:5433/news_summarizer
 NEWS_CACHE_TTL_MINUTES=60
 NEWS_MIN_ARTICLES=20
 NEWS_SUMMARY_RETENTION_DAYS=30
