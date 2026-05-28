@@ -53,6 +53,7 @@ export const ArticleDetailPage = () => {
   const treMn = findIndicator(indicators, ["tre", "mn"]);
   const treMe = findIndicator(indicators, ["tre", "me"]);
   const articleBody = article.content || article.description || "";
+  const hasArticleImage = Boolean(article.image);
 
   const handleRefresh = useCallback(() => {
     void refreshIndicators();
@@ -76,21 +77,30 @@ export const ArticleDetailPage = () => {
             {formatPublishedDate(article.published_at)}
           </time>
           <h1>{article.title}</h1>
-          <ArticleImage image={article.image} alt={article.title} />
 
-          <section className="ai-summary">
-            <div className="panel-title">Resumen IA</div>
-            <p>{relatedSummary?.summary || article.description || article.content}</p>
-            {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
+          <section className={hasArticleImage ? "article-content-layout has-image" : "article-content-layout"}>
+            <div className="article-text-column">
+              <section className="ai-summary">
+                <div className="panel-title">Resumen IA</div>
+                <p>{relatedSummary?.summary || article.description || article.content}</p>
+                {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
+              </section>
+
+              {articleBody && (
+                <section className="article-body">
+                  {articleBody.split(/\n+/).map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+                </section>
+              )}
+            </div>
+
+            {hasArticleImage && (
+              <aside className="article-media-column">
+                <ArticleImage image={article.image} alt={article.title} />
+              </aside>
+            )}
           </section>
-
-          {articleBody && (
-            <section className="article-body">
-              {articleBody.split(/\n+/).map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </section>
-          )}
         </article>
 
         <aside className="detail-sidebar">
