@@ -907,10 +907,10 @@ p {
 }
 
 .detail-article h1 {
-  max-width: 720px;
+  max-width: 980px;
   margin-top: 4px;
-  font-size: clamp(2rem, 3.6vw, 3.15rem);
-  line-height: 1.04;
+  font-size: clamp(1.85rem, 3vw, 2.75rem);
+  line-height: 1.08;
 }
 
 .detail-article .article-image {
