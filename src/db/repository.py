@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from loguru import logger
@@ -427,6 +427,7 @@ class Database:
         category: str | None = None,
         source: str | None = None,
         q: str | None = None,
+        article_date: date | None = None,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
@@ -435,6 +436,14 @@ class Database:
         offset = (page - 1) * page_size
 
         filters = [NewsArticle.is_active.is_(True)]
+        if article_date:
+            start_at, end_at = self._day_bounds(article_date)
+            filters.extend(
+                [
+                    NewsArticle.published_at >= start_at,
+                    NewsArticle.published_at < end_at,
+                ]
+            )
         if category:
             filters.append(NewsCategory.name == category.strip().lower())
         if source:
@@ -476,6 +485,10 @@ class Database:
             page=page,
             page_size=page_size,
         )
+
+    def _day_bounds(self, value: date) -> tuple[datetime, datetime]:
+        start_at = datetime.combine(value, time.min)
+        return start_at, start_at + timedelta(days=1)
 
     async def get_article_by_id(self, article_id: int) -> dict | None:
         async with self.session_maker() as session:

@@ -89,3 +89,12 @@ def test_article_row_to_dict_preserves_float_score():
 
     assert result["score"] == 0.885
     assert result["raw_payload"]["score"] == 0.885
+
+
+def test_day_bounds_cover_exact_selected_date():
+    db = object.__new__(Database)
+
+    start_at, end_at = db._day_bounds(date(2026, 5, 28))
+
+    assert start_at == datetime(2026, 5, 28, 0, 0, 0)
+    assert end_at == datetime(2026, 5, 29, 0, 0, 0)

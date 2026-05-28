@@ -1,7 +1,18 @@
 from collections.abc import Callable
+from datetime import date as date_cls
+from datetime import datetime
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Query
+
+
+def _today_for_app(app_instance: Any) -> date_cls:
+    timezone_name = getattr(app_instance.settings, "schedule_timezone", "America/La_Paz")
+    try:
+        return datetime.now(ZoneInfo(timezone_name)).date()
+    except ZoneInfoNotFoundError:
+        return date_cls.today()
 
 
 def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
@@ -21,6 +32,10 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             str | None,
             Query(description="Texto a buscar en titulo, descripcion o contenido."),
         ] = None,
+        date: Annotated[
+            date_cls | None,
+            Query(description="Fecha de publicacion en formato YYYY-MM-DD. Por defecto usa hoy."),
+        ] = None,
         page: Annotated[int, Query(ge=1, description="Pagina solicitada.")] = 1,
         page_size: Annotated[
             int,
@@ -31,10 +46,16 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
+        today = _today_for_app(app_instance)
+        article_date = date or today
+        if article_date > today:
+            raise HTTPException(status_code=422, detail="La fecha no puede ser futura")
+
         return await app_instance.db.list_articles(
             category=category,
             source=source,
             q=q,
+            article_date=article_date,
             page=page,
             page_size=page_size,
         )

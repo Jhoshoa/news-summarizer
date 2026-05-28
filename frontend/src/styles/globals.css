@@ -499,11 +499,52 @@ p {
 }
 
 .category-tabs,
-.pagination {
+.pagination,
+.news-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+.news-toolbar {
+  justify-content: space-between;
+}
+
+.date-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(38, 24, 15, 0.14);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(251, 247, 239, 0.76);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.date-filter span,
+.news-count,
+.form-notice {
+  color: #655243;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.date-filter input {
+  min-height: 32px;
+  border: 1px solid rgba(38, 24, 15, 0.14);
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #fff;
+  color: #140c08;
+  font: inherit;
+}
+
+.form-notice {
+  padding: 10px 12px;
+  border-left: 4px solid #c63b31;
+  background: rgba(198, 59, 49, 0.08);
 }
 
 .category-tabs a,
@@ -532,6 +573,19 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.empty-state {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid rgba(38, 24, 15, 0.14);
+  border-radius: 8px;
+  background: rgba(251, 247, 239, 0.76);
+}
+
+.empty-state p {
+  color: #46372d;
 }
 
 .data-page,

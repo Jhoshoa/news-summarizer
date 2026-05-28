@@ -16,6 +16,7 @@ type GetIndicatorsArgs = {
 
 type GetArticlesArgs = {
   category?: string;
+  date?: string;
   source?: string;
   q?: string;
   page?: number;
@@ -73,6 +74,7 @@ export const newsApi = createApi({
         url: "/api/articles",
         params: {
           category: args?.category,
+          date: args?.date,
           source: args?.source,
           q: args?.q,
           page: args?.page ?? 1,
