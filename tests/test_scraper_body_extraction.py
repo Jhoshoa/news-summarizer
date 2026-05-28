@@ -254,6 +254,44 @@ def test_reduno_link_fallback_accepts_articles_below_category_path():
     )
 
 
+def test_article_url_filter_rejects_program_pages():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedBolivision",
+        url="https://www.redbolivision.tv.bo/",
+    )
+
+    assert not scraper._looks_like_article_url(
+        "https://www.redbolivision.tv.bo/programa/la-cancha-de-bolivision/",
+        source,
+    )
+
+
+def test_filter_usable_articles_drops_title_only_results():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(name="RedBolivision", url="https://www.redbolivision.tv.bo/")
+
+    articles = scraper._filter_usable_articles(
+        [
+            {
+                "title": "La Cancha de Bolivision",
+                "url": "https://www.redbolivision.tv.bo/programa/la-cancha-de-bolivision/",
+                "description": "",
+                "content": None,
+            },
+            {
+                "title": "Noticia con desarrollo",
+                "url": "https://www.redbolivision.tv.bo/noticia-real/",
+                "description": "La nota incluye informacion suficiente para entender el hecho.",
+                "content": "",
+            },
+        ],
+        source,
+    )
+
+    assert [article["title"] for article in articles] == ["Noticia con desarrollo"]
+
+
 def test_extract_article_cleans_title_and_category_text():
     scraper = NewsScraper(sources=[])
     source = NewsSource(

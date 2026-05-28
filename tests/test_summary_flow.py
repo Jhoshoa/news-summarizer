@@ -99,3 +99,45 @@ async def test_fresh_collection_is_classified_persisted_and_summarized():
     assert db.upserted_articles[0]["content"]
     assert db.saved_summaries[0]["article_id"] == 1
     assert db.finished_runs[0]["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_fresh_collection_skips_title_only_articles():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+    )
+    db = FakeDatabase()
+    app = NewsSummarizerApp(settings)
+    app.db = db
+    app.llm = FakeLLM()
+
+    async def collect_news(categories):
+        return (
+            [
+                {
+                    "title": "Ley Integral contra la Trata y Trafico de Personas",
+                    "url": "https://example.com/ley-integral",
+                    "description": "",
+                    "content": "",
+                    "source": "RedBolivision",
+                    "source_type": "scraper",
+                    "source_url": "https://example.com/",
+                    "category": "general",
+                    "hash": "abc",
+                }
+            ],
+            {"scraper": 1, "newsapi": 0, "inserted": 0, "updated": 0},
+            123,
+        )
+
+    app._collect_news = collect_news
+
+    result = await app.send_summaries("manual", refresh=True)
+
+    assert result["collected"] == 0
+    assert result["summaries"] == 0
+    assert db.upserted_articles == []
+    assert db.saved_summaries == []
+    assert db.finished_runs[0]["status"] == "partial"

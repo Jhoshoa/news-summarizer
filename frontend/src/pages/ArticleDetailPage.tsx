@@ -48,6 +48,7 @@ export const ArticleDetailPage = () => {
   const gold = findIndicator(indicators, ["oro"]);
   const treMn = findIndicator(indicators, ["tre", "mn"]);
   const treMe = findIndicator(indicators, ["tre", "me"]);
+  const articleBody = article.content || article.description || "";
 
   const handleRefresh = () => {
     void refreshIndicators();
@@ -74,14 +75,13 @@ export const ArticleDetailPage = () => {
             {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
           </section>
 
-          <p>
-            El detalle menciona el articulo completo con fuente, fecha de publicacion y fecha de
-            recoleccion. La experiencia permite comparar el resumen con el texto extraido.
-          </p>
-          <p>
-            Los modulos laterales agregan contexto corto pero valioso: compra y venta del dolar,
-            valor UFV, oro, tasas TRE, clima local y radiacion solar.
-          </p>
+          {articleBody && (
+            <section className="article-body">
+              {articleBody.split(/\n+/).map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </section>
+          )}
         </article>
 
         <aside className="detail-sidebar">

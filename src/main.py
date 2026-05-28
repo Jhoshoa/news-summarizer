@@ -158,6 +158,32 @@ class NewsSummarizerApp:
                     "collection_stats": collection_stats,
                 }
 
+            before_quality_filter = len(news)
+            news = self._filter_usable_articles(news)
+            dropped = before_quality_filter - len(news)
+            if dropped:
+                logger.info(f"Filtradas {dropped} noticias sin contenido util")
+
+            if not news:
+                logger.warning("No hay noticias con contenido util para procesar")
+                if self.db and collection_run_id is not None:
+                    await self.db.finish_collection_run(
+                        collection_run_id,
+                        status="partial",
+                        scraper_count=collection_stats["scraper"],
+                        newsapi_count=collection_stats["newsapi"],
+                        inserted_count=collection_stats["inserted"],
+                        updated_count=collection_stats["updated"],
+                    )
+                return {
+                    "collected": 0,
+                    "summaries": 0,
+                    "sent": 0,
+                    "used_cached_articles": used_cached_articles,
+                    "used_cached_summaries": used_cached_summaries,
+                    "collection_stats": collection_stats,
+                }
+
             deduplicator = Deduplicator()
             news = deduplicator.deduplicate(news)
 
@@ -285,6 +311,25 @@ class NewsSummarizerApp:
             "used_cached_summaries": used_cached_summaries,
             "collection_stats": collection_stats,
         }
+
+    def _filter_usable_articles(self, news: list[dict]) -> list[dict]:
+        return [article for article in news if self._has_usable_article_text(article)]
+
+    def _has_usable_article_text(self, article: dict) -> bool:
+        text = " ".join(
+            str(article.get(field) or "")
+            for field in ("description", "content", "excerpt")
+        ).strip()
+        if not text:
+            return False
+
+        title = str(article.get("title") or "").strip().lower()
+        normalized_text = " ".join(text.lower().split())
+        normalized_title = " ".join(title.split())
+        if normalized_text == normalized_title:
+            return False
+
+        return len(normalized_text) >= 50 or len(normalized_text.split()) >= 8
 
     async def _collect_news(
         self, categories: list[str]

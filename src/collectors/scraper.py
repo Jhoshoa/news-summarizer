@@ -206,7 +206,8 @@ class NewsScraper:
                 articles = self._extract_links_fallback(soup, source)
 
             articles = self._deduplicate(articles)
-            return await self._enrich_articles(client, articles, source)
+            enriched = await self._enrich_articles(client, articles, source)
+            return self._filter_usable_articles(enriched, source)
         except Exception as e:
             logger.error(f"Error fetching {source.name}: {e}")
             return []
@@ -294,6 +295,26 @@ class NewsScraper:
                 enriched.append(article)
 
         return enriched
+
+    def _filter_usable_articles(self, articles: list[dict], source: NewsSource) -> list[dict]:
+        usable = [article for article in articles if self._has_usable_text(article)]
+        dropped = len(articles) - len(usable)
+        if dropped:
+            logger.info(f"Dropped {dropped} title-only articles from {source.name}")
+        return usable
+
+    def _has_usable_text(self, article: dict) -> bool:
+        title = self._normalize_for_match(article.get("title", ""))
+        text = " ".join(
+            str(article.get(field) or "")
+            for field in ("description", "content", "excerpt")
+        ).strip()
+        normalized_text = self._normalize_for_match(text)
+
+        if not normalized_text or normalized_text == title:
+            return False
+
+        return self._count_words(text) >= 8 or len(text) >= 50
 
     async def _enrich_article(
         self,
@@ -682,6 +703,7 @@ class NewsScraper:
             "/categoria/",
             "/author/",
             "/page/",
+            "/programa/",
             "facebook.com",
             "instagram.com",
             "twitter.com",
