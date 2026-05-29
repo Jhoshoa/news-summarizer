@@ -451,6 +451,111 @@ p {
   background: #eadbc5;
 }
 
+.skeleton-block {
+  display: block;
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e1d1ba 0%, #f7efe2 48%, #e1d1ba 100%);
+  background-size: 220% 100%;
+  animation: skeleton-pulse 1.25s ease-in-out infinite;
+}
+
+.skeleton-card,
+.skeleton-panel {
+  pointer-events: none;
+}
+
+.skeleton-card {
+  min-height: 184px;
+}
+
+.skeleton-stack {
+  display: grid;
+  gap: 9px;
+  align-content: start;
+}
+
+.skeleton-media {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 3 / 4;
+}
+
+.skeleton-line {
+  width: 100%;
+  height: 12px;
+}
+
+.skeleton-line-xs {
+  width: 32%;
+}
+
+.skeleton-line-sm {
+  width: 46%;
+}
+
+.skeleton-line-md {
+  width: 68%;
+}
+
+.skeleton-line-lg {
+  width: 82%;
+}
+
+.skeleton-line-xl {
+  width: 92%;
+  height: 34px;
+}
+
+.skeleton-title {
+  width: min(780px, 100%);
+  height: 42px;
+}
+
+.skeleton-title-short {
+  width: min(520px, 78%);
+}
+
+.skeleton-image-large {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+}
+
+.skeleton-phone {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.skeleton-phone-row {
+  width: 100%;
+  height: 56px;
+}
+
+.skeleton-table {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.skeleton-chip {
+  width: 86px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+@keyframes skeleton-pulse {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
 .card-link {
   color: inherit;
   cursor: pointer;
@@ -548,7 +653,7 @@ p {
 .browser-heading {
   display: grid;
   gap: 10px;
-  max-width: 760px;
+  max-width: none;
 }
 
 .browser-heading h1 {
@@ -557,6 +662,7 @@ p {
 
 .browser-heading p {
   color: #46372d;
+  max-width: 760px;
 }
 
 .category-tabs,

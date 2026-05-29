@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { usePageRefreshControl } from "../app/refreshControl";
 import { Link, useRouter } from "../app/router";
 import { NewsCard } from "../components/news/NewsCard";
+import { NewsCardSkeleton } from "../components/ui/Skeleton";
 import { useGetArticlesQuery, useTriggerSummaryMutation } from "../services/api";
 import {
   buildNewsHref,
@@ -36,6 +37,7 @@ export const NewsPage = () => {
   const hasNext = page < totalPages;
   const today = getTodayDate();
   const normalizedHref = buildNewsHref(page, selectedDate, category);
+  const showNewsSkeleton = isFetching;
 
   useEffect(() => {
     if (`${location.pathname}${location.search}` !== normalizedHref) {
@@ -81,9 +83,7 @@ export const NewsPage = () => {
               onChange={(event) => navigate(navigateToDate(event.target.value || today, category))}
             />
           </label>
-          <span className="news-count">
-            {data ? `${data.total} noticias para ${selectedDate}` : "Cargando noticias"}
-          </span>
+          <span className="news-count">{showNewsSkeleton ? "Cargando noticias" : `${data?.total ?? 0} noticias para ${selectedDate}`}</span>
         </div>
 
         {validationMessage && <p className="form-notice">{validationMessage}</p>}
@@ -100,27 +100,27 @@ export const NewsPage = () => {
           ))}
         </div>
 
-        <div className="archive-list" aria-busy={isFetching}>
-          {articles.map((article) => (
-            <NewsCard key={article.id} article={article} />
-          ))}
+        <div className="archive-list" aria-busy={showNewsSkeleton}>
+          {showNewsSkeleton
+            ? Array.from({ length: 6 }, (_, index) => <NewsCardSkeleton key={index} />)
+            : articles.map((article) => <NewsCard key={article.id} article={article} />)}
         </div>
 
-        {!isFetching && error && (
+        {!showNewsSkeleton && error && (
           <section className="empty-state">
             <span className="panel-title">No se pudo cargar</span>
             <p>Revisa que el backend este disponible y vuelve a intentar.</p>
           </section>
         )}
 
-        {!isFetching && !error && articles.length === 0 && (
+        {!showNewsSkeleton && !error && articles.length === 0 && (
           <section className="empty-state">
             <span className="panel-title">Sin noticias para esta fecha</span>
             <p>No hay articulos guardados para {selectedDate}. Puedes actualizar o elegir otro dia.</p>
           </section>
         )}
 
-        {articles.length > 0 && (
+        {!showNewsSkeleton && articles.length > 0 && (
           <nav className="pagination" aria-label="Paginacion">
             <Link
               className={!hasPrevious ? "disabled" : ""}

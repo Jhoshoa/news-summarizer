@@ -2,7 +2,9 @@ import { useCallback, useMemo } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
 import { useRouter } from "../app/router";
+import { findByExactCode, findIndicator, formatNumber } from "../components/indicators/indicatorUtils";
 import { ArticleImage } from "../components/news/ArticleImage";
+import { ArticleDetailSkeleton, PanelSkeleton } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
 import { mockArticles } from "../data/mockNews";
 import {
@@ -12,7 +14,6 @@ import {
   useGetWeatherQuery,
   useRefreshEconomicIndicatorsMutation,
 } from "../services/api";
-import { findByExactCode, findIndicator, formatNumber } from "../components/indicators/indicatorUtils";
 import { formatPublishedDate } from "../utils/date";
 
 const getArticleIdFromPath = (pathname: string) => {
@@ -24,13 +25,15 @@ const getArticleIdFromPath = (pathname: string) => {
 export const ArticleDetailPage = () => {
   const { location } = useRouter();
   const articleId = getArticleIdFromPath(location.pathname);
-  const { data: articleData } = useGetArticleByIdQuery(articleId ?? 1, { skip: articleId === null });
-  const { data: summaryData } = useGetSummariesQuery(
+  const { data: articleData, isFetching: isFetchingArticle } = useGetArticleByIdQuery(articleId ?? 1, {
+    skip: articleId === null,
+  });
+  const { data: summaryData, isFetching: isFetchingSummary } = useGetSummariesQuery(
     articleId ? { article_id: articleId, page_size: 1 } : undefined,
     { skip: articleId === null },
   );
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
-  const { data: weather } = useGetWeatherQuery();
+  const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery();
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
 
   const indicators = indicatorsData?.items ?? [];
@@ -54,6 +57,7 @@ export const ArticleDetailPage = () => {
   const treMe = findIndicator(indicators, ["tre", "me"]);
   const articleBody = article.content || article.description || "";
   const hasArticleImage = Boolean(article.image);
+  const showArticleSkeleton = articleId === null || isFetchingArticle || isFetchingSummary;
 
   const handleRefresh = useCallback(() => {
     void refreshIndicators();
@@ -67,6 +71,10 @@ export const ArticleDetailPage = () => {
     [handleRefresh, isFetchingIndicators, isRefreshing],
   );
   usePageRefreshControl(refreshControl);
+
+  if (showArticleSkeleton) {
+    return <ArticleDetailSkeleton />;
+  }
 
   return (
     <>
@@ -104,51 +112,60 @@ export const ArticleDetailPage = () => {
         </article>
 
         <aside className="detail-sidebar">
-          <section className="side-card">
-            <div className="panel-title">Dolar hoy</div>
-            <dl className="side-values">
-              <div>
-                <dt>Oficial C/V</dt>
-                <dd>
-                  {formatNumber(officialBuy)} / {formatNumber(officialSell)}
-                </dd>
-              </div>
-              <div>
-                <dt>Referencial C/V</dt>
-                <dd>
-                  {formatNumber(referenceBuy)} / {formatNumber(referenceSell)}
-                </dd>
-              </div>
-              <div>
-                <dt>P2P C/V</dt>
-                <dd>
-                  {formatNumber(p2pBuy)} / {formatNumber(p2pSell)}
-                </dd>
-              </div>
-            </dl>
-          </section>
+          {isFetchingIndicators ? (
+            <>
+              <PanelSkeleton />
+              <PanelSkeleton />
+            </>
+          ) : (
+            <>
+              <section className="side-card">
+                <div className="panel-title">Dolar hoy</div>
+                <dl className="side-values">
+                  <div>
+                    <dt>Oficial C/V</dt>
+                    <dd>
+                      {formatNumber(officialBuy)} / {formatNumber(officialSell)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Referencial C/V</dt>
+                    <dd>
+                      {formatNumber(referenceBuy)} / {formatNumber(referenceSell)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>P2P C/V</dt>
+                    <dd>
+                      {formatNumber(p2pBuy)} / {formatNumber(p2pSell)}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
 
-          <section className="side-card">
-            <div className="panel-title">BCB clave</div>
-            <dl className="side-values">
-              <div>
-                <dt>UFV</dt>
-                <dd>{formatNumber(ufv?.value, 5)}</dd>
-              </div>
-              <div>
-                <dt>Oro USD/O.T.F.</dt>
-                <dd>{formatNumber(gold?.value, 2)}</dd>
-              </div>
-              <div>
-                <dt>TRe MN / ME</dt>
-                <dd>
-                  {formatNumber(treMn?.value, 2)} / {formatNumber(treMe?.value, 2)}
-                </dd>
-              </div>
-            </dl>
-          </section>
+              <section className="side-card">
+                <div className="panel-title">BCB clave</div>
+                <dl className="side-values">
+                  <div>
+                    <dt>UFV</dt>
+                    <dd>{formatNumber(ufv?.value, 5)}</dd>
+                  </div>
+                  <div>
+                    <dt>Oro USD/O.T.F.</dt>
+                    <dd>{formatNumber(gold?.value, 2)}</dd>
+                  </div>
+                  <div>
+                    <dt>TRe MN / ME</dt>
+                    <dd>
+                      {formatNumber(treMn?.value, 2)} / {formatNumber(treMe?.value, 2)}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+            </>
+          )}
 
-          <WeatherPanel weather={weather} />
+          {isFetchingWeather ? <PanelSkeleton /> : <WeatherPanel weather={weather} />}
         </aside>
       </section>
     </>
