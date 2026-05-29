@@ -1,6 +1,16 @@
 from src.processors.classifier import NewsClassifier
 
 
+class FakeClassifierLLM:
+    def __init__(self, response: str):
+        self.response = response
+        self.calls = []
+
+    async def chat(self, prompt, **kwargs):
+        self.calls.append({"prompt": prompt, **kwargs})
+        return self.response
+
+
 def test_classifier_uses_weighted_rules_for_politics():
     classifier = NewsClassifier()
 
@@ -109,3 +119,86 @@ def test_classify_batch_adds_auditable_metadata():
     assert result[0]["category_scores"]["economia"] > 0
     assert result[0]["category_reason"].startswith("economia:")
     assert result[0]["category_method"] == "rules"
+
+
+async def test_classify_batch_async_uses_llm_for_low_confidence_rule():
+    llm = FakeClassifierLLM(
+        '{"category": "politica", "confidence": 0.81, "reason": "Menciona ley y club civico."}'
+    )
+    classifier = NewsClassifier(llm_provider=llm)
+    articles = [
+        {
+            "title": "Presidente del club habla de elecciones y futbol",
+            "description": "El candidato y jugador anuncio ley y gol.",
+            "content": "",
+            "category": "general",
+        }
+    ]
+
+    result = await classifier.classify_batch_async(articles)
+
+    assert len(llm.calls) == 1
+    assert result[0]["category"] == "politica"
+    assert result[0]["category_method"] == "llm_fallback"
+    assert result[0]["category_rule_category"] == "politica"
+    assert result[0]["category_rule_confidence"] > 0
+    assert result[0]["category_reason"].startswith("llm:")
+
+
+async def test_classify_batch_async_skips_llm_for_confident_rule():
+    llm = FakeClassifierLLM('{"category": "general", "confidence": 0.99, "reason": "No usar"}')
+    classifier = NewsClassifier(llm_provider=llm)
+    articles = [
+        {
+            "title": "El Gobierno y el TSE coordinan las elecciones nacionales",
+            "description": "El presidente y diputados explicaron la nueva ley electoral.",
+            "content": "",
+            "category": "general",
+        }
+    ]
+
+    result = await classifier.classify_batch_async(articles)
+
+    assert llm.calls == []
+    assert result[0]["category"] == "politica"
+    assert result[0]["category_method"] == "rules"
+
+
+async def test_classify_batch_async_keeps_rules_when_llm_returns_invalid_category():
+    llm = FakeClassifierLLM('{"category": "salud", "confidence": 0.95, "reason": "Invalida"}')
+    classifier = NewsClassifier(llm_provider=llm)
+    articles = [
+        {
+            "title": "Presidente del club habla de elecciones y futbol",
+            "description": "El candidato y jugador anuncio ley y gol.",
+            "content": "",
+            "category": "general",
+        }
+    ]
+
+    result = await classifier.classify_batch_async(articles)
+
+    assert len(llm.calls) == 1
+    assert result[0]["category"] == "politica"
+    assert result[0]["category_method"] == "rules_low_confidence"
+    assert result[0]["category_llm_error"] == "invalid_category:salud"
+
+
+async def test_classify_batch_async_parses_llm_json_inside_markdown_fence():
+    llm = FakeClassifierLLM(
+        '```json\n{"category": "politica", "confidence": 0.77, "reason": "Contexto politico"}\n```'
+    )
+    classifier = NewsClassifier(llm_provider=llm)
+    articles = [
+        {
+            "title": "Presidente del club habla de elecciones y futbol",
+            "description": "El candidato y jugador anuncio ley y gol.",
+            "content": "",
+            "category": "general",
+        }
+    ]
+
+    result = await classifier.classify_batch_async(articles)
+
+    assert result[0]["category"] == "politica"
+    assert result[0]["category_method"] == "llm_fallback"

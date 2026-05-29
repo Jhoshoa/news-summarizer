@@ -63,6 +63,15 @@ class NewsClassifier:
         "low_confidence_threshold": 0.62,
     }
     DEFAULT_LIMITS = {"content_chars": 1200}
+    DEFAULT_AI_FALLBACK = {
+        "enabled": False,
+        "eligible_methods": ["rules_low_confidence"],
+        "quality": "fast",
+        "temperature": 0.1,
+        "max_tokens": 300,
+        "min_confidence": 0.55,
+        "max_articles_per_batch": 12,
+    }
 
     def __init__(
         self,
@@ -76,6 +85,7 @@ class NewsClassifier:
         self.field_weights: dict[str, float] = self.config["field_weights"]
         self.thresholds: dict[str, float] = self.config["thresholds"]
         self.limits: dict[str, int] = self.config["limits"]
+        self.ai_fallback: dict[str, Any] = self.config["ai_fallback"]
         self.valid_categories = set(self.categories) | {"general"}
 
     def classify(self, article: dict) -> str:
@@ -139,48 +149,45 @@ class NewsClassifier:
         if not self.llm:
             return self.classify(article)
 
-        category_descriptions = "\n".join(
-            f"- {category}: {rules.get('description', '')}"
-            for category, rules in self.categories.items()
-        )
-        prompt = f"""Clasifica esta noticia en UNA sola categoria.
+        decision = self.classify_article(article)
+        llm_decision = await self._classify_with_llm(article, decision)
+        if not llm_decision:
+            return decision.category
 
-Titulo: {article.get("title")}
-Descripcion: {str(article.get("description") or "")[:300]}
-
-Categorias disponibles:
-{category_descriptions}
-- general: noticia que no encaja claramente en las categorias anteriores.
-
-Responde SOLO JSON valido con esta forma:
-{{"category": "politica", "confidence": 0.82, "reason": "motivo breve"}}"""
-
-        try:
-            result = await self.llm.chat(prompt, quality="fast")
-            parsed = json.loads(result)
-            category = self._normalize(parsed.get("category", "general"))
-            if category in self.valid_categories:
-                article["category_confidence"] = self._safe_float(parsed.get("confidence"), 0.0)
-                article["category_reason"] = str(parsed.get("reason") or "llm")
-                article["category_method"] = "llm"
-                return category
-
-            return "general"
-
-        except Exception as e:
-            logger.error(f"Error en clasificacion IA: {e}")
-            return self.classify(article)
+        article["category_confidence"] = llm_decision.confidence
+        article["category_reason"] = llm_decision.reason
+        article["category_method"] = llm_decision.method
+        return llm_decision.category
 
     def classify_batch(self, news: list[dict]) -> list[dict]:
         """Clasifica una lista de noticias y agrega metadatos auditables."""
 
         for article in news:
             decision = self.classify_article(article)
-            article["category"] = decision.category
-            article["category_confidence"] = decision.confidence
-            article["category_scores"] = decision.scores
-            article["category_reason"] = decision.reason
-            article["category_method"] = decision.method
+            self._apply_decision(article, decision)
+
+        return news
+
+    async def classify_batch_async(self, news: list[dict]) -> list[dict]:
+        """Clasifica noticias y usa LLM solo para casos ambiguos configurados."""
+
+        eligible_count = 0
+        max_ai_articles = int(self.ai_fallback["max_articles_per_batch"])
+
+        for article in news:
+            rule_decision = self.classify_article(article)
+            self._apply_decision(article, rule_decision)
+
+            if not self._should_use_llm(rule_decision):
+                continue
+            if eligible_count >= max_ai_articles:
+                article["category_llm_error"] = "ai_fallback_batch_limit_reached"
+                continue
+
+            eligible_count += 1
+            llm_decision = await self._classify_with_llm(article, rule_decision)
+            if llm_decision:
+                self._apply_llm_decision(article, llm_decision, rule_decision)
 
         return news
 
@@ -206,6 +213,10 @@ Responde SOLO JSON valido con esta forma:
                 **self.DEFAULT_LIMITS,
                 **(loaded.get("limits") or {}),
             },
+            "ai_fallback": {
+                **self.DEFAULT_AI_FALLBACK,
+                **(loaded.get("ai_fallback") or {}),
+            },
         }
 
     def _fallback_config(self) -> dict[str, Any]:
@@ -214,7 +225,137 @@ Responde SOLO JSON valido con esta forma:
             "field_weights": self.DEFAULT_FIELD_WEIGHTS,
             "thresholds": self.DEFAULT_THRESHOLDS,
             "limits": self.DEFAULT_LIMITS,
+            "ai_fallback": self.DEFAULT_AI_FALLBACK,
         }
+
+    def _apply_decision(self, article: dict, decision: ClassificationDecision) -> None:
+        article["category"] = decision.category
+        article["category_confidence"] = decision.confidence
+        article["category_scores"] = decision.scores
+        article["category_reason"] = decision.reason
+        article["category_method"] = decision.method
+
+    def _apply_llm_decision(
+        self,
+        article: dict,
+        llm_decision: ClassificationDecision,
+        rule_decision: ClassificationDecision,
+    ) -> None:
+        article["category_rule_category"] = rule_decision.category
+        article["category_rule_confidence"] = rule_decision.confidence
+        article["category_rule_reason"] = rule_decision.reason
+        self._apply_decision(article, llm_decision)
+
+    def _should_use_llm(self, decision: ClassificationDecision) -> bool:
+        if not self.llm or not bool(self.ai_fallback["enabled"]):
+            return False
+
+        eligible_methods = {
+            str(method) for method in self.ai_fallback.get("eligible_methods", [])
+        }
+        return decision.method in eligible_methods
+
+    async def _classify_with_llm(
+        self,
+        article: dict,
+        rule_decision: ClassificationDecision,
+    ) -> ClassificationDecision | None:
+        prompt = self._build_llm_prompt(article, rule_decision)
+        quality = str(self.ai_fallback["quality"])
+        temperature = self._safe_float(self.ai_fallback["temperature"], 0.1)
+        max_tokens = int(self.ai_fallback["max_tokens"])
+
+        try:
+            result = await self.llm.chat(
+                prompt,
+                quality=quality,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            parsed = self._parse_llm_json(result)
+            category = self._normalize(parsed.get("category", ""))
+            confidence = self._safe_float(parsed.get("confidence"), 0.0)
+            reason = str(parsed.get("reason") or "llm_fallback").strip()
+
+            if category not in self.valid_categories:
+                article["category_llm_error"] = f"invalid_category:{category or 'empty'}"
+                return None
+
+            if confidence < self._safe_float(self.ai_fallback["min_confidence"], 0.55):
+                article["category_llm_error"] = f"low_confidence:{confidence:g}"
+                return None
+
+            return ClassificationDecision(
+                category=category,
+                confidence=round(confidence, 4),
+                scores=rule_decision.scores,
+                reason=f"llm:{reason}",
+                method="llm_fallback",
+            )
+        except Exception as e:
+            logger.warning(f"Fallback IA de clasificacion fallo: {e}")
+            article["category_llm_error"] = str(e)
+            return None
+
+    def _build_llm_prompt(
+        self,
+        article: dict,
+        rule_decision: ClassificationDecision,
+    ) -> str:
+        category_descriptions = "\n".join(
+            f"- {category}: {rules.get('description', '')}"
+            for category, rules in self.categories.items()
+        )
+        content_limit = min(int(self.limits["content_chars"]), 900)
+        content = str(article.get("content") or "")[:content_limit]
+        scores = json.dumps(rule_decision.scores, ensure_ascii=False, sort_keys=True)
+
+        return f"""Clasifica esta noticia boliviana en UNA sola categoria.
+
+Categorias disponibles:
+{category_descriptions}
+- general: noticia que no encaja claramente en las categorias anteriores.
+
+Decision por reglas:
+- categoria: {rule_decision.category}
+- confianza: {rule_decision.confidence}
+- scores: {scores}
+- razon: {rule_decision.reason}
+
+Noticia:
+Titulo: {article.get("title")}
+Descripcion: {str(article.get("description") or "")[:400]}
+Contenido: {content}
+
+Reglas:
+- Responde solo una categoria permitida.
+- Usa "general" si no hay una categoria clara.
+- Devuelve SOLO JSON valido, sin markdown.
+
+Formato:
+{{"category": "politica", "confidence": 0.82, "reason": "motivo breve"}}"""
+
+    def _parse_llm_json(self, response: str) -> dict[str, Any]:
+        text = str(response or "").strip()
+        if not text:
+            raise ValueError("empty_llm_response")
+
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+            text = re.sub(r"\s*```$", "", text)
+
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+            if not match:
+                raise
+            parsed = json.loads(match.group(0))
+
+        if not isinstance(parsed, dict):
+            raise ValueError("llm_response_is_not_object")
+
+        return parsed
 
     def _article_fields(self, article: dict) -> dict[str, str]:
         content_limit = int(self.limits["content_chars"])
