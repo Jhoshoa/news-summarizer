@@ -426,8 +426,6 @@ class NewsScraper:
             article_body = node.get("articleBody")
             if article_body:
                 text_parts.append(str(article_body))
-            elif node.get("description"):
-                text_parts.append(str(node["description"]))
 
         return self._clean_text("\n\n".join(text_parts))
 

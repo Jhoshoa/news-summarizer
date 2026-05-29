@@ -91,6 +91,30 @@ def test_article_row_to_dict_preserves_float_score():
     assert result["raw_payload"]["score"] == 0.885
 
 
+def test_article_row_to_dict_hides_content_that_duplicates_description():
+    db = object.__new__(Database)
+    article = SimpleNamespace(
+        id=1,
+        title="Titulo",
+        url="https://example.com",
+        description="La entradilla de la noticia con datos principales.",
+        content=" La entradilla de la noticia con datos principales. ",
+        author=None,
+        image_url=None,
+        published_at=datetime(2026, 5, 10, 12, 0),
+        collected_at=datetime(2026, 5, 10, 12, 1),
+        country="bolivia",
+        url_hash="abc",
+        score=0.885,
+        raw_payload={},
+    )
+
+    result = db._article_row_to_dict((article, "politica", "Example", "scraper"))
+
+    assert result["description"] == "La entradilla de la noticia con datos principales."
+    assert result["content"] is None
+
+
 def test_day_bounds_cover_exact_selected_date():
     db = object.__new__(Database)
 

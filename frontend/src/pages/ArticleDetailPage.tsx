@@ -22,6 +22,27 @@ const getArticleIdFromPath = (pathname: string) => {
   return Number.isFinite(id) ? id : null;
 };
 
+const normalizeArticleText = (value?: string | null) =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const isDuplicateText = (value?: string | null, reference?: string | null) => {
+  const normalizedValue = normalizeArticleText(value);
+  const normalizedReference = normalizeArticleText(reference);
+  if (!normalizedValue || !normalizedReference) {
+    return false;
+  }
+
+  return (
+    normalizedValue === normalizedReference ||
+    (Math.abs(normalizedValue.length - normalizedReference.length) < 80 &&
+      (normalizedValue.includes(normalizedReference) || normalizedReference.includes(normalizedValue)))
+  );
+};
+
 export const ArticleDetailPage = () => {
   const { location } = useRouter();
   const articleId = getArticleIdFromPath(location.pathname);
@@ -55,7 +76,13 @@ export const ArticleDetailPage = () => {
   const gold = findIndicator(indicators, ["oro"]);
   const treMn = findIndicator(indicators, ["tre", "mn"]);
   const treMe = findIndicator(indicators, ["tre", "me"]);
-  const articleBody = article.content || article.description || "";
+  const summaryText = relatedSummary?.summary || article.description || article.content;
+  const articleBody =
+    article.content &&
+    !isDuplicateText(article.content, relatedSummary?.summary) &&
+    !isDuplicateText(article.content, article.description)
+      ? article.content
+      : "";
   const hasArticleImage = Boolean(article.image);
   const showArticleSkeleton = articleId === null || isFetchingArticle || isFetchingSummary;
 
@@ -90,7 +117,7 @@ export const ArticleDetailPage = () => {
             <div className="article-text-column">
               <section className="ai-summary">
                 <div className="panel-title">Resumen IA</div>
-                <p>{relatedSummary?.summary || article.description || article.content}</p>
+                <p>{summaryText}</p>
                 {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
               </section>
 

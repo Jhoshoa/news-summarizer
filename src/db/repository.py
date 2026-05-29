@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
@@ -808,7 +809,7 @@ class Database:
             "title": article.title,
             "url": article.url,
             "description": article.description,
-            "content": article.content,
+            "content": self._article_content_for_response(article.content, article.description),
             "author": article.author,
             "image": self._public_image_url(article.image_url),
             "published_at": article.published_at,
@@ -821,6 +822,24 @@ class Database:
             "score": article.score,
             "raw_payload": article.raw_payload,
         }
+
+    def _article_content_for_response(
+        self,
+        content: str | None,
+        description: str | None,
+    ) -> str | None:
+        if not content:
+            return None
+
+        normalized_content = self._normalize_article_text(content)
+        normalized_description = self._normalize_article_text(description)
+        if normalized_description and normalized_content == normalized_description:
+            return None
+
+        return content
+
+    def _normalize_article_text(self, value: str | None) -> str:
+        return re.sub(r"\s+", " ", str(value or "")).strip().lower()
 
     def _summary_row_to_dict(self, row: Any) -> dict:
         summary = row[0]

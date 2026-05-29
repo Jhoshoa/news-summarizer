@@ -107,6 +107,42 @@ def test_extract_body_content_uses_json_ld_article_body_before_css():
     assert "Segundo parrafo desde JSON-LD" in content
 
 
+def test_extract_body_content_ignores_json_ld_description_as_body():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Example",
+        url="https://example.com/",
+        body_selector=".article-body p",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <head>
+            <script type="application/ld+json">
+              {
+                "@type": "NewsArticle",
+                "description": "Entradilla breve que no es el cuerpo completo."
+              }
+            </script>
+          </head>
+          <body>
+            <article class="article-body">
+              <p>Primer parrafo real de la noticia con informacion suficiente para superar el minimo.</p>
+              <p>Segundo parrafo real con contexto adicional y datos importantes del acontecimiento.</p>
+            </article>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    content = scraper._extract_body_content(soup, source)
+
+    assert "Entradilla breve" not in content
+    assert "Primer parrafo real" in content
+    assert "Segundo parrafo real" in content
+
+
 def test_clean_text_decodes_entities_tags_spacing_and_mojibake():
     scraper = NewsScraper(sources=[])
 
