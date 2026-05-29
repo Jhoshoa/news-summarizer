@@ -1,0 +1,123 @@
+version: 1
+
+categories:
+  economia:
+    description: "Economia, finanzas, dolar, banca, produccion, comercio, precios y energia."
+    positive:
+      - { term: "dolar", weight: 3 }
+      - { term: "tipo de cambio", weight: 4 }
+      - { term: "banco central", weight: 4 }
+      - { term: "bcb", weight: 3 }
+      - { term: "inflacion", weight: 3 }
+      - { term: "exportacion", weight: 2 }
+      - { term: "importacion", weight: 2 }
+      - { term: "combustible", weight: 3 }
+      - { term: "hidrocarburos", weight: 3 }
+      - { term: "precio", weight: 1.5 }
+      - { term: "mercado", weight: 1.5 }
+      - { term: "banco", weight: 2 }
+      - { term: "credito", weight: 2 }
+      - { term: "deuda", weight: 2 }
+      - { term: "economia", weight: 3 }
+    negative:
+      - { term: "club", weight: 2 }
+      - { term: "gol", weight: 2 }
+
+  politica:
+    description: "Gobierno, elecciones, partidos politicos, Asamblea, leyes, candidatos y autoridades."
+    positive:
+      - { term: "gobierno", weight: 2 }
+      - { term: "presidente", weight: 3 }
+      - { term: "ministro", weight: 2 }
+      - { term: "viceministro", weight: 2 }
+      - { term: "elecciones", weight: 4 }
+      - { term: "candidato", weight: 3 }
+      - { term: "asamblea legislativa", weight: 4 }
+      - { term: "diputado", weight: 3 }
+      - { term: "senador", weight: 3 }
+      - { term: "ley", weight: 2 }
+      - { term: "decreto", weight: 2 }
+      - { term: "tribunal supremo electoral", weight: 4 }
+      - { term: "tse", weight: 3 }
+      - { term: "partido politico", weight: 4 }
+      - { term: "\\bmas\\b", weight: 2, regex: true }
+      - { term: "evo morales", weight: 3 }
+      - { term: "luis arce", weight: 3 }
+    negative:
+      - { term: "partido de futbol", weight: 5 }
+      - { term: "liga profesional", weight: 4 }
+      - { term: "gol", weight: 3 }
+      - { term: "club", weight: 2 }
+
+  deportes:
+    description: "Futbol, clubes, torneos, seleccion, resultados y deportistas."
+    positive:
+      - { term: "futbol", weight: 4 }
+      - { term: "gol", weight: 3 }
+      - { term: "club", weight: 3 }
+      - { term: "liga profesional", weight: 4 }
+      - { term: "seleccion boliviana", weight: 4 }
+      - { term: "copa", weight: 2 }
+      - { term: "torneo", weight: 2 }
+      - { term: "campeonato", weight: 3 }
+      - { term: "jugador", weight: 2 }
+      - { term: "entrenador", weight: 2 }
+      - { term: "partido de futbol", weight: 5 }
+      - { term: "bolivar", weight: 2 }
+      - { term: "the strongest", weight: 3 }
+      - { term: "oriente petrolero", weight: 3 }
+      - { term: "wilstermann", weight: 3 }
+    negative:
+      - { term: "partido politico", weight: 5 }
+      - { term: "candidato", weight: 3 }
+      - { term: "elecciones", weight: 3 }
+      - { term: "asamblea legislativa", weight: 3 }
+
+  tecnologia:
+    description: "Tecnologia, internet, software, ciberseguridad, inteligencia artificial y telecomunicaciones."
+    positive:
+      - { term: "inteligencia artificial", weight: 4 }
+      - { term: "\\bia\\b", weight: 3, regex: true }
+      - { term: "software", weight: 3 }
+      - { term: "internet", weight: 2 }
+      - { term: "ciberseguridad", weight: 4 }
+      - { term: "aplicacion", weight: 2 }
+      - { term: "app", weight: 2 }
+      - { term: "tecnologia", weight: 3 }
+      - { term: "digital", weight: 2 }
+      - { term: "telecomunicaciones", weight: 3 }
+      - { term: "redes sociales", weight: 2 }
+    negative: []
+
+  entretenimiento:
+    description: "Cultura, television, cine, musica, famosos, festivales y espectaculos."
+    positive:
+      - { term: "cine", weight: 3 }
+      - { term: "musica", weight: 3 }
+      - { term: "cantante", weight: 3 }
+      - { term: "festival", weight: 3 }
+      - { term: "television", weight: 2 }
+      - { term: "actor", weight: 2 }
+      - { term: "actriz", weight: 2 }
+      - { term: "concierto", weight: 3 }
+      - { term: "pelicula", weight: 3 }
+      - { term: "serie", weight: 2 }
+      - { term: "famoso", weight: 2 }
+      - { term: "farandula", weight: 3 }
+    negative:
+      - { term: "tribunal supremo electoral", weight: 4 }
+      - { term: "banco central", weight: 4 }
+
+field_weights:
+  title: 3.0
+  description: 2.0
+  content: 1.0
+  source_category: 1.5
+
+thresholds:
+  min_score: 2.0
+  accept_margin: 2.0
+  low_confidence_threshold: 0.62
+
+limits:
+  content_chars: 1200
