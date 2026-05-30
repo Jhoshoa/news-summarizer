@@ -211,8 +211,6 @@ class NewsSummarizerApp:
                         )
                     raise
 
-            news = news[:20]
-
             if self.db and collection_run_id is not None:
                 await self.db.finish_collection_run(
                     collection_run_id,
@@ -234,7 +232,8 @@ class NewsSummarizerApp:
                     "collection_stats": collection_stats,
                 }
 
-            summaries = await self._build_summaries(news, categories)
+            summary_candidates = self._select_summary_candidates(news, categories)
+            summaries = await self._build_summaries(summary_candidates, categories)
 
             if summaries:
                 rewriter = NewsRewriter(self.llm)
@@ -409,6 +408,70 @@ class NewsSummarizerApp:
                 logger.error(f"Error resumiendo {category}: {e}")
 
         return summaries
+
+    def _select_summary_candidates(
+        self,
+        news: list[dict],
+        categories: list[str],
+        per_category_limit: int = 5,
+        max_per_source: int = 2,
+    ) -> list[dict]:
+        selected: list[dict] = []
+        selected_ids: set[int] = set()
+
+        for category in categories:
+            category_news = [article for article in news if article.get("category") == category]
+            category_selection = self._select_diverse_articles(
+                category_news,
+                limit=per_category_limit,
+                max_per_source=max_per_source,
+            )
+            for article in category_selection:
+                article_key = id(article)
+                if article_key not in selected_ids:
+                    selected.append(article)
+                    selected_ids.add(article_key)
+
+        return selected
+
+    def _select_diverse_articles(
+        self,
+        articles: list[dict],
+        *,
+        limit: int,
+        max_per_source: int,
+    ) -> list[dict]:
+        if limit <= 0 or not articles:
+            return []
+
+        selected: list[dict] = []
+        source_counts: dict[str, int] = {}
+
+        for article in articles:
+            source = self._normalize_source_name(article.get("source"))
+            if source_counts.get(source, 0) >= max_per_source:
+                continue
+            selected.append(article)
+            source_counts[source] = source_counts.get(source, 0) + 1
+            if len(selected) >= limit:
+                return selected
+
+        if len(selected) >= limit:
+            return selected
+
+        selected_ids = {id(article) for article in selected}
+        for article in articles:
+            if id(article) in selected_ids:
+                continue
+            selected.append(article)
+            if len(selected) >= limit:
+                break
+
+        return selected
+
+    def _normalize_source_name(self, source: object) -> str:
+        normalized = str(source or "unknown").strip().lower()
+        return normalized or "unknown"
 
     def _format_summary(self, news: list[dict]) -> str:
         """Formats the summary for delivery."""

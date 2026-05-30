@@ -141,3 +141,53 @@ async def test_fresh_collection_skips_title_only_articles():
     assert db.upserted_articles == []
     assert db.saved_summaries == []
     assert db.finished_runs[0]["status"] == "partial"
+
+
+def test_summary_candidates_are_diversified_by_source_within_category():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+    )
+    app = NewsSummarizerApp(settings)
+    news = [
+        {"title": "Unitel 1", "category": "politica", "source": "Unitel", "score": 0.9},
+        {"title": "Unitel 2", "category": "politica", "source": "Unitel", "score": 0.89},
+        {"title": "Unitel 3", "category": "politica", "source": "Unitel", "score": 0.88},
+        {"title": "Unitel 4", "category": "politica", "source": "Unitel", "score": 0.87},
+        {"title": "RedUno 1", "category": "politica", "source": "RedUno", "score": 0.8},
+        {"title": "RadioFides 1", "category": "politica", "source": "RadioFides", "score": 0.78},
+    ]
+
+    selected = app._select_summary_candidates(news, ["politica"])
+
+    assert [article["title"] for article in selected] == [
+        "Unitel 1",
+        "Unitel 2",
+        "RedUno 1",
+        "RadioFides 1",
+        "Unitel 3",
+    ]
+
+
+def test_summary_candidates_do_not_drop_articles_when_only_one_source_exists():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+    )
+    app = NewsSummarizerApp(settings)
+    news = [
+        {"title": f"Unitel {index}", "category": "politica", "source": "Unitel", "score": 1 - index}
+        for index in range(1, 7)
+    ]
+
+    selected = app._select_summary_candidates(news, ["politica"])
+
+    assert [article["title"] for article in selected] == [
+        "Unitel 1",
+        "Unitel 2",
+        "Unitel 3",
+        "Unitel 4",
+        "Unitel 5",
+    ]
