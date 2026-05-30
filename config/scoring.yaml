@@ -1,0 +1,102 @@
+version: 1
+scale:
+  min: 0
+  max: 100
+
+weights:
+  recency: 0.25
+  source: 0.15
+  content_quality: 0.25
+  impact: 0.25
+  category_confidence: 0.10
+
+recency:
+  buckets:
+    - { max_hours: 1, score: 100 }
+    - { max_hours: 3, score: 90 }
+    - { max_hours: 6, score: 75 }
+    - { max_hours: 12, score: 60 }
+    - { max_hours: 24, score: 45 }
+    - { max_hours: 48, score: 25 }
+  default_score: 10
+  missing_score: 20
+
+sources:
+  unitel: 82
+  reduno: 84
+  radiofides: 84
+  redbolivision: 78
+  opinion: 82
+  el_deber: 84
+  la_razon: 82
+  newsapi: 62
+  default: 55
+
+source_aliases:
+  red uno: reduno
+  radio fides: radiofides
+  red bolivision: redbolivision
+  el deber: el_deber
+  la razon: la_razon
+
+content_quality:
+  base_score: 35
+  min_good_words: 120
+  min_excellent_words: 300
+  good_words_bonus: 20
+  excellent_words_bonus: 10
+  image_bonus: 10
+  description_bonus: 10
+  title_bonus: 10
+  max_score: 100
+
+impact_terms:
+  high:
+    score: 100
+    terms:
+      - "bloqueo nacional"
+      - "estado de emergencia"
+      - "banco central"
+      - "crisis"
+      - "muertos"
+      - "fallecidos"
+      - "dolar"
+      - "elecciones"
+      - "combustible"
+  medium:
+    score: 70
+    terms:
+      - "bloqueo"
+      - "paro"
+      - "protesta"
+      - "inflacion"
+      - "deuda"
+      - "exportacion"
+      - "ley"
+      - "candidato"
+      - "gobierno"
+      - "seguridad"
+  low:
+    score: 35
+    terms:
+      - "anuncio"
+      - "reunion"
+      - "informe"
+      - "operativo"
+      - "campana"
+
+category_confidence:
+  missing_score: 45
+  buckets:
+    - { min: 0.80, score: 100 }
+    - { min: 0.60, score: 75 }
+    - { min: 0.40, score: 55 }
+  default_score: 35
+
+penalties:
+  missing_content: 25
+  short_content: 15
+  duplicated_description_content: 20
+  missing_date: 10
+  unknown_source: 8
+  low_category_confidence: 10
