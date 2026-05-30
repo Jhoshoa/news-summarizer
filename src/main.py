@@ -188,7 +188,7 @@ class NewsSummarizerApp:
             news = deduplicator.deduplicate(news)
 
             classifier = NewsClassifier(self.llm)
-            news = classifier.classify_batch(news)
+            news = await classifier.classify_batch_async(news)
 
             ranker = NewsRanker()
             news = ranker.rank(news)
