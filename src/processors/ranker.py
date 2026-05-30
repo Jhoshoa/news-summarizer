@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 import unicodedata
 from datetime import UTC, datetime
+from difflib import SequenceMatcher
+from hashlib import sha1
 from pathlib import Path
 from typing import Any
 
@@ -17,10 +19,11 @@ class NewsRanker:
     DEFAULT_CONFIG: dict[str, Any] = {
         "scale": {"min": 0, "max": 100},
         "weights": {
-            "recency": 0.25,
+            "recency": 0.20,
             "source": 0.15,
-            "content_quality": 0.25,
+            "content_quality": 0.22,
             "impact": 0.25,
+            "corroboration": 0.10,
             "category_confidence": 0.10,
         },
         "recency": {
@@ -77,6 +80,13 @@ class NewsRanker:
                     "dolar",
                     "elecciones",
                     "combustible",
+                    "bloqueo indefinido",
+                    "escasez de combustible",
+                    "tipo de cambio",
+                    "riesgo pais",
+                    "conflicto social",
+                    "transporte pesado",
+                    "medidas de presion",
                 ],
             },
             "medium": {
@@ -98,6 +108,16 @@ class NewsRanker:
                 "score": 35,
                 "terms": ["anuncio", "reunion", "informe", "operativo", "campana"],
             },
+        },
+        "corroboration": {
+            "same_story_title_similarity": 0.82,
+            "same_story_token_jaccard": 0.55,
+            "min_token_length": 4,
+            "multi_source_bonus": {
+                "two_sources": 70,
+                "three_or_more_sources": 100,
+            },
+            "default_score": 0,
         },
         "category_confidence": {
             "missing_score": 45,
@@ -144,6 +164,8 @@ class NewsRanker:
         }
 
     def rank(self, news: list[dict], limit: int | None = None) -> list[dict]:
+        self._annotate_corroboration(news)
+
         for item in news:
             score, components, reasons = self._calculate_score_details(item)
             item["score"] = score
@@ -164,6 +186,7 @@ class NewsRanker:
             "source": self._source_score(item.get("source"), reasons),
             "content_quality": self._content_quality_score(item, reasons),
             "impact": self._impact_score(item, reasons),
+            "corroboration": self._corroboration_score(item, reasons),
             "category_confidence": self._category_confidence_score(
                 item.get("category_confidence"),
                 reasons,
@@ -312,6 +335,139 @@ class NewsRanker:
             reasons.append("penalizacion:categoria baja confianza")
 
         return penalty
+
+    def _annotate_corroboration(self, news: list[dict]) -> None:
+        clusters: list[list[dict]] = []
+
+        for article in news:
+            article.pop("cluster_id", None)
+            article["corroborating_sources"] = [self._canonical_source(article.get("source"))]
+
+            matched_cluster = self._find_matching_cluster(article, clusters)
+            if matched_cluster is None:
+                clusters.append([article])
+            else:
+                matched_cluster.append(article)
+
+        for cluster in clusters:
+            representative = self._cluster_representative(cluster)
+            cluster_id = self._cluster_id(representative)
+            sources = sorted(
+                {
+                    source
+                    for article in cluster
+                    if (source := self._canonical_source(article.get("source")))
+                }
+            )
+
+            for article in cluster:
+                article["cluster_id"] = cluster_id
+                article["corroborating_sources"] = sources
+
+    def _find_matching_cluster(
+        self,
+        article: dict,
+        clusters: list[list[dict]],
+    ) -> list[dict] | None:
+        for cluster in clusters:
+            if any(self._same_story(article, candidate) for candidate in cluster):
+                return cluster
+        return None
+
+    def _same_story(self, left: dict, right: dict) -> bool:
+        left_category = str(left.get("category") or "").strip().lower()
+        right_category = str(right.get("category") or "").strip().lower()
+        if left_category and right_category and left_category != right_category:
+            return False
+
+        title_similarity = SequenceMatcher(
+            None,
+            self._normalize_text(left.get("title")),
+            self._normalize_text(right.get("title")),
+        ).ratio()
+        if title_similarity >= self._corroboration_threshold("same_story_title_similarity", 0.82):
+            return True
+
+        token_jaccard = self._token_jaccard(self._story_text(left), self._story_text(right))
+        return token_jaccard >= self._corroboration_threshold("same_story_token_jaccard", 0.55)
+
+    def _story_text(self, article: dict) -> str:
+        return self._normalize_text(
+            " ".join(
+                [
+                    str(article.get("title") or ""),
+                    str(article.get("description") or ""),
+                    str(article.get("content") or "")[:600],
+                ]
+            )
+        )
+
+    def _token_jaccard(self, left: str, right: str) -> float:
+        left_tokens = self._significant_tokens(left)
+        right_tokens = self._significant_tokens(right)
+        if not left_tokens or not right_tokens:
+            return 0.0
+
+        intersection = left_tokens & right_tokens
+        union = left_tokens | right_tokens
+        return len(intersection) / len(union)
+
+    def _significant_tokens(self, text: str) -> set[str]:
+        min_length = int(self.config["corroboration"].get("min_token_length", 4))
+        stopwords = {
+            "para",
+            "como",
+            "esta",
+            "este",
+            "esto",
+            "desde",
+            "sobre",
+            "entre",
+            "tras",
+            "ante",
+            "bolivia",
+        }
+        return {
+            token
+            for token in re.findall(r"\w+", text, flags=re.UNICODE)
+            if len(token) >= min_length and token not in stopwords
+        }
+
+    def _cluster_representative(self, cluster: list[dict]) -> dict:
+        return max(cluster, key=lambda article: self._word_count(str(article.get("title") or "")))
+
+    def _cluster_id(self, article: dict) -> str:
+        normalized_title = self._normalize_text(article.get("title"))
+        digest = sha1(normalized_title.encode("utf-8")).hexdigest()[:12]
+        return f"story-{digest}"
+
+    def _corroboration_score(self, item: dict, reasons: list[str]) -> float:
+        config = self.config["corroboration"]
+        sources = {
+            self._canonical_source(source)
+            for source in item.get("corroborating_sources", [])
+            if self._canonical_source(source)
+        }
+
+        source_count = len(sources)
+        if source_count >= 3:
+            reasons.append(f"corroborada:{source_count} fuentes")
+            return self._safe_float(
+                config.get("multi_source_bonus", {}).get("three_or_more_sources"),
+                100.0,
+            )
+        if source_count == 2:
+            reasons.append("corroborada:2 fuentes")
+            return self._safe_float(
+                config.get("multi_source_bonus", {}).get("two_sources"),
+                70.0,
+            )
+
+        reasons.append("sin corroboracion multi-fuente")
+        return self._safe_float(config.get("default_score"), 0.0)
+
+    def _corroboration_threshold(self, name: str, default: float) -> float:
+        return self._safe_float(self.config["corroboration"].get(name), default)
 
     def _load_config(self, config_path: Path) -> dict[str, Any]:
         config = self._deep_copy_config(self.DEFAULT_CONFIG)

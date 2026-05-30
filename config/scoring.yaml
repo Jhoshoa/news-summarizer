@@ -4,10 +4,11 @@ scale:
   max: 100
 
 weights:
-  recency: 0.25
+  recency: 0.20
   source: 0.15
-  content_quality: 0.25
+  content_quality: 0.22
   impact: 0.25
+  corroboration: 0.10
   category_confidence: 0.10
 
 recency:
@@ -63,6 +64,13 @@ impact_terms:
       - "dolar"
       - "elecciones"
       - "combustible"
+      - "bloqueo indefinido"
+      - "escasez de combustible"
+      - "tipo de cambio"
+      - "riesgo pais"
+      - "conflicto social"
+      - "transporte pesado"
+      - "medidas de presion"
   medium:
     score: 70
     terms:
@@ -84,6 +92,15 @@ impact_terms:
       - "informe"
       - "operativo"
       - "campana"
+
+corroboration:
+  same_story_title_similarity: 0.82
+  same_story_token_jaccard: 0.55
+  min_token_length: 4
+  multi_source_bonus:
+    two_sources: 70
+    three_or_more_sources: 100
+  default_score: 0
 
 category_confidence:
   missing_score: 45
