@@ -76,7 +76,7 @@ export const ArticleDetailPage = () => {
   const gold = findIndicator(indicators, ["oro"]);
   const treMn = findIndicator(indicators, ["tre", "mn"]);
   const treMe = findIndicator(indicators, ["tre", "me"]);
-  const summaryText = relatedSummary?.summary || article.description || article.content;
+  const summaryText = relatedSummary?.summary;
   const articleBody =
     article.content &&
     !isDuplicateText(article.content, relatedSummary?.summary) &&
@@ -115,11 +115,18 @@ export const ArticleDetailPage = () => {
 
           <section className={hasArticleImage ? "article-content-layout has-image" : "article-content-layout"}>
             <div className="article-text-column">
-              <section className="ai-summary">
-                <div className="panel-title">Resumen IA</div>
-                <p>{summaryText}</p>
-                {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
-              </section>
+              {summaryText ? (
+                <section className="ai-summary">
+                  <div className="panel-title">Resumen IA</div>
+                  <p>{summaryText}</p>
+                  {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
+                </section>
+              ) : (
+                <section className="ai-summary pending-summary">
+                  <div className="panel-title">Resumen IA pendiente</div>
+                  <p>Esta noticia fue recolectada y conservada como fuente original, pero todavía no fue priorizada para síntesis IA.</p>
+                </section>
+              )}
 
               {articleBody && (
                 <section className="article-body">

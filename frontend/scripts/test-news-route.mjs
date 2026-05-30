@@ -18,6 +18,7 @@ assert.equal(getCurrentPage("?page=-1"), 1);
 assert.equal(getCurrentPage("?page=abc"), 1);
 assert.equal(getCategory("?category=politica"), "politica");
 assert.equal(getCategory("?category="), undefined);
+assert.equal(getCategory("?category=general"), undefined);
 assert.equal(isValidDateValue("2026-05-28"), true);
 assert.equal(isValidDateValue("2026-02-31"), false);
 assert.equal(getSelectedDate("?date=2026-05-28", "2026-05-29"), "2026-05-28");
@@ -27,6 +28,13 @@ assert.match(
   getDateValidationMessage("?date=2026-05-30", "2026-05-29", "2026-05-29"),
   /futura/,
 );
-assert.equal(buildNewsHref(2, "2026-05-28", "politica"), "/news?page=2&date=2026-05-28&category=politica");
+assert.equal(
+  buildNewsHref(2, "2026-05-28", "politica"),
+  "/news?page=2&date=2026-05-28&view=resumenes&category=politica",
+);
+assert.equal(
+  buildNewsHref(1, "2026-05-28", undefined, "recolectadas"),
+  "/news?page=1&date=2026-05-28&view=recolectadas",
+);
 
 console.log("newsRoute tests passed");

@@ -30,7 +30,15 @@ export const getCurrentPage = (search: string) => {
 
 export const getCategory = (search: string) => {
   const params = new URLSearchParams(search);
-  return params.get("category") || undefined;
+  const category = params.get("category");
+  return category && category !== "general" ? category : undefined;
+};
+
+export type NewsView = "resumenes" | "recolectadas";
+
+export const getNewsView = (search: string): NewsView => {
+  const params = new URLSearchParams(search);
+  return params.get("view") === "recolectadas" ? "recolectadas" : "resumenes";
 };
 
 export const getSelectedDate = (search: string, today = getTodayDate()) => {
@@ -65,10 +73,16 @@ export const getDateValidationMessage = (
   return "";
 };
 
-export const buildNewsHref = (page: number, date: string, category?: string) => {
+export const buildNewsHref = (
+  page: number,
+  date: string,
+  category?: string,
+  view: NewsView = "resumenes",
+) => {
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("date", date);
+  params.set("view", view);
   if (category) {
     params.set("category", category);
   }

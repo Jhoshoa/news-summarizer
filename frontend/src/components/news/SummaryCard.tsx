@@ -13,9 +13,12 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
     <>
       <ArticleImage image={summary.image} alt={summary.title} compact />
       <div>
-        <span className="eyebrow">
-          {summary.source ?? "Noticias Bolivia IA"} - {summary.category}
-        </span>
+        <div className="card-meta-row">
+          <span className="eyebrow">
+            {summary.source ?? "Noticias Bolivia IA"} - {summary.category}
+          </span>
+          <span className="status-badge summarized">Resumido IA</span>
+        </div>
         <time className="published-date" dateTime={summary.published_at ?? summary.created_at ?? undefined}>
           {formatPublishedDate(summary.published_at ?? summary.created_at)}
         </time>

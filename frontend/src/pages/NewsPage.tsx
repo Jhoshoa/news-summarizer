@@ -3,40 +3,62 @@ import { useCallback, useEffect, useMemo } from "react";
 import { usePageRefreshControl } from "../app/refreshControl";
 import { Link, useRouter } from "../app/router";
 import { NewsCard } from "../components/news/NewsCard";
-import { NewsCardSkeleton } from "../components/ui/Skeleton";
-import { useGetArticlesQuery, useTriggerSummaryMutation } from "../services/api";
+import { SummaryCard } from "../components/news/SummaryCard";
+import { NewsCardSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
+import { useGetArticlesQuery, useGetSummariesQuery, useTriggerSummaryMutation } from "../services/api";
 import {
   buildNewsHref,
   getCategory,
   getCurrentPage,
   getDateValidationMessage,
+  getNewsView,
   getSelectedDate,
   getTodayDate,
 } from "../utils/newsRoute";
 
-const navigateToDate = (date: string, category?: string) => {
-  return buildNewsHref(1, date, category);
+const navigateToDate = (date: string, category: string | undefined, view: "resumenes" | "recolectadas") => {
+  return buildNewsHref(1, date, category, view);
 };
+
+const categoryTabs: Array<{ label: string; value?: string }> = [
+  { label: "general" },
+  { label: "economia", value: "economia" },
+  { label: "politica", value: "politica" },
+  { label: "deportes", value: "deportes" },
+  { label: "tecnologia", value: "tecnologia" },
+];
 
 export const NewsPage = () => {
   const { location, navigate, replace } = useRouter();
   const page = getCurrentPage(location.search);
   const category = getCategory(location.search);
+  const view = getNewsView(location.search);
   const selectedDate = getSelectedDate(location.search);
   const validationMessage = getDateValidationMessage(location.search, selectedDate);
-  const { data, error, isFetching } = useGetArticlesQuery({
+  const articlesQuery = useGetArticlesQuery({
+    page,
+    page_size: 12,
+    category,
+    date: selectedDate,
+  });
+  const summariesQuery = useGetSummariesQuery({
     page,
     page_size: 12,
     category,
     date: selectedDate,
   });
   const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
-  const articles = data?.items ?? [];
-  const totalPages = data?.total_pages ?? 1;
+  const activeData = view === "resumenes" ? summariesQuery.data : articlesQuery.data;
+  const activeError = view === "resumenes" ? summariesQuery.error : articlesQuery.error;
+  const isFetching = view === "resumenes" ? summariesQuery.isFetching : articlesQuery.isFetching;
+  const articles = articlesQuery.data?.items ?? [];
+  const summaries = summariesQuery.data?.items ?? [];
+  const activeItems = activeData?.items ?? [];
+  const totalPages = activeData?.total_pages ?? 1;
   const hasPrevious = page > 1;
   const hasNext = page < totalPages;
   const today = getTodayDate();
-  const normalizedHref = buildNewsHref(page, selectedDate, category);
+  const normalizedHref = buildNewsHref(page, selectedDate, category, view);
   const showNewsSkeleton = isFetching;
 
   useEffect(() => {
@@ -64,11 +86,12 @@ export const NewsPage = () => {
     <>
       <section className="news-browser">
         <div className="browser-heading">
-          <span className="eyebrow">Archivo de noticias</span>
-          <h1>Todas las noticias recolectadas</h1>
+          <span className="eyebrow">EcoBrief Bolivia</span>
+          <h1>{view === "resumenes" ? "Resumenes IA priorizados" : "Noticias recolectadas"}</h1>
           <p>
-            Explora las notas originales guardadas en la base de datos, incluyendo articulos que
-            todavia no tienen resumen IA.
+            {view === "resumenes"
+              ? "Lee las noticias priorizadas y sintetizadas por IA para reducir ruido informativo."
+              : "Explora el archivo completo de notas originales recolectadas por las fuentes monitoreadas."}
           </p>
         </div>
 
@@ -80,51 +103,83 @@ export const NewsPage = () => {
               max={today}
               type="date"
               value={selectedDate}
-              onChange={(event) => navigate(navigateToDate(event.target.value || today, category))}
+              onChange={(event) => navigate(navigateToDate(event.target.value || today, category, view))}
             />
           </label>
-          <span className="news-count">{showNewsSkeleton ? "Cargando noticias" : `${data?.total ?? 0} noticias para ${selectedDate}`}</span>
+          <span className="news-count">
+            {showNewsSkeleton
+              ? "Cargando"
+              : `${activeData?.total ?? 0} ${view === "resumenes" ? "resumenes" : "noticias"} para ${selectedDate}`}
+          </span>
         </div>
 
         {validationMessage && <p className="form-notice">{validationMessage}</p>}
 
+        <div className="view-tabs" aria-label="Tipo de contenido">
+          <Link
+            className={view === "resumenes" ? "active" : ""}
+            href={buildNewsHref(1, selectedDate, category, "resumenes")}
+          >
+            Resumenes IA
+          </Link>
+          <Link
+            className={view === "recolectadas" ? "active" : ""}
+            href={buildNewsHref(1, selectedDate, category, "recolectadas")}
+          >
+            Noticias recolectadas
+          </Link>
+        </div>
+
         <div className="category-tabs" aria-label="Categorias">
-          {["general", "economia", "politica", "deportes", "tecnologia"].map((item) => (
+          {categoryTabs.map((item) => (
             <Link
-              className={category === item ? "active" : ""}
-              key={item}
-              href={buildNewsHref(1, selectedDate, item)}
+              className={item.value ? (category === item.value ? "active" : "") : !category ? "active" : ""}
+              key={item.label}
+              href={buildNewsHref(1, selectedDate, item.value, view)}
             >
-              {item}
+              {item.label}
             </Link>
           ))}
         </div>
 
         <div className="archive-list" aria-busy={showNewsSkeleton}>
-          {showNewsSkeleton
-            ? Array.from({ length: 6 }, (_, index) => <NewsCardSkeleton key={index} />)
-            : articles.map((article) => <NewsCard key={article.id} article={article} />)}
+          {showNewsSkeleton &&
+            Array.from({ length: 6 }, (_, index) =>
+              view === "resumenes" ? <SummaryCardSkeleton key={index} /> : <NewsCardSkeleton key={index} />,
+            )}
+          {!showNewsSkeleton &&
+            view === "resumenes" &&
+            summaries.map((summary) => <SummaryCard key={summary.id ?? summary.title} summary={summary} />)}
+          {!showNewsSkeleton &&
+            view === "recolectadas" &&
+            articles.map((article) => <NewsCard key={article.id} article={article} />)}
         </div>
 
-        {!showNewsSkeleton && error && (
+        {!showNewsSkeleton && activeError && (
           <section className="empty-state">
             <span className="panel-title">No se pudo cargar</span>
             <p>Revisa que el backend este disponible y vuelve a intentar.</p>
           </section>
         )}
 
-        {!showNewsSkeleton && !error && articles.length === 0 && (
+        {!showNewsSkeleton && !activeError && activeItems.length === 0 && (
           <section className="empty-state">
-            <span className="panel-title">Sin noticias para esta fecha</span>
-            <p>No hay articulos guardados para {selectedDate}. Puedes actualizar o elegir otro dia.</p>
+            <span className="panel-title">
+              {view === "resumenes" ? "Sin resumenes para esta fecha" : "Sin noticias para esta fecha"}
+            </span>
+            <p>
+              {view === "resumenes"
+                ? `No hay resumenes IA para ${selectedDate}. Puedes revisar noticias recolectadas o actualizar.`
+                : `No hay articulos guardados para ${selectedDate}. Puedes actualizar o elegir otro dia.`}
+            </p>
           </section>
         )}
 
-        {!showNewsSkeleton && articles.length > 0 && (
+        {!showNewsSkeleton && activeItems.length > 0 && (
           <nav className="pagination" aria-label="Paginacion">
             <Link
               className={!hasPrevious ? "disabled" : ""}
-              href={buildNewsHref(page - 1, selectedDate, category)}
+              href={buildNewsHref(page - 1, selectedDate, category, view)}
             >
               Anterior
             </Link>
@@ -133,7 +188,7 @@ export const NewsPage = () => {
             </span>
             <Link
               className={!hasNext ? "disabled" : ""}
-              href={buildNewsHref(page + 1, selectedDate, category)}
+              href={buildNewsHref(page + 1, selectedDate, category, view)}
             >
               Siguiente
             </Link>
