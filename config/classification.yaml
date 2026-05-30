@@ -112,7 +112,79 @@ field_weights:
   title: 3.0
   description: 2.0
   content: 1.0
-  source_category: 1.5
+  source_category: 2.5
+
+source_category_mappings:
+  global:
+    economia: economia
+    economía: economia
+    economicas: economia
+    económicas: economia
+    politica: politica
+    política: politica
+    politicas: politica
+    políticas: politica
+    deportes: deportes
+    deportivo: deportes
+    tecnologia: tecnologia
+    tecnología: tecnologia
+    farandula: entretenimiento
+    farándula: entretenimiento
+    espectaculos: entretenimiento
+    espectáculos: entretenimiento
+    entretenimiento: entretenimiento
+    cultura: entretenimiento
+    general: general
+
+  reduno:
+    nacionales: politica
+    nacional: politica
+    economia: economia
+    economía: economia
+    deportes: deportes
+    mundo deportivo: deportes
+    farandula: entretenimiento
+    farándula: entretenimiento
+    espectaculos: entretenimiento
+    espectáculos: entretenimiento
+    tecnologia: tecnologia
+    tecnología: tecnologia
+    seguridad: general
+
+  unitel:
+    politica: politica
+    política: politica
+    economia: economia
+    economía: economia
+    deportes: deportes
+    tecnologia: tecnologia
+    tecnología: tecnologia
+    farandula: entretenimiento
+    farándula: entretenimiento
+    seguridad: general
+    sociedad: general
+
+  radiofides:
+    politica: politica
+    política: politica
+    economia: economia
+    economía: economia
+    deportes: deportes
+    sociedad: general
+    nacional: politica
+    nacionales: politica
+
+  redbolivision:
+    politica: politica
+    política: politica
+    economia: economia
+    economía: economia
+    deportes: deportes
+    farandula: entretenimiento
+    farándula: entretenimiento
+    seguridad: general
+    nacional: politica
+    noticias: general
 
 thresholds:
   min_score: 2.0

@@ -121,6 +121,67 @@ def test_classify_batch_adds_auditable_metadata():
     assert result[0]["category_method"] == "rules"
 
 
+def test_classifier_maps_reduno_deportes_source_category():
+    classifier = NewsClassifier()
+
+    result = classifier.classify_batch(
+        [
+            {
+                "title": "Equipo local presenta nueva camiseta",
+                "description": "La actividad se realizo con hinchas en La Paz.",
+                "content": "",
+                "source": "RedUno",
+                "category": "Deportes",
+            }
+        ]
+    )
+
+    assert result[0]["category"] == "deportes"
+    assert result[0]["source_category_raw"] == "deportes"
+    assert result[0]["source_category_mapped"] == "deportes"
+    assert "source_category:categoria_fuente" in result[0]["category_reason"]
+
+
+def test_classifier_maps_reduno_nacionales_to_politics():
+    classifier = NewsClassifier()
+
+    result = classifier.classify_batch(
+        [
+            {
+                "title": "Autoridades anuncian reunion nacional",
+                "description": "El encuentro abordara temas de gestion publica.",
+                "content": "",
+                "source": "RedUno",
+                "category": "Nacionales",
+            }
+        ]
+    )
+
+    assert result[0]["category"] == "politica"
+    assert result[0]["source_category_raw"] == "nacionales"
+    assert result[0]["source_category_mapped"] == "politica"
+
+
+def test_classifier_uses_global_source_category_mapping_with_accents():
+    classifier = NewsClassifier()
+
+    result = classifier.classify_batch(
+        [
+            {
+                "title": "Empresas reportan nueva actividad productiva",
+                "description": "El informe fue presentado durante la jornada.",
+                "content": "",
+                "source": "Example",
+                "category": "Economía",
+            }
+        ]
+    )
+
+    assert result[0]["category"] == "economia"
+    assert result[0]["source_category_raw"] == "economia"
+    assert result[0]["source_category_mapped"] == "economia"
+
+
 async def test_classify_batch_async_uses_llm_for_low_confidence_rule():
     llm = FakeClassifierLLM(
         '{"category": "politica", "confidence": 0.81, "reason": "Menciona ley y club civico."}'

@@ -55,7 +55,7 @@ class NewsClassifier:
         "title": 3.0,
         "description": 2.0,
         "content": 1.0,
-        "source_category": 1.5,
+        "source_category": 2.5,
     }
     DEFAULT_THRESHOLDS = {
         "min_score": 2.0,
@@ -63,6 +63,7 @@ class NewsClassifier:
         "low_confidence_threshold": 0.62,
     }
     DEFAULT_LIMITS = {"content_chars": 1200}
+    DEFAULT_SOURCE_CATEGORY_MAPPINGS = {"global": {}}
     DEFAULT_AI_FALLBACK = {
         "enabled": False,
         "eligible_methods": ["rules_low_confidence"],
@@ -85,6 +86,9 @@ class NewsClassifier:
         self.field_weights: dict[str, float] = self.config["field_weights"]
         self.thresholds: dict[str, float] = self.config["thresholds"]
         self.limits: dict[str, int] = self.config["limits"]
+        self.source_category_mappings: dict[str, dict[str, str]] = self.config[
+            "source_category_mappings"
+        ]
         self.ai_fallback: dict[str, Any] = self.config["ai_fallback"]
         self.valid_categories = set(self.categories) | {"general"}
 
@@ -213,6 +217,9 @@ class NewsClassifier:
                 **self.DEFAULT_LIMITS,
                 **(loaded.get("limits") or {}),
             },
+            "source_category_mappings": self._normalize_source_category_mappings(
+                loaded.get("source_category_mappings") or self.DEFAULT_SOURCE_CATEGORY_MAPPINGS
+            ),
             "ai_fallback": {
                 **self.DEFAULT_AI_FALLBACK,
                 **(loaded.get("ai_fallback") or {}),
@@ -225,6 +232,7 @@ class NewsClassifier:
             "field_weights": self.DEFAULT_FIELD_WEIGHTS,
             "thresholds": self.DEFAULT_THRESHOLDS,
             "limits": self.DEFAULT_LIMITS,
+            "source_category_mappings": self.DEFAULT_SOURCE_CATEGORY_MAPPINGS,
             "ai_fallback": self.DEFAULT_AI_FALLBACK,
         }
 
@@ -234,6 +242,16 @@ class NewsClassifier:
         article["category_scores"] = decision.scores
         article["category_reason"] = decision.reason
         article["category_method"] = decision.method
+
+        raw_source_category = article.get("source_category_raw")
+        mapped_source_category = article.pop(
+            "_source_category_mapped",
+            article.get("source_category_mapped"),
+        )
+        if raw_source_category:
+            article["source_category_raw"] = raw_source_category
+        if mapped_source_category:
+            article["source_category_mapped"] = mapped_source_category
 
     def _apply_llm_decision(
         self,
@@ -359,12 +377,58 @@ Formato:
 
     def _article_fields(self, article: dict) -> dict[str, str]:
         content_limit = int(self.limits["content_chars"])
+        raw_source_category = self._normalize(article.get("category", ""))
+        mapped_source_category = self._map_source_category(
+            source=article.get("source", ""),
+            raw_category=raw_source_category,
+        )
+        if raw_source_category:
+            article["source_category_raw"] = raw_source_category
+        if mapped_source_category:
+            article["_source_category_mapped"] = mapped_source_category
+
         return {
             "title": self._normalize(article.get("title", "")),
             "description": self._normalize(article.get("description", "")),
             "content": self._normalize(str(article.get("content") or "")[:content_limit]),
-            "source_category": self._normalize(article.get("category", "")),
+            "source_category": mapped_source_category or raw_source_category,
         }
+
+    def _normalize_source_category_mappings(
+        self,
+        mappings: dict[str, Any],
+    ) -> dict[str, dict[str, str]]:
+        normalized: dict[str, dict[str, str]] = {}
+
+        for source, source_mappings in mappings.items():
+            if not isinstance(source_mappings, dict):
+                continue
+
+            normalized_source = self._normalize(source)
+            normalized[normalized_source] = {}
+            for raw_category, mapped_category in source_mappings.items():
+                normalized_category = self._normalize(raw_category)
+                normalized_target = self._normalize(mapped_category)
+                normalized[normalized_source][normalized_category] = normalized_target
+
+        return normalized
+
+    def _map_source_category(self, source: object, raw_category: str) -> str:
+        if not raw_category:
+            return ""
+
+        normalized_source = self._normalize(source)
+        source_mapping = self.source_category_mappings.get(normalized_source, {})
+        mapped = source_mapping.get(raw_category)
+        if mapped and mapped in self.valid_categories:
+            return mapped
+
+        global_mapping = self.source_category_mappings.get("global", {})
+        mapped = global_mapping.get(raw_category)
+        if mapped and mapped in self.valid_categories:
+            return mapped
+
+        return raw_category if raw_category in self.valid_categories else ""
 
     def _score_category(
         self,
