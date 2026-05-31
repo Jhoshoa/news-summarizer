@@ -14,6 +14,7 @@ import {
   useRefreshEconomicIndicatorsMutation,
 } from "../services/api";
 import { formatPublishedDate } from "../utils/date";
+import { buildContextualSummary } from "../utils/summaryText";
 
 const getArticleIdFromPath = (pathname: string) => {
   const parts = pathname.split("/").filter(Boolean);
@@ -103,7 +104,9 @@ export const ArticleDetailPage = () => {
     );
   }
 
-  const summaryText = relatedSummary?.summary;
+  const summaryText = relatedSummary
+    ? buildContextualSummary(relatedSummary.summary, article.description)
+    : undefined;
   const articleBody =
     article.content &&
     !isDuplicateText(article.content, relatedSummary?.summary) &&

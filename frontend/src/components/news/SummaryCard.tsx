@@ -1,18 +1,17 @@
 import { Link } from "../../app/router";
 import type { Summary } from "../../services/types";
 import { formatPublishedDate } from "../../utils/date";
+import { buildContextualSummary, cleanGeneratedText } from "../../utils/summaryText";
 import { ArticleImage } from "./ArticleImage";
 
 type SummaryCardProps = {
   summary: Summary;
 };
 
-const cleanGeneratedText = (value: string) => value.replace(/^\s*(?:\d+[.)]\s*)+/, "").trim();
-
 export const SummaryCard = ({ summary }: SummaryCardProps) => {
   const href = summary.article_id ? `/article/${summary.article_id}` : summary.url || "#";
   const title = cleanGeneratedText(summary.title);
-  const summaryText = cleanGeneratedText(summary.summary);
+  const summaryText = buildContextualSummary(summary.summary, summary.article_description);
   const fact = summary.fact ? cleanGeneratedText(summary.fact) : "";
   const content = (
     <>

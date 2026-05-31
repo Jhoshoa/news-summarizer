@@ -10,16 +10,20 @@ from loguru import logger
 class NewsRewriter:
     """Reescribe/normaliza el estilo de las noticias."""
 
+    TITLE_MAX_CHARS = 100
+    SUMMARY_MAX_CHARS = 360
+
     SYSTEM_PROMPT = """Eres un editor de noticias profesional.
 Tu tarea es reescribir los resúmenes en un estilo consistente:
 
 - Tono: profesional pero accesible
 - Persona: tercera persona
-- Oraciones: cortas y directas
+- Resumenes: 2 oraciones con contexto suficiente, entre 180 y 320 caracteres
+- Oraciones: claras y directas
 - Sin opiniones personales
 - Español latinoamericano neutral
 
-Mejora la claridad sin cambiar los hechos."""
+Mejora la claridad sin cambiar los hechos ni recortar contexto relevante."""
 
     def __init__(self, llm_provider: "LLMProvider"):
         self.llm = llm_provider
@@ -62,7 +66,7 @@ Mejora la claridad sin cambiar los hechos."""
             prompt += f"{i}. [{category}] {title}: {summary}\n"
 
         prompt += "\nFormato de respuesta:"
-        prompt += "\nNÚMERO. Título reescrito | Resumen reescrito"
+        prompt += "\nNÚMERO. Título reescrito | Resumen reescrito en 2 oraciones con contexto"
 
         return prompt
 
@@ -82,8 +86,14 @@ Mejora la claridad sin cambiar los hechos."""
                 subparts = parts[1].split("|")
 
                 base = dict(original[original_index]) if original_index < len(original) else {}
-                base["title"] = self._clean_generated_text(subparts[0])[:100]
-                base["summary"] = self._clean_generated_text(subparts[1])[:200]
+                base["title"] = self._limit_text(
+                    self._clean_generated_text(subparts[0]),
+                    self.TITLE_MAX_CHARS,
+                )
+                base["summary"] = self._limit_text(
+                    self._clean_generated_text(subparts[1]),
+                    self.SUMMARY_MAX_CHARS,
+                )
                 base["category"] = base.get("category", "general")
                 base["fact"] = base.get("fact", "")
                 rewritten.append(base)
@@ -98,3 +108,10 @@ Mejora la claridad sin cambiar los hechos."""
         text = str(value or "").strip()
         text = re.sub(r"^\s*(?:\d+[\.)]\s*)+", "", text)
         return re.sub(r"\s+", " ", text).strip()
+
+    def _limit_text(self, value: str, max_chars: int) -> str:
+        if len(value) <= max_chars:
+            return value
+
+        truncated = value[:max_chars].rsplit(" ", 1)[0].strip()
+        return truncated or value[:max_chars].strip()

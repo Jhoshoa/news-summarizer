@@ -46,6 +46,7 @@ def test_parse_json_response_preserves_article_metadata_from_original_news():
         [
             {
                 "id": 42,
+                "title": "Titulo original completo de la fuente",
                 "source": "Unitel",
                 "url": "https://unitel.bo/noticia",
             }
@@ -54,7 +55,7 @@ def test_parse_json_response_preserves_article_metadata_from_original_news():
 
     assert summaries == [
         {
-            "title": "Titulo resumido",
+            "title": "Titulo original completo de la fuente",
             "summary": "Resumen claro de la noticia.",
             "fact": "Dato clave",
             "category": "politica",
@@ -139,3 +140,55 @@ def test_parse_response_removes_generated_numbering():
     assert summaries[0]["title"] == "Titulo resumido"
     assert summaries[0]["summary"] == "Resumen claro"
     assert summaries[0]["fact"] == "Dato clave"
+
+
+def test_parse_response_enriches_short_summary_with_article_context():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "title": "Control de Vivencia digital",
+            "summary": "El tramite se puede hacer desde casa.",
+            "fact": "Es obligatorio cada tres meses"
+          }
+        ]
+        """,
+        "tecnologia",
+        [
+            {
+                "id": 7,
+                "description": (
+                    "El tramite obligatorio de tres meses ya se puede efectuar mediante la "
+                    "aplicacion movil de la Gestora. Esta dirigido a rentistas y "
+                    "derechohabientes que cobran por abono en cuenta."
+                ),
+            }
+        ],
+    )
+
+    assert summaries[0]["summary"] == (
+        "El tramite se puede hacer desde casa. El tramite obligatorio de tres meses ya "
+        "se puede efectuar mediante la aplicacion movil de la Gestora."
+    )
+    assert len(summaries[0]["summary"]) >= summarizer.SUMMARY_MIN_CHARS
+
+
+def test_parse_response_uses_generated_title_when_original_is_missing():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "title": "Titulo generado",
+            "summary": "Resumen claro de la noticia."
+          }
+        ]
+        """,
+        "general",
+        [],
+    )
+
+    assert summaries[0]["title"] == "Titulo generado"

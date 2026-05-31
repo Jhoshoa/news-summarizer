@@ -8,13 +8,19 @@ from loguru import logger
 class NewsSummarizer:
     """Resume noticias usando IA."""
 
+    TITLE_MAX_CHARS = 100
+    SUMMARY_MIN_CHARS = 120
+    SUMMARY_MAX_CHARS = 360
+    FACT_MAX_CHARS = 140
+
     SYSTEM_PROMPT = """Eres un editor de noticias experto en espanol latinoamericano.
 Tu tarea es resumir noticias de forma clara, objetiva y concisa.
 
 Cada resumen debe tener:
 - Titulo destacado (max 100 caracteres)
-- 2-3 lineas de lo mas importante (max 200 caracteres)
-- Un dato relevante o dato clave
+- 2-3 oraciones con contexto suficiente: que paso, a quien afecta y por que importa
+- Resumen entre 180 y 320 caracteres, maximo 360 caracteres
+- Un dato relevante o dato clave, distinto del titulo
 
 Se preciso, no agregues opiniones personales.
 Responde en espanol.
@@ -81,7 +87,7 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
   {
     "article_id": 123,
     "title": "Titulo destacado",
-    "summary": "Resumen claro en 2-3 lineas",
+    "summary": "Resumen claro en 2-3 oraciones con contexto suficiente",
     "fact": "Dato relevante",
     "category": "politica",
     "source": "Nombre de la fuente",
@@ -156,8 +162,11 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 continue
 
             original = self._find_original_article(item, original_news, index)
-            title = self._clean_generated_text(item.get("title") or original.get("title") or "")[:100]
-            summary = self._clean_generated_text(item.get("summary") or "")[:200]
+            title = self._limit_text(
+                self._clean_generated_text(original.get("title") or item.get("title") or ""),
+                self.TITLE_MAX_CHARS,
+            )
+            summary = self._summary_with_context(item.get("summary") or "", original)
 
             if not title or not summary:
                 logger.warning(f"Ignoring incomplete summary item at index {index}: {item}")
@@ -167,7 +176,10 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 {
                     "title": title,
                     "summary": summary,
-                    "fact": self._clean_generated_text(item.get("fact") or "")[:100],
+                    "fact": self._limit_text(
+                        self._clean_generated_text(item.get("fact") or ""),
+                        self.FACT_MAX_CHARS,
+                    ),
                     "category": str(item.get("category") or category).strip().lower(),
                     "article_id": item.get("article_id")
                     or original.get("id")
@@ -225,11 +237,17 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
 
                 summaries.append(
                     {
-                        "title": self._clean_generated_text(subparts[0])[:100],
-                        "summary": self._clean_generated_text(subparts[1])[:200]
+                        "title": self._limit_text(
+                            self._clean_generated_text(subparts[0]),
+                            self.TITLE_MAX_CHARS,
+                        ),
+                        "summary": self._summary_with_context(subparts[1], original)
                         if len(subparts) > 1
                         else "",
-                        "fact": self._clean_generated_text(subparts[2])[:100]
+                        "fact": self._limit_text(
+                            self._clean_generated_text(subparts[2]),
+                            self.FACT_MAX_CHARS,
+                        )
                         if len(subparts) > 2
                         else "",
                         "category": category,
@@ -245,3 +263,49 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
         text = str(value or "").strip()
         text = re.sub(r"^\s*(?:\d+[\.)]\s*)+", "", text)
         return re.sub(r"\s+", " ", text).strip()
+
+    def _summary_with_context(self, value: Any, original: dict) -> str:
+        summary = self._clean_generated_text(value)
+        if len(summary) >= self.SUMMARY_MIN_CHARS:
+            return self._limit_text(summary, self.SUMMARY_MAX_CHARS)
+
+        context = self._clean_generated_text(
+            original.get("description") or original.get("excerpt") or original.get("content") or ""
+        )
+        if not context:
+            return self._limit_text(summary, self.SUMMARY_MAX_CHARS)
+
+        combined = summary
+        for sentence in self._context_sentences(context):
+            if not self._adds_context(combined, sentence):
+                continue
+            combined = self._append_sentence(combined, sentence)
+            if len(combined) >= self.SUMMARY_MIN_CHARS:
+                break
+
+        return self._limit_text(combined, self.SUMMARY_MAX_CHARS)
+
+    def _context_sentences(self, text: str) -> list[str]:
+        sentences = re.split(r"(?<=[.!?])\s+", text)
+        return [sentence.strip() for sentence in sentences if sentence.strip()]
+
+    def _append_sentence(self, current: str, sentence: str) -> str:
+        if not current:
+            return sentence
+
+        separator = " " if current[-1] in ".!?" else ". "
+        return f"{current}{separator}{sentence}"
+
+    def _adds_context(self, current: str, sentence: str) -> bool:
+        normalized_current = self._clean_generated_text(current).lower()
+        normalized_sentence = self._clean_generated_text(sentence).lower()
+        if not normalized_sentence:
+            return False
+        return normalized_sentence not in normalized_current and normalized_current not in normalized_sentence
+
+    def _limit_text(self, value: str, max_chars: int) -> str:
+        if len(value) <= max_chars:
+            return value
+
+        truncated = value[:max_chars].rsplit(" ", 1)[0].strip()
+        return truncated or value[:max_chars].strip()
