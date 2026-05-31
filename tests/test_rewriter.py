@@ -50,3 +50,15 @@ def test_parse_response_ignores_preface_without_shifting_metadata():
 
     assert rewritten[0]["article_id"] == 55
     assert rewritten[0]["url"] == "https://example.com/source"
+
+
+def test_parse_response_removes_nested_numbering():
+    rewriter = NewsRewriter(llm_provider=None)
+
+    rewritten = rewriter._parse_response(
+        "1. 1. Titulo reescrito | 2) Resumen reescrito",
+        [{"title": "Original", "summary": "Original"}],
+    )
+
+    assert rewritten[0]["title"] == "Titulo reescrito"
+    assert rewritten[0]["summary"] == "Resumen reescrito"

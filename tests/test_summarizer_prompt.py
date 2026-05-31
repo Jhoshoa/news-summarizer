@@ -117,3 +117,25 @@ def test_parse_legacy_response_keeps_article_metadata_as_fallback():
     assert summaries[0]["article_id"] == 9
     assert summaries[0]["source"] == "Example"
     assert summaries[0]["url"] == "https://example.com/deportes"
+
+
+def test_parse_response_removes_generated_numbering():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "title": "1. Titulo resumido",
+            "summary": "2) Resumen claro",
+            "fact": "3. Dato clave"
+          }
+        ]
+        """,
+        "politica",
+        [],
+    )
+
+    assert summaries[0]["title"] == "Titulo resumido"
+    assert summaries[0]["summary"] == "Resumen claro"
+    assert summaries[0]["fact"] == "Dato clave"

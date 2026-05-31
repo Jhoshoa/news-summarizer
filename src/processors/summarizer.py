@@ -156,8 +156,8 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 continue
 
             original = self._find_original_article(item, original_news, index)
-            title = str(item.get("title") or original.get("title") or "").strip()[:100]
-            summary = str(item.get("summary") or "").strip()[:200]
+            title = self._clean_generated_text(item.get("title") or original.get("title") or "")[:100]
+            summary = self._clean_generated_text(item.get("summary") or "")[:200]
 
             if not title or not summary:
                 logger.warning(f"Ignoring incomplete summary item at index {index}: {item}")
@@ -167,7 +167,7 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 {
                     "title": title,
                     "summary": summary,
-                    "fact": str(item.get("fact") or "").strip()[:100],
+                    "fact": self._clean_generated_text(item.get("fact") or "")[:100],
                     "category": str(item.get("category") or category).strip().lower(),
                     "article_id": item.get("article_id")
                     or original.get("id")
@@ -225,9 +225,13 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
 
                 summaries.append(
                     {
-                        "title": subparts[0].strip()[:100],
-                        "summary": subparts[1].strip()[:200] if len(subparts) > 1 else "",
-                        "fact": subparts[2].strip()[:100] if len(subparts) > 2 else "",
+                        "title": self._clean_generated_text(subparts[0])[:100],
+                        "summary": self._clean_generated_text(subparts[1])[:200]
+                        if len(subparts) > 1
+                        else "",
+                        "fact": self._clean_generated_text(subparts[2])[:100]
+                        if len(subparts) > 2
+                        else "",
                         "category": category,
                         "article_id": original.get("id") or original.get("article_id"),
                         "source": original.get("source"),
@@ -236,3 +240,8 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 )
 
         return summaries
+
+    def _clean_generated_text(self, value: Any) -> str:
+        text = str(value or "").strip()
+        text = re.sub(r"^\s*(?:\d+[\.)]\s*)+", "", text)
+        return re.sub(r"\s+", " ", text).strip()

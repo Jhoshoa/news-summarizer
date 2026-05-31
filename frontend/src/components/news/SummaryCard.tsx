@@ -7,11 +7,16 @@ type SummaryCardProps = {
   summary: Summary;
 };
 
+const cleanGeneratedText = (value: string) => value.replace(/^\s*(?:\d+[.)]\s*)+/, "").trim();
+
 export const SummaryCard = ({ summary }: SummaryCardProps) => {
   const href = summary.article_id ? `/article/${summary.article_id}` : summary.url || "#";
+  const title = cleanGeneratedText(summary.title);
+  const summaryText = cleanGeneratedText(summary.summary);
+  const fact = summary.fact ? cleanGeneratedText(summary.fact) : "";
   const content = (
     <>
-      <ArticleImage image={summary.image} alt={summary.title} compact />
+      <ArticleImage image={summary.image} alt={title} compact />
       <div>
         <div className="card-meta-row">
           <span className="eyebrow">
@@ -22,9 +27,9 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
         <time className="published-date" dateTime={summary.published_at ?? summary.created_at ?? undefined}>
           {formatPublishedDate(summary.published_at ?? summary.created_at)}
         </time>
-        <h3>{summary.title}</h3>
-        <p>{summary.summary}</p>
-        {summary.fact && <small>{summary.fact}</small>}
+        <h3>{title}</h3>
+        <p>{summaryText}</p>
+        {fact && <small>{fact}</small>}
       </div>
     </>
   );

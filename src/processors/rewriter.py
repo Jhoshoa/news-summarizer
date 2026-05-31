@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING
+import re
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from llm.client import LLMProvider
@@ -81,8 +82,8 @@ Mejora la claridad sin cambiar los hechos."""
                 subparts = parts[1].split("|")
 
                 base = dict(original[original_index]) if original_index < len(original) else {}
-                base["title"] = subparts[0].strip()[:100]
-                base["summary"] = subparts[1].strip()[:200]
+                base["title"] = self._clean_generated_text(subparts[0])[:100]
+                base["summary"] = self._clean_generated_text(subparts[1])[:200]
                 base["category"] = base.get("category", "general")
                 base["fact"] = base.get("fact", "")
                 rewritten.append(base)
@@ -92,3 +93,8 @@ Mejora la claridad sin cambiar los hechos."""
             return original
 
         return rewritten
+
+    def _clean_generated_text(self, value: Any) -> str:
+        text = str(value or "").strip()
+        text = re.sub(r"^\s*(?:\d+[\.)]\s*)+", "", text)
+        return re.sub(r"\s+", " ", text).strip()

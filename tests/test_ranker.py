@@ -25,6 +25,7 @@ def test_rank_adds_auditable_score_metadata():
 
     assert ranked[0]["score"] > 0
     assert ranked[0]["score_components"]["impact"] == 100
+    assert ranked[0]["score_components"]["bolivia_relevance"] == 75
     assert ranked[0]["score_components"]["corroboration"] == 0
     assert ranked[0]["score_components"]["category_confidence"] == 100
     assert "score_reason" in ranked[0]
@@ -177,3 +178,26 @@ def test_corroborated_story_can_outrank_isolated_recent_story():
     assert ranked[0] is corroborated_old or ranked[0] is corroborated_pair
     assert ranked[0]["score_components"]["corroboration"] == 70
     assert isolated_recent["score_components"]["corroboration"] == 0
+
+
+def test_foreign_story_without_bolivia_context_is_penalized():
+    ranker = NewsRanker()
+    foreign_story = _article(
+        title="Accidente en Nepal deja varios fallecidos",
+        description="Autoridades de Nepal investigan las causas de la emergencia.",
+        content=" ".join(["nepal"] * 120),
+        source="Unitel",
+    )
+    bolivia_story = _article(
+        title="Conflicto social en Santa Cruz afecta el transporte pesado",
+        description="Sectores bolivianos reportan medidas de presion y bloqueos.",
+        content=" ".join(["bolivia santa cruz transporte"] * 80),
+        source="RedUno",
+    )
+
+    ranked = ranker.rank([foreign_story, bolivia_story])
+
+    assert ranked[0] is bolivia_story
+    assert foreign_story["score_components"]["bolivia_relevance"] == 5
+    assert foreign_story["score_components"]["penalties"] >= 20
+    assert "penalizacion:internacional sin contexto boliviano" in foreign_story["score_reason"]

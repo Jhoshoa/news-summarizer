@@ -4,12 +4,13 @@ scale:
   max: 100
 
 weights:
-  recency: 0.20
-  source: 0.15
-  content_quality: 0.22
-  impact: 0.25
+  recency: 0.15
+  source: 0.10
+  content_quality: 0.17
+  impact: 0.20
+  bolivia_relevance: 0.20
   corroboration: 0.10
-  category_confidence: 0.10
+  category_confidence: 0.08
 
 recency:
   buckets:
@@ -102,6 +103,61 @@ corroboration:
     three_or_more_sources: 100
   default_score: 0
 
+bolivia_relevance:
+  strong_score: 100
+  medium_score: 75
+  weak_score: 45
+  foreign_only_score: 5
+  local_terms:
+    - "bolivia"
+    - "boliviano"
+    - "boliviana"
+    - "gobierno boliviano"
+    - "banco central"
+    - "banco central de bolivia"
+    - "santa cruz"
+    - "la paz"
+    - "cochabamba"
+    - "el alto"
+    - "oruro"
+    - "potosi"
+    - "tarija"
+    - "chuquisaca"
+    - "beni"
+    - "pando"
+    - "sucre"
+    - "chapare"
+    - "tropico"
+    - "ypfb"
+    - "aduana nacional"
+    - "senasag"
+    - "abc"
+    - "cob"
+    - "mas"
+    - "tse"
+  foreign_indicators:
+    - "nepal"
+    - "colombia"
+    - "madrid"
+    - "sao paulo"
+    - "brasil"
+    - "argentina"
+    - "chile"
+    - "peru"
+    - "mexico"
+    - "estados unidos"
+    - "eeuu"
+    - "japon"
+    - "china"
+    - "europa"
+    - "venezuela"
+    - "ucrania"
+    - "rusia"
+    - "israel"
+    - "gaza"
+    - "francia"
+    - "espana"
+
 category_confidence:
   missing_score: 45
   buckets:
@@ -117,3 +173,4 @@ penalties:
   missing_date: 10
   unknown_source: 8
   low_category_confidence: 10
+  foreign_without_bolivia_context: 20

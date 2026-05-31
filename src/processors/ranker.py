@@ -19,12 +19,13 @@ class NewsRanker:
     DEFAULT_CONFIG: dict[str, Any] = {
         "scale": {"min": 0, "max": 100},
         "weights": {
-            "recency": 0.20,
-            "source": 0.15,
-            "content_quality": 0.22,
-            "impact": 0.25,
+            "recency": 0.15,
+            "source": 0.10,
+            "content_quality": 0.17,
+            "impact": 0.20,
+            "bolivia_relevance": 0.20,
             "corroboration": 0.10,
-            "category_confidence": 0.10,
+            "category_confidence": 0.08,
         },
         "recency": {
             "buckets": [
@@ -119,6 +120,63 @@ class NewsRanker:
             },
             "default_score": 0,
         },
+        "bolivia_relevance": {
+            "strong_score": 100,
+            "medium_score": 75,
+            "weak_score": 45,
+            "foreign_only_score": 5,
+            "local_terms": [
+                "bolivia",
+                "boliviano",
+                "boliviana",
+                "gobierno boliviano",
+                "banco central",
+                "banco central de bolivia",
+                "santa cruz",
+                "la paz",
+                "cochabamba",
+                "el alto",
+                "oruro",
+                "potosi",
+                "tarija",
+                "chuquisaca",
+                "beni",
+                "pando",
+                "sucre",
+                "chapare",
+                "tropico",
+                "ypfb",
+                "aduana nacional",
+                "senasag",
+                "abc",
+                "cob",
+                "mas",
+                "tse",
+            ],
+            "foreign_indicators": [
+                "nepal",
+                "colombia",
+                "madrid",
+                "sao paulo",
+                "brasil",
+                "argentina",
+                "chile",
+                "peru",
+                "mexico",
+                "estados unidos",
+                "eeuu",
+                "japon",
+                "china",
+                "europa",
+                "venezuela",
+                "ucrania",
+                "rusia",
+                "israel",
+                "gaza",
+                "francia",
+                "espana",
+            ],
+        },
         "category_confidence": {
             "missing_score": 45,
             "buckets": [
@@ -135,6 +193,7 @@ class NewsRanker:
             "missing_date": 10,
             "unknown_source": 8,
             "low_category_confidence": 10,
+            "foreign_without_bolivia_context": 20,
         },
     }
 
@@ -186,6 +245,7 @@ class NewsRanker:
             "source": self._source_score(item.get("source"), reasons),
             "content_quality": self._content_quality_score(item, reasons),
             "impact": self._impact_score(item, reasons),
+            "bolivia_relevance": self._bolivia_relevance_score(item, reasons),
             "corroboration": self._corroboration_score(item, reasons),
             "category_confidence": self._category_confidence_score(
                 item.get("category_confidence"),
@@ -289,6 +349,25 @@ class NewsRanker:
             reasons.append("impacto bajo")
         return best_score
 
+    def _bolivia_relevance_score(self, item: dict, reasons: list[str]) -> float:
+        config = self.config["bolivia_relevance"]
+        text = self._article_text(item)
+        local_matches = self._matching_terms(text, config.get("local_terms", []))
+        foreign_matches = self._matching_terms(text, config.get("foreign_indicators", []))
+
+        if len(local_matches) >= 2:
+            reasons.append(f"bolivia alta:{','.join(local_matches[:3])}")
+            return self._safe_float(config.get("strong_score"), 100.0)
+        if local_matches:
+            reasons.append(f"bolivia media:{local_matches[0]}")
+            return self._safe_float(config.get("medium_score"), 75.0)
+        if foreign_matches:
+            reasons.append(f"internacional sin contexto boliviano:{foreign_matches[0]}")
+            return self._safe_float(config.get("foreign_only_score"), 5.0)
+
+        reasons.append("bolivia relevancia debil")
+        return self._safe_float(config.get("weak_score"), 45.0)
+
     def _category_confidence_score(self, confidence: Any, reasons: list[str]) -> float:
         config = self.config["category_confidence"]
         if confidence is None:
@@ -333,6 +412,13 @@ class NewsRanker:
         if confidence is not None and self._safe_float(confidence, 0.0) < 0.4:
             penalty += self._safe_float(penalties.get("low_category_confidence"), 10.0)
             reasons.append("penalizacion:categoria baja confianza")
+
+        if self._is_foreign_without_bolivia_context(item):
+            penalty += self._safe_float(
+                penalties.get("foreign_without_bolivia_context"),
+                20.0,
+            )
+            reasons.append("penalizacion:internacional sin contexto boliviano")
 
         return penalty
 
@@ -392,15 +478,7 @@ class NewsRanker:
         return token_jaccard >= self._corroboration_threshold("same_story_token_jaccard", 0.55)
 
     def _story_text(self, article: dict) -> str:
-        return self._normalize_text(
-            " ".join(
-                [
-                    str(article.get("title") or ""),
-                    str(article.get("description") or ""),
-                    str(article.get("content") or "")[:600],
-                ]
-            )
-        )
+        return self._article_text(article, content_chars=600)
 
     def _token_jaccard(self, left: str, right: str) -> float:
         left_tokens = self._significant_tokens(left)
@@ -468,6 +546,32 @@ class NewsRanker:
 
     def _corroboration_threshold(self, name: str, default: float) -> float:
         return self._safe_float(self.config["corroboration"].get(name), default)
+
+    def _article_text(self, item: dict, content_chars: int = 2000) -> str:
+        return self._normalize_text(
+            " ".join(
+                [
+                    str(item.get("title") or ""),
+                    str(item.get("description") or ""),
+                    str(item.get("content") or "")[:content_chars],
+                ]
+            )
+        )
+
+    def _matching_terms(self, text: str, terms: list[str]) -> list[str]:
+        matches = []
+        for term in terms:
+            normalized_term = self._normalize_text(term)
+            if self._contains_term(text, normalized_term):
+                matches.append(normalized_term)
+        return matches
+
+    def _is_foreign_without_bolivia_context(self, item: dict) -> bool:
+        text = self._article_text(item)
+        config = self.config["bolivia_relevance"]
+        return bool(self._matching_terms(text, config.get("foreign_indicators", []))) and not bool(
+            self._matching_terms(text, config.get("local_terms", []))
+        )
 
     def _load_config(self, config_path: Path) -> dict[str, Any]:
         config = self._deep_copy_config(self.DEFAULT_CONFIG)
