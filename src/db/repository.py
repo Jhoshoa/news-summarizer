@@ -429,13 +429,87 @@ class Database:
         source: str | None = None,
         q: str | None = None,
         article_date: date | None = None,
+        fallback_to_latest: bool = False,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
         page = max(page, 1)
         page_size = min(max(page_size, 1), 100)
         offset = (page - 1) * page_size
+        requested_date = article_date
+        effective_date = article_date
+        is_fallback = False
 
+        async with self.session_maker() as session:
+            filters = self._article_filters(
+                category=category,
+                source=source,
+                q=q,
+                article_date=effective_date,
+            )
+            total_stmt = (
+                select(func.count(NewsArticle.id))
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(*filters)
+            )
+            total = int(await session.scalar(total_stmt) or 0)
+
+            if total == 0 and fallback_to_latest and requested_date:
+                latest_date = await self._latest_article_date(
+                    session,
+                    category=category,
+                    source=source,
+                    q=q,
+                    before_or_on=requested_date,
+                )
+                if latest_date and latest_date != requested_date:
+                    effective_date = latest_date
+                    is_fallback = True
+                    filters = self._article_filters(
+                        category=category,
+                        source=source,
+                        q=q,
+                        article_date=effective_date,
+                    )
+                    total_stmt = (
+                        select(func.count(NewsArticle.id))
+                        .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                        .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                        .where(*filters)
+                    )
+                    total = int(await session.scalar(total_stmt) or 0)
+
+            stmt = (
+                select(NewsArticle, NewsCategory.name, NewsSource.name, NewsSource.source_type)
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(*filters)
+                .order_by(NewsArticle.published_at.desc(), NewsArticle.collected_at.desc())
+                .offset(offset)
+                .limit(page_size)
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+
+        return self._paginated_response(
+            items=[self._article_row_to_dict(row) for row in rows],
+            total=total,
+            page=page,
+            page_size=page_size,
+            date=effective_date,
+            requested_date=requested_date,
+            is_fallback=is_fallback,
+        )
+
+    def _article_filters(
+        self,
+        *,
+        category: str | None = None,
+        source: str | None = None,
+        q: str | None = None,
+        article_date: date | None = None,
+    ) -> list[Any]:
         filters = [NewsArticle.is_active.is_(True)]
         if article_date:
             start_at, end_at = self._day_bounds(article_date)
@@ -458,34 +532,28 @@ class Database:
                     NewsArticle.content.ilike(term),
                 )
             )
+        return filters
 
-        async with self.session_maker() as session:
-            total_stmt = (
-                select(func.count(NewsArticle.id))
-                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
-                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
-                .where(*filters)
-            )
-            total = int(await session.scalar(total_stmt) or 0)
+    async def _latest_article_date(
+        self,
+        session: AsyncSession,
+        *,
+        category: str | None = None,
+        source: str | None = None,
+        q: str | None = None,
+        before_or_on: date,
+    ) -> date | None:
+        filters = self._article_filters(category=category, source=source, q=q)
+        end_at = datetime.combine(before_or_on + timedelta(days=1), time.min)
+        filters.append(NewsArticle.published_at < end_at)
 
-            stmt = (
-                select(NewsArticle, NewsCategory.name, NewsSource.name, NewsSource.source_type)
-                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
-                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
-                .where(*filters)
-                .order_by(NewsArticle.published_at.desc(), NewsArticle.collected_at.desc())
-                .offset(offset)
-                .limit(page_size)
-            )
-            result = await session.execute(stmt)
-            rows = result.all()
-
-        return self._paginated_response(
-            items=[self._article_row_to_dict(row) for row in rows],
-            total=total,
-            page=page,
-            page_size=page_size,
+        stmt = (
+            select(func.max(func.date(NewsArticle.published_at)))
+            .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+            .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+            .where(*filters)
         )
+        return await session.scalar(stmt)
 
     def _day_bounds(self, value: date) -> tuple[datetime, datetime]:
         start_at = datetime.combine(value, time.min)
@@ -598,21 +666,23 @@ class Database:
         category: str | None = None,
         summary_date: date | None = None,
         article_id: int | None = None,
+        fallback_to_latest: bool = False,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
         page = max(page, 1)
         page_size = min(max(page_size, 1), 100)
         offset = (page - 1) * page_size
-        summary_date = summary_date or date.today()
-
-        filters = [NewsSummary.summary_date == summary_date]
-        if category:
-            filters.append(NewsCategory.name == category.strip().lower())
-        if article_id is not None:
-            filters.append(NewsSummary.article_id == article_id)
+        requested_date = summary_date or date.today()
+        effective_date = requested_date
+        is_fallback = False
 
         async with self.session_maker() as session:
+            filters = self._summary_filters(
+                category=category,
+                summary_date=effective_date,
+                article_id=article_id,
+            )
             total_stmt = (
                 select(func.count(NewsSummary.id))
                 .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
@@ -621,6 +691,30 @@ class Database:
                 .where(*filters)
             )
             total = int(await session.scalar(total_stmt) or 0)
+
+            if total == 0 and fallback_to_latest:
+                latest_date = await self._latest_summary_date(
+                    session,
+                    category=category,
+                    article_id=article_id,
+                    before_or_on=requested_date,
+                )
+                if latest_date and latest_date != requested_date:
+                    effective_date = latest_date
+                    is_fallback = True
+                    filters = self._summary_filters(
+                        category=category,
+                        summary_date=effective_date,
+                        article_id=article_id,
+                    )
+                    total_stmt = (
+                        select(func.count(NewsSummary.id))
+                        .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+                        .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
+                        .outerjoin(NewsSource, NewsArticle.source_id == NewsSource.id)
+                        .where(*filters)
+                    )
+                    total = int(await session.scalar(total_stmt) or 0)
 
             stmt = (
                 select(
@@ -649,7 +743,47 @@ class Database:
             total=total,
             page=page,
             page_size=page_size,
+            date=effective_date,
+            requested_date=requested_date,
+            is_fallback=is_fallback,
         )
+
+    def _summary_filters(
+        self,
+        *,
+        category: str | None = None,
+        summary_date: date,
+        article_id: int | None = None,
+    ) -> list[Any]:
+        filters = [NewsSummary.summary_date == summary_date]
+        if category:
+            filters.append(NewsCategory.name == category.strip().lower())
+        if article_id is not None:
+            filters.append(NewsSummary.article_id == article_id)
+        return filters
+
+    async def _latest_summary_date(
+        self,
+        session: AsyncSession,
+        *,
+        category: str | None = None,
+        article_id: int | None = None,
+        before_or_on: date,
+    ) -> date | None:
+        filters = [NewsSummary.summary_date <= before_or_on]
+        if category:
+            filters.append(NewsCategory.name == category.strip().lower())
+        if article_id is not None:
+            filters.append(NewsSummary.article_id == article_id)
+
+        stmt = (
+            select(func.max(NewsSummary.summary_date))
+            .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+            .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
+            .outerjoin(NewsSource, NewsArticle.source_id == NewsSource.id)
+            .where(*filters)
+        )
+        return await session.scalar(stmt)
 
     async def get_summary_by_id(self, summary_id: int) -> dict | None:
         async with self.session_maker() as session:
@@ -892,6 +1026,9 @@ class Database:
         total: int,
         page: int,
         page_size: int,
+        date: date | None = None,
+        requested_date: date | None = None,
+        is_fallback: bool = False,
     ) -> dict[str, Any]:
         total_pages = (total + page_size - 1) // page_size if total else 0
         return {
@@ -900,6 +1037,9 @@ class Database:
             "page_size": page_size,
             "total": total,
             "total_pages": total_pages,
+            "date": date,
+            "requested_date": requested_date,
+            "is_fallback": is_fallback,
         }
 
     async def _find_subscriber(

@@ -19,6 +19,7 @@ type GetArticlesArgs = {
   date?: string;
   source?: string;
   q?: string;
+  fallback_to_latest?: boolean;
   page?: number;
   page_size?: number;
   limit?: number;
@@ -28,6 +29,7 @@ type GetSummariesArgs = {
   category?: string;
   date?: string;
   article_id?: number;
+  fallback_to_latest?: boolean;
   page?: number;
   page_size?: number;
 };
@@ -77,6 +79,7 @@ export const newsApi = createApi({
           date: args?.date,
           source: args?.source,
           q: args?.q,
+          fallback_to_latest: args?.fallback_to_latest,
           page: args?.page ?? 1,
           page_size: args?.page_size ?? args?.limit ?? 20,
         },
@@ -94,6 +97,7 @@ export const newsApi = createApi({
           category: args?.category,
           date: args?.date,
           article_id: args?.article_id,
+          fallback_to_latest: args?.fallback_to_latest,
           page: args?.page ?? 1,
           page_size: args?.page_size ?? 20,
         },

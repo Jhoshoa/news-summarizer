@@ -36,6 +36,10 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             date_cls | None,
             Query(description="Fecha de publicacion en formato YYYY-MM-DD. Por defecto usa hoy."),
         ] = None,
+        fallback_to_latest: Annotated[
+            bool,
+            Query(description="Si no hay datos para la fecha solicitada, devuelve la fecha anterior disponible."),
+        ] = False,
         page: Annotated[int, Query(ge=1, description="Pagina solicitada.")] = 1,
         page_size: Annotated[
             int,
@@ -56,6 +60,7 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             source=source,
             q=q,
             article_date=article_date,
+            fallback_to_latest=fallback_to_latest,
             page=page,
             page_size=page_size,
         )

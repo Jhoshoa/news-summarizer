@@ -865,6 +865,10 @@ p {
   background: var(--color-surface);
 }
 
+.empty-state.compact {
+  padding: 14px;
+}
+
 .empty-state p {
   color: var(--color-subtle);
 }

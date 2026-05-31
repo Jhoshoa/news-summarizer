@@ -63,6 +63,9 @@ export type PaginatedResponse<T> = {
   page_size: number;
   total: number;
   total_pages: number;
+  date?: string | null;
+  requested_date?: string | null;
+  is_fallback?: boolean;
 };
 
 export type Article = {

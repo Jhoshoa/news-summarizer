@@ -15,7 +15,6 @@ import {
   SummaryCardSkeleton,
 } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
-import { departments, mockArticles, mockSummaries } from "../data/mockNews";
 import {
   useGetArticlesQuery,
   useGetEconomicIndicatorsQuery,
@@ -25,18 +24,58 @@ import {
   useTriggerSummaryMutation,
 } from "../services/api";
 
+const departments = [
+  "La Paz",
+  "Santa Cruz",
+  "Cochabamba",
+  "Oruro",
+  "Potosi",
+  "Tarija",
+  "Beni",
+  "Chuquisaca",
+  "Pando",
+];
+
+const formatContentDate = (value?: string | null) => {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("es-BO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+};
+
 export const HomePage = () => {
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery();
-  const { data: articlesData, isFetching: isFetchingArticles } = useGetArticlesQuery({ limit: 8 });
-  const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery();
+  const { data: articlesData, isFetching: isFetchingArticles } = useGetArticlesQuery({
+    limit: 8,
+    fallback_to_latest: true,
+  });
+  const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
+    fallback_to_latest: true,
+  });
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
   const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
 
   const indicators = indicatorsData?.items ?? [];
-  const articles = articlesData?.items.length ? articlesData.items : mockArticles;
-  const summaries = summariesData?.items.length ? summariesData.items : mockSummaries;
+  const articles = useMemo(() => articlesData?.items ?? [], [articlesData?.items]);
+  const summaries = useMemo(() => summariesData?.items ?? [], [summariesData?.items]);
   const headline = summaries[0]?.title ?? "Bolivia en titulares, contexto y datos locales";
+  const fallbackDate = summariesData?.is_fallback
+    ? summariesData.date
+    : articlesData?.is_fallback
+      ? articlesData.date
+      : null;
+  const fallbackDateLabel = formatContentDate(fallbackDate);
   const p2pBuy = formatNumber(findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value);
   const p2pSell = formatNumber(findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value);
   const showIndicatorSkeleton = isFetchingIndicators;
@@ -104,18 +143,35 @@ export const HomePage = () => {
 
           <section className="lower-grid">
             <div className="news-list">
+              {fallbackDateLabel && (
+                <p className="form-notice">
+                  No hay noticias de hoy todavia. Mostrando ultimas disponibles del {fallbackDateLabel}.
+                </p>
+              )}
               <div className="section-label">Resumenes IA</div>
               {showSummarySkeleton
                 ? Array.from({ length: 3 }, (_, index) => <SummaryCardSkeleton key={index} />)
                 : featuredSummaries.map((summary) => (
                     <SummaryCard key={summary.id ?? summary.title} summary={summary} />
                   ))}
+              {!showSummarySkeleton && featuredSummaries.length === 0 && (
+                <section className="empty-state compact">
+                  <span className="panel-title">Sin resumenes disponibles</span>
+                  <p>Actualiza la portada para generar resumenes IA con las noticias recolectadas.</p>
+                </section>
+              )}
               <div className="section-label">Mas noticias</div>
               {showArticleSkeleton
                 ? Array.from({ length: 2 }, (_, index) => <NewsCardSkeleton key={index} />)
                 : featuredArticles.slice(0, 2).map((article) => (
                     <NewsCard key={article.id} article={article} />
                   ))}
+              {!showArticleSkeleton && featuredArticles.length === 0 && (
+                <section className="empty-state compact">
+                  <span className="panel-title">Sin noticias recolectadas</span>
+                  <p>Presiona actualizar para recolectar noticias desde las fuentes configuradas.</p>
+                </section>
+              )}
             </div>
 
             <aside className="side-stack">

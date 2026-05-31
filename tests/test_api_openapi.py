@@ -27,6 +27,30 @@ def test_articles_endpoint_documents_date_query_param():
     assert {"type": "string", "format": "date"} in date_param["schema"]["anyOf"]
 
 
+def test_articles_endpoint_documents_fallback_query_param():
+    schema = app.openapi()
+    parameters = schema["paths"]["/api/articles"]["get"]["parameters"]
+
+    fallback_param = next(param for param in parameters if param["name"] == "fallback_to_latest")
+
+    assert fallback_param["in"] == "query"
+    assert fallback_param["required"] is False
+    assert fallback_param["schema"]["type"] == "boolean"
+    assert fallback_param["schema"]["default"] is False
+
+
+def test_summaries_endpoint_documents_fallback_query_param():
+    schema = app.openapi()
+    parameters = schema["paths"]["/api/summaries"]["get"]["parameters"]
+
+    fallback_param = next(param for param in parameters if param["name"] == "fallback_to_latest")
+
+    assert fallback_param["in"] == "query"
+    assert fallback_param["required"] is False
+    assert fallback_param["schema"]["type"] == "boolean"
+    assert fallback_param["schema"]["default"] is False
+
+
 def test_articles_today_falls_back_when_timezone_is_invalid():
     app_instance = SimpleNamespace(settings=SimpleNamespace(schedule_timezone="Invalid/Zone"))
 

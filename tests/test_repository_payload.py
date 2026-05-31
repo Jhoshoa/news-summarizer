@@ -122,3 +122,21 @@ def test_day_bounds_cover_exact_selected_date():
 
     assert start_at == datetime(2026, 5, 28, 0, 0, 0)
     assert end_at == datetime(2026, 5, 29, 0, 0, 0)
+
+
+def test_paginated_response_includes_fallback_metadata():
+    db = object.__new__(Database)
+
+    response = db._paginated_response(
+        items=[],
+        total=0,
+        page=1,
+        page_size=20,
+        date=date(2026, 5, 30),
+        requested_date=date(2026, 5, 31),
+        is_fallback=True,
+    )
+
+    assert response["date"] == date(2026, 5, 30)
+    assert response["requested_date"] == date(2026, 5, 31)
+    assert response["is_fallback"] is True

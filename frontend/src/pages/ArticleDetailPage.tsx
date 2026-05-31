@@ -6,7 +6,6 @@ import { findByExactCode, findIndicator, formatNumber } from "../components/indi
 import { ArticleImage } from "../components/news/ArticleImage";
 import { ArticleDetailSkeleton, PanelSkeleton } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
-import { mockArticles } from "../data/mockNews";
 import {
   useGetArticleByIdQuery,
   useGetEconomicIndicatorsQuery,
@@ -58,7 +57,7 @@ export const ArticleDetailPage = () => {
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
 
   const indicators = indicatorsData?.items ?? [];
-  const article = articleData ?? mockArticles.find((item) => item.id === articleId) ?? mockArticles[1];
+  const article = articleData;
   const relatedSummary = summaryData?.items[0];
   const officialBuy = findByExactCode(indicators, "bcb_tipo_de_cambio_compra")?.value;
   const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
@@ -76,14 +75,6 @@ export const ArticleDetailPage = () => {
   const gold = findIndicator(indicators, ["oro"]);
   const treMn = findIndicator(indicators, ["tre", "mn"]);
   const treMe = findIndicator(indicators, ["tre", "me"]);
-  const summaryText = relatedSummary?.summary;
-  const articleBody =
-    article.content &&
-    !isDuplicateText(article.content, relatedSummary?.summary) &&
-    !isDuplicateText(article.content, article.description)
-      ? article.content
-      : "";
-  const hasArticleImage = Boolean(article.image);
   const showArticleSkeleton = articleId === null || isFetchingArticle || isFetchingSummary;
 
   const handleRefresh = useCallback(() => {
@@ -102,6 +93,24 @@ export const ArticleDetailPage = () => {
   if (showArticleSkeleton) {
     return <ArticleDetailSkeleton />;
   }
+
+  if (!article) {
+    return (
+      <section className="empty-state">
+        <span className="panel-title">Noticia no disponible</span>
+        <p>El articulo solicitado no existe en la base de datos o todavia no fue recolectado.</p>
+      </section>
+    );
+  }
+
+  const summaryText = relatedSummary?.summary;
+  const articleBody =
+    article.content &&
+    !isDuplicateText(article.content, relatedSummary?.summary) &&
+    !isDuplicateText(article.content, article.description)
+      ? article.content
+      : "";
+  const hasArticleImage = Boolean(article.image);
 
   return (
     <>

@@ -25,6 +25,10 @@ def create_summaries_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             int | None,
             Query(description="Filtra summaries asociados a un articulo especifico."),
         ] = None,
+        fallback_to_latest: Annotated[
+            bool,
+            Query(description="Si no hay summaries para la fecha solicitada, devuelve la fecha anterior disponible."),
+        ] = False,
         page: Annotated[int, Query(ge=1, description="Pagina solicitada.")] = 1,
         page_size: Annotated[
             int,
@@ -39,6 +43,7 @@ def create_summaries_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             category=category,
             summary_date=summary_date,
             article_id=article_id,
+            fallback_to_latest=fallback_to_latest,
             page=page,
             page_size=page_size,
         )
