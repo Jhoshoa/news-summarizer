@@ -124,6 +124,12 @@ export const ArticleDetailPage = () => {
             {formatPublishedDate(article.published_at)}
           </time>
           <h1>{article.title}</h1>
+          <div className="article-source-link">
+            <span>Fuente original</span>
+            <a href={article.url} rel="noreferrer" target="_blank">
+              {article.source}
+            </a>
+          </div>
 
           <section className={hasArticleImage ? "article-content-layout has-image" : "article-content-layout"}>
             <div className="article-text-column">

@@ -1159,6 +1159,23 @@ p {
   line-height: 1.08;
 }
 
+.article-source-link {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 14px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.article-source-link a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .article-content-layout {
   display: grid;
   gap: 12px;
