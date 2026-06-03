@@ -25,6 +25,7 @@
   --text-xl: 1.5rem;
   --text-page-title: clamp(2rem, 3.2vw, 2.75rem);
   --text-hero-title: clamp(1.8rem, 3vw, 2.55rem);
+  --sticky-header-height: 65px;
   color: var(--color-text);
   background: var(--color-page);
   font-family: var(--font-sans);
@@ -91,7 +92,7 @@ p {
 .app-frame {
   width: min(96vw, 1544px);
   margin: 24px auto;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.92);
@@ -107,6 +108,15 @@ p {
   padding: 16px 26px;
   border-bottom: 1px solid var(--color-border);
   background: rgba(255, 255, 255, 0.86);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: rgba(255, 253, 248, 0.94);
+  backdrop-filter: blur(14px);
 }
 
 .brand {
@@ -194,9 +204,13 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  position: sticky;
+  top: var(--sticky-header-height);
+  z-index: 45;
   padding: 10px 26px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
+  background: rgba(251, 245, 235, 0.96);
+  backdrop-filter: blur(12px);
 }
 
 .back-button {
@@ -1424,6 +1438,14 @@ p {
   .navigation-trail {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .topbar {
+    border-radius: 0;
+  }
+
+  .navigation-trail {
+    position: static;
   }
 
   .breadcrumbs {
