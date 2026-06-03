@@ -39,6 +39,18 @@ def test_articles_endpoint_documents_fallback_query_param():
     assert fallback_param["schema"]["default"] is False
 
 
+def test_articles_endpoint_documents_exclude_summarized_query_param():
+    schema = app.openapi()
+    parameters = schema["paths"]["/api/articles"]["get"]["parameters"]
+
+    exclude_param = next(param for param in parameters if param["name"] == "exclude_summarized")
+
+    assert exclude_param["in"] == "query"
+    assert exclude_param["required"] is False
+    assert exclude_param["schema"]["type"] == "boolean"
+    assert exclude_param["schema"]["default"] is False
+
+
 def test_summaries_endpoint_documents_fallback_query_param():
     schema = app.openapi()
     parameters = schema["paths"]["/api/summaries"]["get"]["parameters"]

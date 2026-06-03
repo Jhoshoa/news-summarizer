@@ -17,6 +17,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    exists,
     func,
     or_,
     select,
@@ -430,6 +431,7 @@ class Database:
         q: str | None = None,
         article_date: date | None = None,
         fallback_to_latest: bool = False,
+        exclude_summarized: bool = False,
         page: int = 1,
         page_size: int = 20,
     ) -> dict[str, Any]:
@@ -446,6 +448,7 @@ class Database:
                 source=source,
                 q=q,
                 article_date=effective_date,
+                exclude_summarized=exclude_summarized,
             )
             total_stmt = (
                 select(func.count(NewsArticle.id))
@@ -462,6 +465,7 @@ class Database:
                     source=source,
                     q=q,
                     before_or_on=requested_date,
+                    exclude_summarized=exclude_summarized,
                 )
                 if latest_date and latest_date != requested_date:
                     effective_date = latest_date
@@ -471,6 +475,7 @@ class Database:
                         source=source,
                         q=q,
                         article_date=effective_date,
+                        exclude_summarized=exclude_summarized,
                     )
                     total_stmt = (
                         select(func.count(NewsArticle.id))
@@ -509,6 +514,7 @@ class Database:
         source: str | None = None,
         q: str | None = None,
         article_date: date | None = None,
+        exclude_summarized: bool = False,
     ) -> list[Any]:
         filters = [NewsArticle.is_active.is_(True)]
         if article_date:
@@ -519,6 +525,8 @@ class Database:
                     NewsArticle.published_at < end_at,
                 ]
             )
+        if exclude_summarized:
+            filters.append(self._article_not_summarized_filter(article_date))
         if category:
             filters.append(NewsCategory.name == category.strip().lower())
         if source:
@@ -534,6 +542,14 @@ class Database:
             )
         return filters
 
+    def _article_not_summarized_filter(self, article_date: date | None = None) -> Any:
+        summary_date_filter = article_date if article_date is not None else func.date(NewsArticle.published_at)
+        summarized_article_exists = exists().where(
+            NewsSummary.article_id == NewsArticle.id,
+            NewsSummary.summary_date == summary_date_filter,
+        )
+        return ~summarized_article_exists
+
     async def _latest_article_date(
         self,
         session: AsyncSession,
@@ -542,10 +558,13 @@ class Database:
         source: str | None = None,
         q: str | None = None,
         before_or_on: date,
+        exclude_summarized: bool = False,
     ) -> date | None:
         filters = self._article_filters(category=category, source=source, q=q)
         end_at = datetime.combine(before_or_on + timedelta(days=1), time.min)
         filters.append(NewsArticle.published_at < end_at)
+        if exclude_summarized:
+            filters.append(self._article_not_summarized_filter())
 
         stmt = (
             select(func.max(func.date(NewsArticle.published_at)))

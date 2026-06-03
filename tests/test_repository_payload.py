@@ -124,6 +124,21 @@ def test_day_bounds_cover_exact_selected_date():
     assert end_at == datetime(2026, 5, 29, 0, 0, 0)
 
 
+def test_article_filters_can_exclude_summarized_articles_for_selected_date():
+    db = object.__new__(Database)
+
+    filters = db._article_filters(
+        article_date=date(2026, 6, 3),
+        exclude_summarized=True,
+    )
+    compiled_filter = str(filters[-1].compile(compile_kwargs={"literal_binds": True}))
+
+    assert "NOT" in compiled_filter
+    assert "news_summaries" in compiled_filter
+    assert "news_summaries.article_id = news_articles.id" in compiled_filter
+    assert "news_summaries.summary_date = '2026-06-03'" in compiled_filter
+
+
 def test_paginated_response_includes_fallback_metadata():
     db = object.__new__(Database)
 

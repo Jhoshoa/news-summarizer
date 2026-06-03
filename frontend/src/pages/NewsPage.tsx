@@ -40,6 +40,7 @@ export const NewsPage = () => {
     page_size: 12,
     category,
     date: selectedDate,
+    exclude_summarized: true,
   });
   const summariesQuery = useGetSummariesQuery({
     page,

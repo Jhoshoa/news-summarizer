@@ -40,6 +40,10 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             bool,
             Query(description="Si no hay datos para la fecha solicitada, devuelve la fecha anterior disponible."),
         ] = False,
+        exclude_summarized: Annotated[
+            bool,
+            Query(description="Excluye articulos que ya tienen un resumen IA para la fecha solicitada."),
+        ] = False,
         page: Annotated[int, Query(ge=1, description="Pagina solicitada.")] = 1,
         page_size: Annotated[
             int,
@@ -61,6 +65,7 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             q=q,
             article_date=article_date,
             fallback_to_latest=fallback_to_latest,
+            exclude_summarized=exclude_summarized,
             page=page,
             page_size=page_size,
         )

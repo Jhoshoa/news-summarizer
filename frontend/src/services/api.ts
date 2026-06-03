@@ -20,6 +20,7 @@ type GetArticlesArgs = {
   source?: string;
   q?: string;
   fallback_to_latest?: boolean;
+  exclude_summarized?: boolean;
   page?: number;
   page_size?: number;
   limit?: number;
@@ -80,6 +81,7 @@ export const newsApi = createApi({
           source: args?.source,
           q: args?.q,
           fallback_to_latest: args?.fallback_to_latest,
+          exclude_summarized: args?.exclude_summarized,
           page: args?.page ?? 1,
           page_size: args?.page_size ?? args?.limit ?? 20,
         },

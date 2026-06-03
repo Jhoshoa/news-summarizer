@@ -59,6 +59,7 @@ export const HomePage = () => {
   const { data: articlesData, isFetching: isFetchingArticles } = useGetArticlesQuery({
     limit: 8,
     fallback_to_latest: true,
+    exclude_summarized: true,
   });
   const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
     fallback_to_latest: true,
