@@ -18,9 +18,9 @@ const HeaderComponent = ({
   onRefresh,
 }: HeaderProps) => (
   <header className={compact ? "topbar compact" : "topbar"}>
-    <Link className="brand" href="/" aria-label="Noticias Bolivia IA inicio">
+    <Link className="brand" href="/" aria-label="EcoBrief Bolivia inicio">
       <BoliviaFlag />
-      <span>Noticias Bolivia IA</span>
+      <span>EcoBrief Bolivia</span>
     </Link>
     <nav className="nav" aria-label="Navegacion principal">
       <Link aria-current={activePath === "/news" || activePath === "/article" ? "page" : undefined} href="/news">

@@ -19,7 +19,7 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
       <div>
         <div className="card-meta-row">
           <span className="eyebrow">
-            {summary.source ?? "Noticias Bolivia IA"} - {summary.category}
+            {summary.source ?? "EcoBrief Bolivia"} - {summary.category}
           </span>
           <span className="status-badge summarized">Resumido IA</span>
         </div>

@@ -186,11 +186,11 @@ export const DataPage = () => {
       <section className="data-page">
         <header className="data-hero">
           <div>
-            <span className="eyebrow">Datos Bolivia IA</span>
-            <h1>Indicadores economicos y clima en una vista operativa</h1>
+            <span className="eyebrow">Datos EcoBrief</span>
+            <h1>Indicadores economicos y clima para contexto local eficiente</h1>
             <p>
-              Consulta tipos de cambio, UFV, oro, tasas TRE, clima local, radiacion UV y datos
-              horarios para los departamentos disponibles.
+              Consulta tipos de cambio, UFV, oro, tasas TRE, clima local y radiacion UV sin
+              navegar por multiples fuentes.
             </p>
           </div>
           <div className="data-status-card">

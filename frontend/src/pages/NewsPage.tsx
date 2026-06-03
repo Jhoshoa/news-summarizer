@@ -88,11 +88,11 @@ export const NewsPage = () => {
       <section className="news-browser">
         <div className="browser-heading">
           <span className="eyebrow">EcoBrief Bolivia</span>
-          <h1>{view === "resumenes" ? "Resumenes IA priorizados" : "Noticias recolectadas"}</h1>
+          <h1>{view === "resumenes" ? "Briefs priorizados" : "Noticias recolectadas"}</h1>
           <p>
             {view === "resumenes"
-              ? "Lee las noticias priorizadas y sintetizadas por IA para reducir ruido informativo."
-              : "Explora el archivo completo de notas originales recolectadas por las fuentes monitoreadas."}
+              ? "Lee noticias priorizadas y sintetizadas para reducir ruido informativo."
+              : "Explora notas originales recolectadas que aun no aparecen en los briefs del dia."}
           </p>
         </div>
 
@@ -110,7 +110,7 @@ export const NewsPage = () => {
           <span className="news-count">
             {showNewsSkeleton
               ? "Cargando"
-              : `${activeData?.total ?? 0} ${view === "resumenes" ? "resumenes" : "noticias"} para ${selectedDate}`}
+              : `${activeData?.total ?? 0} ${view === "resumenes" ? "briefs" : "noticias"} para ${selectedDate}`}
           </span>
         </div>
 
@@ -121,7 +121,7 @@ export const NewsPage = () => {
             className={view === "resumenes" ? "active" : ""}
             href={buildNewsHref(1, selectedDate, category, "resumenes")}
           >
-            Resumenes IA
+            Briefs EcoBrief
           </Link>
           <Link
             className={view === "recolectadas" ? "active" : ""}
@@ -166,11 +166,11 @@ export const NewsPage = () => {
         {!showNewsSkeleton && !activeError && activeItems.length === 0 && (
           <section className="empty-state">
             <span className="panel-title">
-              {view === "resumenes" ? "Sin resumenes para esta fecha" : "Sin noticias para esta fecha"}
+              {view === "resumenes" ? "Sin briefs para esta fecha" : "Sin noticias para esta fecha"}
             </span>
             <p>
               {view === "resumenes"
-                ? `No hay resumenes IA para ${selectedDate}. Puedes revisar noticias recolectadas o actualizar.`
+                ? `No hay briefs para ${selectedDate}. Puedes revisar noticias recolectadas o actualizar.`
                 : `No hay articulos guardados para ${selectedDate}. Puedes actualizar o elegir otro dia.`}
             </p>
           </section>

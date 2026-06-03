@@ -3,6 +3,7 @@ import { memo } from "react";
 const FooterComponent = () => (
   <footer className="footer">
     <div className="footer-links">
+      <span>EcoBrief Lab</span>
       <a href="#fuentes">Fuentes</a>
       <a href="#archivo">Archivo</a>
       <a href="#politica-editorial">Politica editorial</a>

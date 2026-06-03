@@ -70,7 +70,7 @@ export const HomePage = () => {
   const indicators = indicatorsData?.items ?? [];
   const articles = useMemo(() => articlesData?.items ?? [], [articlesData?.items]);
   const summaries = useMemo(() => summariesData?.items ?? [], [summariesData?.items]);
-  const headline = summaries[0]?.title ?? "Bolivia en titulares, contexto y datos locales";
+  const headline = summaries[0]?.title ?? "Menos ruido informativo, mas claridad local";
   const fallbackDate = summariesData?.is_fallback
     ? summariesData.date
     : articlesData?.is_fallback
@@ -134,8 +134,8 @@ export const HomePage = () => {
         <section className="content-column">
           <section className="hero-panel" id="ultimo">
             <div className="hero-art">
-              <span>Portada nacional</span>
-              <h1>Noticias actuales con resumen IA, fuente visible e indicadores clave</h1>
+              <span>EcoBrief Bolivia</span>
+              <h1>Noticias locales resumidas con menos ruido y menos desperdicio digital</h1>
             </div>
           </section>
 
@@ -149,7 +149,7 @@ export const HomePage = () => {
                   No hay noticias de hoy todavia. Mostrando ultimas disponibles del {fallbackDateLabel}.
                 </p>
               )}
-              <div className="section-label">Resumenes IA</div>
+              <div className="section-label">Briefs EcoBrief</div>
               {showSummarySkeleton
                 ? Array.from({ length: 3 }, (_, index) => <SummaryCardSkeleton key={index} />)
                 : featuredSummaries.map((summary) => (
@@ -157,11 +157,11 @@ export const HomePage = () => {
                   ))}
               {!showSummarySkeleton && featuredSummaries.length === 0 && (
                 <section className="empty-state compact">
-                  <span className="panel-title">Sin resumenes disponibles</span>
-                  <p>Actualiza la portada para generar resumenes IA con las noticias recolectadas.</p>
+                  <span className="panel-title">Sin briefs disponibles</span>
+                  <p>Actualiza la portada para sintetizar las noticias recolectadas.</p>
                 </section>
               )}
-              <div className="section-label">Mas noticias</div>
+              <div className="section-label">Noticias sin resumir</div>
               {showArticleSkeleton
                 ? Array.from({ length: 2 }, (_, index) => <NewsCardSkeleton key={index} />)
                 : featuredArticles.slice(0, 2).map((article) => (
