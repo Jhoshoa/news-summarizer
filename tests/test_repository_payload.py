@@ -155,3 +155,51 @@ def test_paginated_response_includes_fallback_metadata():
     assert response["date"] == date(2026, 5, 30)
     assert response["requested_date"] == date(2026, 5, 31)
     assert response["is_fallback"] is True
+
+
+def test_build_impact_metrics_payload_calculates_transparent_estimates():
+    db = object.__new__(Database)
+
+    response = db._build_impact_metrics_payload(
+        effective_date=date(2026, 6, 3),
+        requested_date=date(2026, 6, 3),
+        is_fallback=False,
+        collected_articles=86,
+        unique_articles=42,
+        summaries=18,
+        has_data=True,
+    )
+
+    assert response["has_data"] is True
+    assert response["duplicate_articles_estimated"] == 44
+    assert response["estimated_pages_avoided"] == 68
+    assert response["estimated_minutes_saved"] == 34.0
+    assert response["estimated_data_saved_mb"] == 54.4
+    assert response["reduction_rate"] == 0.7907
+    assert response["ai_calls_avoided_estimated"] == 44
+    assert response["pipeline"] == [
+        {"label": "Recolectadas", "value": 86},
+        {"label": "Unicas", "value": 42},
+        {"label": "Briefs", "value": 18},
+    ]
+    assert "no medicion energetica directa" in response["methodology"]["note"]
+
+
+def test_build_impact_metrics_payload_handles_empty_data_without_division_by_zero():
+    db = object.__new__(Database)
+
+    response = db._build_impact_metrics_payload(
+        effective_date=date(2026, 6, 3),
+        requested_date=date(2026, 6, 4),
+        is_fallback=True,
+        collected_articles=0,
+        unique_articles=0,
+        summaries=0,
+        has_data=False,
+    )
+
+    assert response["has_data"] is False
+    assert response["is_fallback"] is True
+    assert response["reduction_rate"] == 0.0
+    assert response["estimated_pages_avoided"] == 0
+    assert response["estimated_minutes_saved"] == 0.0

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
+import { ImpactMetricsPanel } from "../components/impact/ImpactMetricsPanel";
 import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
 import { findByExactCode, formatNumber } from "../components/indicators/indicatorUtils";
 import { SecondaryIndicators } from "../components/indicators/SecondaryIndicators";
@@ -18,6 +19,7 @@ import { WeatherPanel } from "../components/weather/WeatherPanel";
 import {
   useGetArticlesQuery,
   useGetEconomicIndicatorsQuery,
+  useGetImpactMetricsQuery,
   useGetSummariesQuery,
   useGetWeatherQuery,
   useRefreshEconomicIndicatorsMutation,
@@ -56,6 +58,11 @@ const formatContentDate = (value?: string | null) => {
 export const HomePage = () => {
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery();
+  const {
+    data: impactMetrics,
+    error: impactMetricsError,
+    isFetching: isFetchingImpactMetrics,
+  } = useGetImpactMetricsQuery({ fallback_to_latest: true });
   const { data: articlesData, isFetching: isFetchingArticles } = useGetArticlesQuery({
     limit: 8,
     fallback_to_latest: true,
@@ -99,10 +106,10 @@ export const HomePage = () => {
 
   const refreshControl = useMemo(
     () => ({
-      isRefreshing: isRefreshing || isFetchingIndicators || isTriggeringSummary,
+      isRefreshing: isRefreshing || isFetchingIndicators || isFetchingImpactMetrics || isTriggeringSummary,
       onRefresh: handleRefresh,
     }),
-    [handleRefresh, isFetchingIndicators, isRefreshing, isTriggeringSummary],
+    [handleRefresh, isFetchingImpactMetrics, isFetchingIndicators, isRefreshing, isTriggeringSummary],
   );
   usePageRefreshControl(refreshControl);
 
@@ -135,12 +142,16 @@ export const HomePage = () => {
           <section className="hero-panel" id="ultimo">
             <div className="hero-art">
               <span>EcoBrief Bolivia</span>
-              <h1>Noticias locales resumidas con menos ruido y menos desperdicio digital</h1>
+              <h1>Menos ruido informativo. Mas claridad local.</h1>
+              <p>Briefs de noticias bolivianas con fuentes visibles e impacto digital estimado.</p>
             </div>
           </section>
 
-          {showIndicatorSkeleton ? <MarketSkeletons /> : <ExchangeRateCards indicators={indicators} />}
-          {showIndicatorSkeleton ? <MiniIndicatorSkeletons /> : <SecondaryIndicators indicators={indicators} />}
+          <ImpactMetricsPanel
+            data={impactMetrics}
+            isError={Boolean(impactMetricsError)}
+            isLoading={isFetchingImpactMetrics}
+          />
 
           <section className="lower-grid">
             <div className="news-list">
@@ -176,6 +187,12 @@ export const HomePage = () => {
             </div>
 
             <aside className="side-stack">
+              {showWeatherSkeleton ? <PanelSkeleton /> : <WeatherPanel weather={weather} />}
+              <section className="economic-side-section" aria-label="Indicadores economicos">
+                <div className="section-label">Datos clave</div>
+                {showIndicatorSkeleton ? <MarketSkeletons /> : <ExchangeRateCards indicators={indicators} />}
+                {showIndicatorSkeleton ? <MiniIndicatorSkeletons /> : <SecondaryIndicators indicators={indicators} />}
+              </section>
               <section className="departments-card" id="departamentos">
                 <div className="panel-title">Departamentos</div>
                 <div className="chips">
@@ -184,7 +201,6 @@ export const HomePage = () => {
                   ))}
                 </div>
               </section>
-              {showWeatherSkeleton ? <PanelSkeleton /> : <WeatherPanel weather={weather} />}
             </aside>
           </section>
         </section>

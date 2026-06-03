@@ -3,6 +3,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
   Article,
   EconomicIndicatorsResponse,
+  ImpactMetricsResponse,
   PaginatedResponse,
   Summary,
   TriggerSummaryResponse,
@@ -35,6 +36,11 @@ type GetSummariesArgs = {
   page_size?: number;
 };
 
+type GetImpactMetricsArgs = {
+  date?: string;
+  fallback_to_latest?: boolean;
+};
+
 type TriggerSummaryArgs = {
   refresh?: boolean;
   time_of_day?: string;
@@ -45,7 +51,7 @@ export const newsApi = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: import.meta.env.VITE_API_BASE_URL || "",
   }),
-  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries"],
+  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics"],
   endpoints: (builder) => ({
     getEconomicIndicators: builder.query<EconomicIndicatorsResponse, GetIndicatorsArgs | void>({
       query: (args) => ({
@@ -106,6 +112,16 @@ export const newsApi = createApi({
       }),
       providesTags: ["Summaries"],
     }),
+    getImpactMetrics: builder.query<ImpactMetricsResponse, GetImpactMetricsArgs | void>({
+      query: (args) => ({
+        url: "/api/impact-metrics",
+        params: {
+          date: args?.date,
+          fallback_to_latest: args?.fallback_to_latest ?? true,
+        },
+      }),
+      providesTags: ["ImpactMetrics"],
+    }),
     triggerSummary: builder.mutation<TriggerSummaryResponse, TriggerSummaryArgs | void>({
       query: (args) => ({
         url: "/trigger/summary",
@@ -115,7 +131,7 @@ export const newsApi = createApi({
           refresh: args?.refresh ?? true,
         },
       }),
-      invalidatesTags: ["Articles", "Summaries"],
+      invalidatesTags: ["Articles", "Summaries", "ImpactMetrics"],
     }),
   }),
 });
@@ -128,5 +144,6 @@ export const {
   useGetArticlesQuery,
   useGetArticleByIdQuery,
   useGetSummariesQuery,
+  useGetImpactMetricsQuery,
   useTriggerSummaryMutation,
 } = newsApi;

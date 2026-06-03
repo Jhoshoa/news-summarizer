@@ -57,6 +57,36 @@ export type WeatherLocationsResponse = {
   items: WeatherLocation[];
 };
 
+export type ImpactPipelineStep = {
+  label: string;
+  value: number;
+};
+
+export type ImpactMethodology = {
+  minutes_per_article: number;
+  mb_per_page: number;
+  note: string;
+};
+
+export type ImpactMetricsResponse = {
+  date: string;
+  requested_date: string;
+  is_fallback: boolean;
+  has_data: boolean;
+  collected_articles: number;
+  unique_articles: number;
+  summaries: number;
+  duplicate_articles_estimated: number;
+  reduction_rate: number;
+  estimated_pages_avoided: number;
+  estimated_minutes_saved: number;
+  estimated_data_saved_mb: number;
+  cache_reused: boolean;
+  ai_calls_avoided_estimated: number;
+  pipeline: ImpactPipelineStep[];
+  methodology: ImpactMethodology;
+};
+
 export type PaginatedResponse<T> = {
   items: T[];
   page: number;

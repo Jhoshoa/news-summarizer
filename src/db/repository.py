@@ -159,6 +159,12 @@ class NewsSummary(Base):
 class Database:
     """Repositorio de base de datos."""
 
+    IMPACT_MINUTES_PER_ARTICLE = 0.5
+    IMPACT_MB_PER_PAGE = 0.8
+    IMPACT_METHODOLOGY_NOTE = (
+        "Estimaciones orientativas basadas en articulos evitados, no medicion energetica directa."
+    )
+
     def __init__(self, url: str, pool_size: int = 10, max_overflow: int = 20):
         self.engine = create_async_engine(
             url,
@@ -313,6 +319,183 @@ class Database:
             )
             await session.execute(stmt)
             await session.commit()
+
+    async def get_impact_metrics(
+        self,
+        metrics_date: date,
+        *,
+        fallback_to_latest: bool = True,
+    ) -> dict[str, Any]:
+        requested_date = metrics_date
+        effective_date = metrics_date
+
+        async with self.session_maker() as session:
+            counts = await self._impact_counts_for_date(session, effective_date)
+            if not counts["has_data"] and fallback_to_latest:
+                latest_date = await self._latest_impact_date(session, requested_date)
+                if latest_date and latest_date != requested_date:
+                    effective_date = latest_date
+                    counts = await self._impact_counts_for_date(session, effective_date)
+
+        return self._build_impact_metrics_payload(
+            effective_date=effective_date,
+            requested_date=requested_date,
+            is_fallback=effective_date != requested_date,
+            collected_articles=counts["collected_articles"],
+            unique_articles=counts["unique_articles"],
+            summaries=counts["summaries"],
+            cache_reused=counts["cache_reused"],
+            has_data=counts["has_data"],
+        )
+
+    async def _impact_counts_for_date(
+        self,
+        session: AsyncSession,
+        metrics_date: date,
+    ) -> dict[str, Any]:
+        article_start, article_end = self._day_bounds(metrics_date)
+
+        unique_articles = int(
+            await session.scalar(
+                select(func.count(NewsArticle.id)).where(
+                    NewsArticle.is_active.is_(True),
+                    NewsArticle.published_at >= article_start,
+                    NewsArticle.published_at < article_end,
+                )
+            )
+            or 0
+        )
+        summaries = int(
+            await session.scalar(
+                select(func.count(NewsSummary.id)).where(NewsSummary.summary_date == metrics_date)
+            )
+            or 0
+        )
+        latest_run = await self._latest_collection_run_for_date(session, metrics_date)
+        collected_from_run = (
+            int((latest_run.scraper_count or 0) + (latest_run.newsapi_count or 0))
+            if latest_run
+            else 0
+        )
+        collected_articles = max(collected_from_run, unique_articles)
+
+        return {
+            "collected_articles": collected_articles,
+            "unique_articles": unique_articles,
+            "summaries": summaries,
+            "cache_reused": False,
+            "has_data": collected_articles > 0 or unique_articles > 0 or summaries > 0,
+        }
+
+    async def _latest_collection_run_for_date(
+        self,
+        session: AsyncSession,
+        metrics_date: date,
+    ) -> CollectionRun | None:
+        start_at, end_at = self._day_bounds(metrics_date)
+        stmt = (
+            select(CollectionRun)
+            .where(CollectionRun.started_at >= start_at, CollectionRun.started_at < end_at)
+            .order_by(CollectionRun.started_at.desc(), CollectionRun.id.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _latest_impact_date(
+        self,
+        session: AsyncSession,
+        before_or_on: date,
+    ) -> date | None:
+        end_at = datetime.combine(before_or_on + timedelta(days=1), time.min)
+        latest_article_date = await session.scalar(
+            select(func.max(func.date(NewsArticle.published_at))).where(
+                NewsArticle.is_active.is_(True),
+                NewsArticle.published_at < end_at,
+            )
+        )
+        latest_summary_date = await session.scalar(
+            select(func.max(NewsSummary.summary_date)).where(
+                NewsSummary.summary_date <= before_or_on,
+            )
+        )
+        latest_run_date = await session.scalar(
+            select(func.max(func.date(CollectionRun.started_at))).where(
+                CollectionRun.started_at < end_at,
+            )
+        )
+
+        candidates = [
+            self._coerce_date_candidate(value)
+            for value in (latest_article_date, latest_summary_date, latest_run_date)
+        ]
+        valid_candidates = [value for value in candidates if value is not None]
+        return max(valid_candidates) if valid_candidates else None
+
+    def _build_impact_metrics_payload(
+        self,
+        *,
+        effective_date: date,
+        requested_date: date,
+        is_fallback: bool,
+        collected_articles: int,
+        unique_articles: int,
+        summaries: int,
+        cache_reused: bool = False,
+        has_data: bool = True,
+    ) -> dict[str, Any]:
+        collected_articles = max(int(collected_articles), 0)
+        unique_articles = max(int(unique_articles), 0)
+        summaries = max(int(summaries), 0)
+        duplicate_articles_estimated = max(collected_articles - unique_articles, 0)
+        estimated_pages_avoided = max(collected_articles - summaries, 0)
+        estimated_minutes_saved = round(
+            estimated_pages_avoided * self.IMPACT_MINUTES_PER_ARTICLE,
+            1,
+        )
+        estimated_data_saved_mb = round(estimated_pages_avoided * self.IMPACT_MB_PER_PAGE, 1)
+        reduction_rate = (
+            round(1 - (summaries / collected_articles), 4) if collected_articles > 0 else 0.0
+        )
+
+        return {
+            "date": effective_date,
+            "requested_date": requested_date,
+            "is_fallback": is_fallback,
+            "has_data": has_data,
+            "collected_articles": collected_articles,
+            "unique_articles": unique_articles,
+            "summaries": summaries,
+            "duplicate_articles_estimated": duplicate_articles_estimated,
+            "reduction_rate": max(min(reduction_rate, 1.0), 0.0),
+            "estimated_pages_avoided": estimated_pages_avoided,
+            "estimated_minutes_saved": estimated_minutes_saved,
+            "estimated_data_saved_mb": estimated_data_saved_mb,
+            "cache_reused": cache_reused,
+            "ai_calls_avoided_estimated": duplicate_articles_estimated,
+            "pipeline": [
+                {"label": "Recolectadas", "value": collected_articles},
+                {"label": "Unicas", "value": unique_articles},
+                {"label": "Briefs", "value": summaries},
+            ],
+            "methodology": {
+                "minutes_per_article": self.IMPACT_MINUTES_PER_ARTICLE,
+                "mb_per_page": self.IMPACT_MB_PER_PAGE,
+                "note": self.IMPACT_METHODOLOGY_NOTE,
+            },
+        }
+
+    def _coerce_date_candidate(self, value: Any) -> date | None:
+        if isinstance(value, date) and not isinstance(value, datetime):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+        return None
 
     async def upsert_articles(self, articles: list[dict]) -> dict[str, int]:
         inserted = 0

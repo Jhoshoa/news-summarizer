@@ -352,10 +352,15 @@ p {
 .hero-art {
   display: grid;
   align-content: start;
-  padding: 22px;
+  padding: 16px 18px;
   background:
     linear-gradient(90deg, rgba(15, 83, 76, 0.92) 0%, rgba(15, 83, 76, 0.64) 46%, rgba(15, 83, 76, 0.08) 78%),
     url("/assets/home-bolivia-cover.svg") center / cover;
+}
+
+.hero-panel .hero-art {
+  min-height: 124px;
+  align-content: center;
 }
 
 .hero-art span {
@@ -369,11 +374,24 @@ p {
 
 .hero-art h1 {
   position: relative;
-  width: min(660px, 94%);
-  margin-top: 8px;
-  font-size: var(--text-hero-title);
+  width: min(760px, 94%);
+  margin-top: 6px;
+  font-size: clamp(1.35rem, 2.45vw, 2rem);
   font-weight: 700;
+  line-height: 1.03;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  white-space: nowrap;
+}
+
+.hero-art p {
+  position: relative;
+  width: min(560px, 94%);
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.26);
 }
 
 .markets {
@@ -453,6 +471,24 @@ p {
   margin-top: 3px;
   color: var(--color-text);
   font-size: 0.9rem;
+}
+
+.economic-side-section {
+  display: grid;
+  gap: 10px;
+}
+
+.side-stack .markets {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.side-stack .market {
+  padding: 10px;
+}
+
+.side-stack .mini-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .lower-grid {
@@ -680,6 +716,83 @@ p {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.impact-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+}
+
+.impact-compact-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  min-width: 0;
+}
+
+.impact-main-row {
+  align-items: flex-start;
+}
+
+.impact-title-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.impact-title-group strong {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: 1.2;
+}
+
+.impact-metric-strip {
+  display: flex;
+  flex: 1 1 520px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.impact-metric-strip span {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: var(--color-panel);
+  color: var(--color-subtle);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.impact-metric-strip b,
+.impact-detail-row b {
+  color: var(--color-primary);
+}
+
+.impact-detail-row {
+  justify-content: flex-start;
+}
+
+.impact-detail-row p,
+.impact-detail-row small,
+.impact-note {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.impact-detail-row small {
+  font-weight: 500;
 }
 
 .departments-card,
@@ -1350,6 +1463,10 @@ p {
   .data-hero h1 {
     font-size: 1.85rem;
     line-height: 1.05;
+  }
+
+  .hero-art h1 {
+    white-space: normal;
   }
 
   .data-panel,
