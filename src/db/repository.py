@@ -135,6 +135,17 @@ class CollectionRun(Base):
     newsapi_count = Column(Integer, nullable=False, default=0)
     inserted_count = Column(Integer, nullable=False, default=0)
     updated_count = Column(Integer, nullable=False, default=0)
+    raw_collected_count = Column(Integer, nullable=False, default=0)
+    usable_count = Column(Integer, nullable=False, default=0)
+    quality_dropped_count = Column(Integer, nullable=False, default=0)
+    deduplicated_count = Column(Integer, nullable=False, default=0)
+    duplicate_dropped_count = Column(Integer, nullable=False, default=0)
+    ranked_count = Column(Integer, nullable=False, default=0)
+    summary_candidates_count = Column(Integer, nullable=False, default=0)
+    summaries_count = Column(Integer, nullable=False, default=0)
+    used_cached_articles = Column(Boolean, nullable=False, default=False)
+    used_cached_summaries = Column(Boolean, nullable=False, default=False)
+    metrics_payload = Column(JSON, nullable=False, default=dict)
     error_message = Column(Text, nullable=True)
 
 
@@ -301,6 +312,17 @@ class Database:
         newsapi_count: int = 0,
         inserted_count: int = 0,
         updated_count: int = 0,
+        raw_collected_count: int = 0,
+        usable_count: int = 0,
+        quality_dropped_count: int = 0,
+        deduplicated_count: int = 0,
+        duplicate_dropped_count: int = 0,
+        ranked_count: int = 0,
+        summary_candidates_count: int = 0,
+        summaries_count: int = 0,
+        used_cached_articles: bool = False,
+        used_cached_summaries: bool = False,
+        metrics_payload: dict[str, Any] | None = None,
         error_message: str | None = None,
     ) -> None:
         async with self.session_maker() as session:
@@ -314,6 +336,17 @@ class Database:
                     newsapi_count=newsapi_count,
                     inserted_count=inserted_count,
                     updated_count=updated_count,
+                    raw_collected_count=max(int(raw_collected_count), 0),
+                    usable_count=max(int(usable_count), 0),
+                    quality_dropped_count=max(int(quality_dropped_count), 0),
+                    deduplicated_count=max(int(deduplicated_count), 0),
+                    duplicate_dropped_count=max(int(duplicate_dropped_count), 0),
+                    ranked_count=max(int(ranked_count), 0),
+                    summary_candidates_count=max(int(summary_candidates_count), 0),
+                    summaries_count=max(int(summaries_count), 0),
+                    used_cached_articles=used_cached_articles,
+                    used_cached_summaries=used_cached_summaries,
+                    metrics_payload=metrics_payload or {},
                     error_message=error_message,
                 )
             )
@@ -346,6 +379,12 @@ class Database:
             summaries=counts["summaries"],
             cache_reused=counts["cache_reused"],
             has_data=counts["has_data"],
+            data_source=counts["data_source"],
+            quality_dropped_articles=counts["quality_dropped_articles"],
+            duplicate_articles=counts["duplicate_articles"],
+            summary_candidates=counts["summary_candidates"],
+            usable_articles=counts["usable_articles"],
+            ranked_articles=counts["ranked_articles"],
         )
 
     async def _impact_counts_for_date(
@@ -372,20 +411,76 @@ class Database:
             or 0
         )
         latest_run = await self._latest_collection_run_for_date(session, metrics_date)
+        run_has_pipeline_metrics = self._collection_run_has_pipeline_metrics(latest_run)
+        if latest_run and run_has_pipeline_metrics:
+            collected_articles = max(
+                self._safe_int(latest_run.raw_collected_count),
+                self._safe_int(latest_run.scraper_count) + self._safe_int(latest_run.newsapi_count),
+                unique_articles,
+            )
+            unique_from_run = self._safe_int(latest_run.deduplicated_count) or unique_articles
+            summaries_from_run = self._safe_int(latest_run.summaries_count) or summaries
+            return {
+                "data_source": "pipeline_run",
+                "collected_articles": collected_articles,
+                "unique_articles": unique_from_run,
+                "summaries": summaries_from_run,
+                "quality_dropped_articles": self._safe_int(latest_run.quality_dropped_count),
+                "duplicate_articles": self._safe_int(latest_run.duplicate_dropped_count),
+                "summary_candidates": self._safe_int(latest_run.summary_candidates_count),
+                "usable_articles": self._safe_int(latest_run.usable_count),
+                "ranked_articles": self._safe_int(latest_run.ranked_count),
+                "cache_reused": bool(
+                    latest_run.used_cached_articles or latest_run.used_cached_summaries
+                ),
+                "has_data": collected_articles > 0 or unique_from_run > 0 or summaries_from_run > 0,
+            }
+
         collected_from_run = (
-            int((latest_run.scraper_count or 0) + (latest_run.newsapi_count or 0))
+            self._safe_int(latest_run.scraper_count) + self._safe_int(latest_run.newsapi_count)
             if latest_run
             else 0
         )
         collected_articles = max(collected_from_run, unique_articles)
 
         return {
+            "data_source": "derived" if collected_articles > 0 or summaries > 0 else "empty",
             "collected_articles": collected_articles,
             "unique_articles": unique_articles,
             "summaries": summaries,
+            "quality_dropped_articles": 0,
+            "duplicate_articles": max(collected_articles - unique_articles, 0),
+            "summary_candidates": summaries,
+            "usable_articles": unique_articles,
+            "ranked_articles": unique_articles,
             "cache_reused": False,
             "has_data": collected_articles > 0 or unique_articles > 0 or summaries > 0,
         }
+
+    def _collection_run_has_pipeline_metrics(self, run: CollectionRun | None) -> bool:
+        if not run:
+            return False
+        return any(
+            self._safe_int(getattr(run, field, 0)) > 0
+            for field in (
+                "raw_collected_count",
+                "usable_count",
+                "quality_dropped_count",
+                "deduplicated_count",
+                "duplicate_dropped_count",
+                "ranked_count",
+                "summary_candidates_count",
+                "summaries_count",
+            )
+        ) or bool(getattr(run, "used_cached_articles", False)) or bool(
+            getattr(run, "used_cached_summaries", False)
+        )
+
+    def _safe_int(self, value: Any) -> int:
+        try:
+            return max(int(value or 0), 0)
+        except (TypeError, ValueError):
+            return 0
 
     async def _latest_collection_run_for_date(
         self,
@@ -443,11 +538,22 @@ class Database:
         summaries: int,
         cache_reused: bool = False,
         has_data: bool = True,
+        data_source: str = "derived",
+        quality_dropped_articles: int = 0,
+        duplicate_articles: int | None = None,
+        summary_candidates: int = 0,
+        usable_articles: int = 0,
+        ranked_articles: int = 0,
     ) -> dict[str, Any]:
         collected_articles = max(int(collected_articles), 0)
         unique_articles = max(int(unique_articles), 0)
         summaries = max(int(summaries), 0)
-        duplicate_articles_estimated = max(collected_articles - unique_articles, 0)
+        duplicate_articles_estimated = max(
+            int(duplicate_articles)
+            if duplicate_articles is not None
+            else collected_articles - unique_articles,
+            0,
+        )
         estimated_pages_avoided = max(collected_articles - summaries, 0)
         estimated_minutes_saved = round(
             estimated_pages_avoided * self.IMPACT_MINUTES_PER_ARTICLE,
@@ -463,9 +569,15 @@ class Database:
             "requested_date": requested_date,
             "is_fallback": is_fallback,
             "has_data": has_data,
+            "data_source": data_source,
             "collected_articles": collected_articles,
             "unique_articles": unique_articles,
             "summaries": summaries,
+            "quality_dropped_articles": max(int(quality_dropped_articles), 0),
+            "duplicate_articles": duplicate_articles_estimated,
+            "summary_candidates": max(int(summary_candidates), 0),
+            "usable_articles": max(int(usable_articles), 0),
+            "ranked_articles": max(int(ranked_articles), 0),
             "duplicate_articles_estimated": duplicate_articles_estimated,
             "reduction_rate": max(min(reduction_rate, 1.0), 0.0),
             "estimated_pages_avoided": estimated_pages_avoided,

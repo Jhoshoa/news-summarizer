@@ -117,12 +117,27 @@ class NewsSummarizerApp:
         collection_stats = {"scraper": 0, "newsapi": 0, "inserted": 0, "updated": 0}
         collection_run_id: int | None = None
         collected_fresh_articles = False
+        pipeline_metrics: dict[str, object] = {
+            "raw_collected_count": 0,
+            "usable_count": 0,
+            "quality_dropped_count": 0,
+            "deduplicated_count": 0,
+            "duplicate_dropped_count": 0,
+            "ranked_count": 0,
+            "summary_candidates_count": 0,
+            "summaries_count": 0,
+            "used_cached_articles": False,
+            "used_cached_summaries": False,
+            "metrics_payload": {},
+        }
 
         if self.db:
             try:
                 summaries = await self.db.get_recent_summaries(categories)
                 if summaries and not refresh:
                     used_cached_summaries = True
+                    pipeline_metrics["used_cached_summaries"] = True
+                    pipeline_metrics["summaries_count"] = len(summaries)
                     logger.info(f"Reusing {len(summaries)} cached summaries")
                 else:
                     since = datetime.utcnow() - timedelta(
@@ -131,10 +146,15 @@ class NewsSummarizerApp:
                     news = await self.db.get_recent_articles(categories, since=since, limit=200)
                     if len(news) >= self.settings.news_min_articles and not refresh:
                         used_cached_articles = True
+                        pipeline_metrics["used_cached_articles"] = True
+                        pipeline_metrics["usable_count"] = len(news)
+                        pipeline_metrics["deduplicated_count"] = len(news)
+                        pipeline_metrics["ranked_count"] = len(news)
                         logger.info(f"Reusing {len(news)} cached articles")
                     else:
                         news, collection_stats, collection_run_id = await self._collect_news(categories)
                         collected_fresh_articles = True
+                        pipeline_metrics["raw_collected_count"] = len(news)
             except Exception as e:
                 logger.error(f"Cache/DB error: {e}")
 
@@ -149,6 +169,7 @@ class NewsSummarizerApp:
                         newsapi_count=collection_stats["newsapi"],
                         inserted_count=collection_stats["inserted"],
                         updated_count=collection_stats["updated"],
+                        **pipeline_metrics,
                     )
                 return {
                     "collected": 0,
@@ -162,6 +183,12 @@ class NewsSummarizerApp:
             before_quality_filter = len(news)
             news = self._filter_usable_articles(news)
             dropped = before_quality_filter - len(news)
+            pipeline_metrics["raw_collected_count"] = max(
+                int(pipeline_metrics["raw_collected_count"] or 0),
+                before_quality_filter,
+            )
+            pipeline_metrics["usable_count"] = len(news)
+            pipeline_metrics["quality_dropped_count"] = dropped
             if dropped:
                 logger.info(f"Filtradas {dropped} noticias sin contenido util")
 
@@ -175,6 +202,7 @@ class NewsSummarizerApp:
                         newsapi_count=collection_stats["newsapi"],
                         inserted_count=collection_stats["inserted"],
                         updated_count=collection_stats["updated"],
+                        **pipeline_metrics,
                     )
                 return {
                     "collected": 0,
@@ -186,13 +214,17 @@ class NewsSummarizerApp:
                 }
 
             deduplicator = Deduplicator()
+            before_dedup = len(news)
             news = deduplicator.deduplicate(news)
+            pipeline_metrics["deduplicated_count"] = len(news)
+            pipeline_metrics["duplicate_dropped_count"] = before_dedup - len(news)
 
             classifier = NewsClassifier(self.llm)
             news = await classifier.classify_batch_async(news)
 
             ranker = NewsRanker()
             news = ranker.rank(news)
+            pipeline_metrics["ranked_count"] = len(news)
 
             if self.db and collected_fresh_articles:
                 try:
@@ -208,22 +240,23 @@ class NewsSummarizerApp:
                             newsapi_count=collection_stats["newsapi"],
                             inserted_count=collection_stats["inserted"],
                             updated_count=collection_stats["updated"],
+                            **pipeline_metrics,
                             error_message=str(e),
                         )
                     raise
 
-            if self.db and collection_run_id is not None:
-                await self.db.finish_collection_run(
-                    collection_run_id,
-                    status="success" if news else "partial",
-                    scraper_count=collection_stats["scraper"],
-                    newsapi_count=collection_stats["newsapi"],
-                    inserted_count=collection_stats["inserted"],
-                    updated_count=collection_stats["updated"],
-                )
-
             if not self.llm:
                 logger.error("No hay LLM para resumir")
+                if self.db and collection_run_id is not None:
+                    await self.db.finish_collection_run(
+                        collection_run_id,
+                        status="partial",
+                        scraper_count=collection_stats["scraper"],
+                        newsapi_count=collection_stats["newsapi"],
+                        inserted_count=collection_stats["inserted"],
+                        updated_count=collection_stats["updated"],
+                        **pipeline_metrics,
+                    )
                 return {
                     "collected": len(news),
                     "summaries": 0,
@@ -234,6 +267,7 @@ class NewsSummarizerApp:
                 }
 
             summary_candidates = self._select_summary_candidates(news, categories)
+            pipeline_metrics["summary_candidates_count"] = len(summary_candidates)
             summaries = await self._build_summaries(summary_candidates, categories)
 
             if summaries:
@@ -242,6 +276,7 @@ class NewsSummarizerApp:
                     summaries = await rewriter.rewrite(summaries)
                 except Exception as e:
                     logger.warning(f"Error reescribiendo: {e}")
+            pipeline_metrics["summaries_count"] = len(summaries)
 
             if self.db and summaries:
                 try:
@@ -252,6 +287,17 @@ class NewsSummarizerApp:
                     )
                 except Exception as e:
                     logger.error(f"Error guardando summaries: {e}")
+
+            if self.db and collection_run_id is not None:
+                await self.db.finish_collection_run(
+                    collection_run_id,
+                    status="success" if news else "partial",
+                    scraper_count=collection_stats["scraper"],
+                    newsapi_count=collection_stats["newsapi"],
+                    inserted_count=collection_stats["inserted"],
+                    updated_count=collection_stats["updated"],
+                    **pipeline_metrics,
+                )
 
         if not self.db:
             logger.warning("DB no disponible, no se envia nada")

@@ -73,9 +73,15 @@ export type ImpactMetricsResponse = {
   requested_date: string;
   is_fallback: boolean;
   has_data: boolean;
+  data_source?: "pipeline_run" | "derived" | "empty";
   collected_articles: number;
   unique_articles: number;
   summaries: number;
+  quality_dropped_articles?: number;
+  duplicate_articles?: number;
+  summary_candidates?: number;
+  usable_articles?: number;
+  ranked_articles?: number;
   duplicate_articles_estimated: number;
   reduction_rate: number;
   estimated_pages_avoided: number;

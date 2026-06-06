@@ -99,6 +99,14 @@ async def test_fresh_collection_is_classified_persisted_and_summarized():
     assert db.upserted_articles[0]["content"]
     assert db.saved_summaries[0]["article_id"] == 1
     assert db.finished_runs[0]["status"] == "success"
+    assert db.finished_runs[0]["raw_collected_count"] == 1
+    assert db.finished_runs[0]["usable_count"] == 1
+    assert db.finished_runs[0]["quality_dropped_count"] == 0
+    assert db.finished_runs[0]["deduplicated_count"] == 1
+    assert db.finished_runs[0]["duplicate_dropped_count"] == 0
+    assert db.finished_runs[0]["ranked_count"] == 1
+    assert db.finished_runs[0]["summary_candidates_count"] == 1
+    assert db.finished_runs[0]["summaries_count"] == 1
 
 
 @pytest.mark.asyncio
@@ -141,6 +149,11 @@ async def test_fresh_collection_skips_title_only_articles():
     assert db.upserted_articles == []
     assert db.saved_summaries == []
     assert db.finished_runs[0]["status"] == "partial"
+    assert db.finished_runs[0]["raw_collected_count"] == 1
+    assert db.finished_runs[0]["usable_count"] == 0
+    assert db.finished_runs[0]["quality_dropped_count"] == 1
+    assert db.finished_runs[0]["deduplicated_count"] == 0
+    assert db.finished_runs[0]["summaries_count"] == 0
 
 
 def test_summary_candidates_are_diversified_by_source_within_category():

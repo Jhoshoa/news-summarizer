@@ -85,6 +85,19 @@ export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }:
 
   const effectiveDate = formatContentDate(data.date);
   const requestedDate = formatContentDate(data.requested_date);
+  const hasPipelineMetrics = data.data_source === "pipeline_run";
+  const flowLabel = hasPipelineMetrics ? "Flujo real" : "Flujo estimado";
+  const flowParts = hasPipelineMetrics
+    ? [
+        { label: "recolectadas", value: data.collected_articles },
+        { label: "utiles", value: data.usable_articles },
+        { label: "unicas", value: data.unique_articles },
+        { label: "briefs", value: data.summaries },
+      ]
+    : data.pipeline.map((item) => ({
+        label: item.label.toLowerCase(),
+        value: item.value,
+      }));
 
   return (
     <section className="impact-panel">
@@ -111,11 +124,11 @@ export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }:
 
       <div className="impact-compact-row impact-detail-row">
         <p>
-          Flujo:{" "}
-          {data.pipeline.map((item, index) => (
+          {flowLabel}:{" "}
+          {flowParts.map((item, index) => (
             <span key={item.label}>
               {index > 0 && " -> "}
-              <b>{formatNumber(item.value)}</b> {item.label.toLowerCase()}
+              <b>{formatNumber(item.value)}</b> {item.label}
             </span>
           ))}
           {" · "}reduccion estimada: <b>{formatPercent(data.reduction_rate)}</b>.

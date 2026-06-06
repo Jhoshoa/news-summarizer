@@ -185,6 +185,36 @@ def test_build_impact_metrics_payload_calculates_transparent_estimates():
     assert "no medicion energetica directa" in response["methodology"]["note"]
 
 
+def test_build_impact_metrics_payload_includes_real_pipeline_fields():
+    db = object.__new__(Database)
+
+    response = db._build_impact_metrics_payload(
+        effective_date=date(2026, 6, 3),
+        requested_date=date(2026, 6, 3),
+        is_fallback=False,
+        data_source="pipeline_run",
+        collected_articles=12,
+        unique_articles=8,
+        summaries=3,
+        quality_dropped_articles=2,
+        duplicate_articles=2,
+        summary_candidates=5,
+        usable_articles=10,
+        ranked_articles=8,
+        cache_reused=True,
+        has_data=True,
+    )
+
+    assert response["data_source"] == "pipeline_run"
+    assert response["quality_dropped_articles"] == 2
+    assert response["duplicate_articles"] == 2
+    assert response["duplicate_articles_estimated"] == 2
+    assert response["summary_candidates"] == 5
+    assert response["usable_articles"] == 10
+    assert response["ranked_articles"] == 8
+    assert response["cache_reused"] is True
+
+
 def test_build_impact_metrics_payload_handles_empty_data_without_division_by_zero():
     db = object.__new__(Database)
 
