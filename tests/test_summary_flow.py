@@ -204,3 +204,36 @@ def test_summary_candidates_do_not_drop_articles_when_only_one_source_exists():
         "Unitel 4",
         "Unitel 5",
     ]
+
+
+def test_delivery_summaries_are_deduplicated_by_normalized_title():
+    settings = SimpleNamespace(
+        categories_list=["deportes"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+    )
+    app = NewsSummarizerApp(settings)
+    summaries = [
+        {
+            "title": "Video: Reportera cae al intentar atrapar regalo",
+            "summary": "Primer resumen.",
+            "category": "deportes",
+        },
+        {
+            "title": " video reportera cae al intentar atrapar regalo ",
+            "summary": "Segundo resumen duplicado.",
+            "category": "deportes",
+        },
+        {
+            "title": "Bolivia cayo ante Escocia",
+            "summary": "Otra noticia.",
+            "category": "deportes",
+        },
+    ]
+
+    result = app._deduplicate_summaries_for_delivery(summaries)
+
+    assert [summary["title"] for summary in result] == [
+        "Video: Reportera cae al intentar atrapar regalo",
+        "Bolivia cayo ante Escocia",
+    ]

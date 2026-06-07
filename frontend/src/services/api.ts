@@ -5,8 +5,15 @@ import type {
   EconomicIndicatorsResponse,
   ImpactMetricsResponse,
   PaginatedResponse,
+  PreferenceOptionsResponse,
+  PreferencePreviewRequest,
+  PreferencePreviewResponse,
   Summary,
+  SubscribeRequest,
+  SubscribeResponse,
   TriggerSummaryResponse,
+  UnsubscribeRequest,
+  UnsubscribeResponse,
   WeatherLocationsResponse,
   WeatherResponse,
 } from "./types";
@@ -51,7 +58,7 @@ export const newsApi = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: import.meta.env.VITE_API_BASE_URL || "",
   }),
-  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics"],
+  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics", "Preferences"],
   endpoints: (builder) => ({
     getEconomicIndicators: builder.query<EconomicIndicatorsResponse, GetIndicatorsArgs | void>({
       query: (args) => ({
@@ -122,6 +129,33 @@ export const newsApi = createApi({
       }),
       providesTags: ["ImpactMetrics"],
     }),
+    getPreferenceOptions: builder.query<PreferenceOptionsResponse, void>({
+      query: () => "/api/preferences/options",
+      providesTags: ["Preferences"],
+    }),
+    subscribeToBrief: builder.mutation<SubscribeResponse, SubscribeRequest>({
+      query: (body) => ({
+        url: "/api/preferences/subscribe",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Preferences"],
+    }),
+    unsubscribeFromBrief: builder.mutation<UnsubscribeResponse, UnsubscribeRequest>({
+      query: (body) => ({
+        url: "/api/preferences/unsubscribe",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Preferences"],
+    }),
+    previewPreferences: builder.mutation<PreferencePreviewResponse, PreferencePreviewRequest>({
+      query: (body) => ({
+        url: "/api/preferences/preview",
+        method: "POST",
+        body,
+      }),
+    }),
     triggerSummary: builder.mutation<TriggerSummaryResponse, TriggerSummaryArgs | void>({
       query: (args) => ({
         url: "/trigger/summary",
@@ -145,5 +179,9 @@ export const {
   useGetArticleByIdQuery,
   useGetSummariesQuery,
   useGetImpactMetricsQuery,
+  useGetPreferenceOptionsQuery,
+  usePreviewPreferencesMutation,
   useTriggerSummaryMutation,
+  useSubscribeToBriefMutation,
+  useUnsubscribeFromBriefMutation,
 } = newsApi;

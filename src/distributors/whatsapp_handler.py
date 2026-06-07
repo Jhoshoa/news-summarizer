@@ -119,6 +119,7 @@ class WhatsAppHandler:
                     phone=from_number,
                     channel="whatsapp",
                     categories=categories,
+                    consent_accepted=True,
                 )
             )
 

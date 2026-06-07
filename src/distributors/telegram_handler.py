@@ -135,6 +135,7 @@ class TelegramHandler:
                 telegram_id=chat_id,
                 channel="telegram",
                 categories=categories,
+                consent_accepted=True,
             )
 
         names = [

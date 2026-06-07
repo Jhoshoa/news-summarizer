@@ -79,6 +79,16 @@ def test_impact_metrics_endpoint_documents_date_and_fallback_query_params():
     assert fallback_param["schema"]["default"] is True
 
 
+def test_preferences_endpoints_are_documented():
+    schema = app.openapi()
+
+    assert "/api/preferences/options" in schema["paths"]
+    assert "/api/preferences/subscribe" in schema["paths"]
+    assert "/api/preferences/unsubscribe" in schema["paths"]
+    assert "/api/preferences/preview" in schema["paths"]
+    assert "post" in schema["paths"]["/api/preferences/subscribe"]
+
+
 def test_articles_today_falls_back_when_timezone_is_invalid():
     app_instance = SimpleNamespace(settings=SimpleNamespace(schedule_timezone="Invalid/Zone"))
 

@@ -93,6 +93,69 @@ export type ImpactMetricsResponse = {
   methodology: ImpactMethodology;
 };
 
+export type PreferenceOption = {
+  slug: string;
+  label: string;
+  enabled: boolean;
+  note?: string | null;
+};
+
+export type PreferenceOptionsResponse = {
+  categories: PreferenceOption[];
+  channels: PreferenceOption[];
+  frequencies: PreferenceOption[];
+  preferred_times: PreferenceOption[];
+};
+
+export type SubscribeRequest = {
+  channel: "whatsapp" | "telegram";
+  phone?: string | null;
+  telegram_id?: string | null;
+  categories: string[];
+  frequency: string;
+  preferred_time: string;
+  timezone: string;
+  consent_accepted: boolean;
+};
+
+export type SubscribeResponse = {
+  status: "saved";
+  channel: "whatsapp" | "telegram";
+  categories: string[];
+  frequency: string;
+  preferred_time: string;
+  message: string;
+};
+
+export type UnsubscribeRequest = {
+  channel: "whatsapp" | "telegram";
+  identifier: string;
+};
+
+export type UnsubscribeResponse = {
+  status: "unsubscribed";
+  message: string;
+};
+
+export type PreferencePreviewRequest = {
+  categories: string[];
+  frequency: string;
+};
+
+export type PreferencePreviewItem = {
+  category: string;
+  title: string;
+  summary: string;
+  fact?: string | null;
+  summary_date?: string | null;
+};
+
+export type PreferencePreviewResponse = {
+  items: PreferencePreviewItem[];
+  has_data: boolean;
+  message: string;
+};
+
 export type PaginatedResponse<T> = {
   items: T[];
   page: number;

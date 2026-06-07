@@ -14,6 +14,7 @@ from src.api import (
     create_articles_router,
     create_economic_indicators_router,
     create_impact_metrics_router,
+    create_preferences_router,
     create_summaries_router,
     create_weather_router,
 )
@@ -330,6 +331,7 @@ class NewsSummarizerApp:
             try:
                 user_categories = sub.categories or categories
                 user_news = [n for n in summaries if n.get("category") in user_categories]
+                user_news = self._deduplicate_summaries_for_delivery(user_news)
 
                 if not user_news:
                     continue
@@ -541,6 +543,31 @@ class NewsSummarizerApp:
 
         return text
 
+    def _deduplicate_summaries_for_delivery(self, summaries: list[dict]) -> list[dict]:
+        unique: list[dict] = []
+        seen: set[str] = set()
+
+        for summary in summaries:
+            title_key = self._summary_title_key(summary.get("title"))
+            if title_key in seen:
+                continue
+            seen.add(title_key)
+            unique.append(summary)
+
+        return unique
+
+    def _summary_title_key(self, title: object) -> str:
+        import re
+        import unicodedata
+
+        normalized = unicodedata.normalize("NFD", str(title or ""))
+        normalized = "".join(
+            char for char in normalized if unicodedata.category(char) != "Mn"
+        )
+        normalized = normalized.lower()
+        normalized = re.sub(r"[^\w\s]", "", normalized)
+        return re.sub(r"\s+", " ", normalized).strip()
+
     def run_sync(self):
         """Executes summary delivery synchronously."""
 
@@ -576,6 +603,7 @@ app.include_router(create_weather_router())
 app.include_router(create_articles_router(lambda: app_instance))
 app.include_router(create_summaries_router(lambda: app_instance))
 app.include_router(create_impact_metrics_router(lambda: app_instance))
+app.include_router(create_preferences_router(lambda: app_instance))
 
 
 @app.get("/")

@@ -233,3 +233,11 @@ def test_build_impact_metrics_payload_handles_empty_data_without_division_by_zer
     assert response["reduction_rate"] == 0.0
     assert response["estimated_pages_avoided"] == 0
     assert response["estimated_minutes_saved"] == 0.0
+
+
+def test_summary_title_key_normalizes_duplicate_titles():
+    db = object.__new__(Database)
+
+    assert db._summary_title_key("Video: Reportera cae al intentar atrapar regalo") == (
+        db._summary_title_key(" video reportera cae al intentar atrapar regalo ")
+    )

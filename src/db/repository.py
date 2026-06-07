@@ -46,7 +46,10 @@ class Subscriber(Base):
     telegram_id = Column(String(50), nullable=True, unique=True, index=True)
     channel = Column(String(20), nullable=False, default="whatsapp")
     categories = Column(JSON, nullable=False, default=list)
+    frequency = Column(String(20), nullable=False, default="diario")
+    preferred_time = Column(String(20), nullable=False, default="manana")
     timezone = Column(String(50), nullable=False, default="America/La_Paz")
+    consent_accepted = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(
         DateTime,
@@ -55,6 +58,7 @@ class Subscriber(Base):
         onupdate=datetime.utcnow,
     )
     is_active = Column(Boolean, nullable=False, default=True)
+    unsubscribed_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
         return f"<Subscriber {self.phone or self.telegram_id} active={self.is_active}>"
@@ -209,6 +213,10 @@ class Database:
         telegram_id: str | None = None,
         channel: str = "whatsapp",
         categories: set[str] | None = None,
+        frequency: str = "diario",
+        preferred_time: str = "manana",
+        timezone: str = "America/La_Paz",
+        consent_accepted: bool = False,
     ) -> bool:
         """Guarda o actualiza una suscripcion."""
 
@@ -223,8 +231,13 @@ class Database:
                 if categories:
                     subscriber.categories = sorted(categories)
                 subscriber.channel = channel
+                subscriber.frequency = frequency
+                subscriber.preferred_time = preferred_time
+                subscriber.timezone = timezone
+                subscriber.consent_accepted = consent_accepted
                 subscriber.updated_at = datetime.utcnow()
                 subscriber.is_active = True
+                subscriber.unsubscribed_at = None
                 logger.info(f"Actualizada suscripcion: {phone or telegram_id}")
             else:
                 subscriber = Subscriber(
@@ -232,6 +245,10 @@ class Database:
                     telegram_id=telegram_id,
                     channel=channel,
                     categories=sorted(categories) if categories else ["general"],
+                    frequency=frequency,
+                    preferred_time=preferred_time,
+                    timezone=timezone,
+                    consent_accepted=consent_accepted,
                 )
                 session.add(subscriber)
                 logger.info(f"Nueva suscripcion: {phone or telegram_id}")
@@ -277,7 +294,11 @@ class Database:
                     (Subscriber.phone == identifier)
                     | (Subscriber.telegram_id == identifier)
                 )
-                .values(is_active=False, updated_at=datetime.utcnow())
+                .values(
+                    is_active=False,
+                    updated_at=datetime.utcnow(),
+                    unsubscribed_at=datetime.utcnow(),
+                )
             )
             await session.execute(stmt)
             await session.commit()
@@ -293,6 +314,49 @@ class Database:
             )
             result = await session.execute(stmt)
             return int(result.scalar_one())
+
+    async def get_preference_preview(
+        self,
+        categories: list[str],
+        *,
+        limit: int = 5,
+    ) -> list[dict]:
+        """Obtiene summaries recientes para previsualizar un brief sin llamar al LLM."""
+
+        normalized_categories = [category for category in categories if category in DEFAULT_CATEGORIES]
+        if not normalized_categories:
+            return []
+
+        async with self.session_maker() as session:
+            query_limit = max(int(limit), 1) * 3
+            stmt = (
+                select(NewsSummary, NewsCategory.name)
+                .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+                .where(NewsCategory.name.in_(normalized_categories))
+                .order_by(NewsSummary.summary_date.desc(), NewsSummary.created_at.desc())
+                .limit(query_limit)
+            )
+            result = await session.execute(stmt)
+            items = []
+            seen_titles: set[str] = set()
+            for summary, category_name in result.all():
+                title_key = self._summary_title_key(summary.title)
+                if title_key in seen_titles:
+                    continue
+                seen_titles.add(title_key)
+                slug = self._category_slug(category_name)
+                items.append(
+                    {
+                        "category": slug,
+                        "title": summary.title,
+                        "summary": summary.summary,
+                        "fact": summary.fact,
+                        "summary_date": summary.summary_date,
+                    }
+                )
+                if len(items) >= limit:
+                    break
+            return items
 
     async def start_collection_run(self, requested_categories: list[str]) -> int:
         async with self.session_maker() as session:
@@ -1288,6 +1352,15 @@ class Database:
 
     def _normalize_article_text(self, value: str | None) -> str:
         return re.sub(r"\s+", " ", str(value or "")).strip().lower()
+
+    def _category_slug(self, display_name: str | None) -> str:
+        reverse_categories = {display_name: slug for slug, display_name in DEFAULT_CATEGORIES.items()}
+        return reverse_categories.get(str(display_name or ""), str(display_name or "general").lower())
+
+    def _summary_title_key(self, title: str | None) -> str:
+        normalized = self._normalize_article_text(title)
+        normalized = re.sub(r"[^\w\s]", "", normalized)
+        return re.sub(r"\s+", " ", normalized).strip()
 
     def _summary_row_to_dict(self, row: Any) -> dict:
         summary = row[0]
