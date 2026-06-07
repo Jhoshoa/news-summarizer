@@ -1,28 +1,16 @@
 import { memo } from "react";
 
+import { Link } from "../../app/router";
+
 const FooterComponent = () => (
   <footer className="footer">
     <div className="footer-links">
       <span>EcoBrief Lab</span>
-      <a href="#fuentes">Fuentes</a>
-      <a href="#archivo">Archivo</a>
-      <a href="#politica-editorial">Politica editorial</a>
-      <a href="#contacto">Contacto</a>
+      <Link href="/impacto#fuentes">Fuentes</Link>
+      <Link href="/news">Archivo</Link>
+      <Link href="/impacto#politica-editorial">Politica editorial</Link>
     </div>
-    <div className="socials" aria-label="Redes sociales">
-      <a className="social" href="#facebook" aria-label="Facebook">
-        f
-      </a>
-      <a className="social" href="#instagram" aria-label="Instagram">
-        ig
-      </a>
-      <a className="social" href="#tiktok" aria-label="TikTok">
-        tk
-      </a>
-      <a className="social" href="#x" aria-label="X">
-        X
-      </a>
-    </div>
+    <span className="footer-note">Eficiencia informativa sin claims de CO2 o kWh.</span>
   </footer>
 );
 

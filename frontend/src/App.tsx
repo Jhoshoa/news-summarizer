@@ -4,6 +4,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { ArticleDetailPage } from "./pages/ArticleDetailPage";
 import { DataPage } from "./pages/DataPage";
 import { HomePage } from "./pages/HomePage";
+import { ImpactPage } from "./pages/ImpactPage";
 import { NewsPage } from "./pages/NewsPage";
 import { getNavigationState } from "./utils/navigation";
 
@@ -13,7 +14,8 @@ const App = () => {
   const isArticleRoute = location.pathname.startsWith("/article");
   const isNewsRoute = location.pathname.startsWith("/news");
   const isDataRoute = location.pathname.startsWith("/datos");
-  const compactHeader = isArticleRoute || isNewsRoute || isDataRoute;
+  const isImpactRoute = location.pathname.startsWith("/impacto");
+  const compactHeader = isArticleRoute || isNewsRoute || isDataRoute || isImpactRoute;
   const navigationState = getNavigationState(location.pathname);
 
   let page = <HomePage />;
@@ -24,6 +26,8 @@ const App = () => {
     page = <NewsPage />;
   } else if (isDataRoute) {
     page = <DataPage />;
+  } else if (isImpactRoute) {
+    page = <ImpactPage />;
   }
 
   return (

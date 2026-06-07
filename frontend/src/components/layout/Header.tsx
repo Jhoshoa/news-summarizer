@@ -29,6 +29,9 @@ const HeaderComponent = ({
       <Link aria-current={activePath === "/datos" ? "page" : undefined} href="/datos">
         Datos
       </Link>
+      <Link aria-current={activePath === "/impacto" ? "page" : undefined} href="/impacto">
+        Impacto
+      </Link>
       <button className="button" type="button" onClick={onRefresh} disabled={isRefreshing}>
         {isRefreshing ? "Actualizando" : "Actualizar"}
       </button>

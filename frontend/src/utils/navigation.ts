@@ -4,7 +4,7 @@ export type BreadcrumbItem = {
 };
 
 export type NavigationState = {
-  activePath: "/" | "/news" | "/datos" | "/article";
+  activePath: "/" | "/news" | "/datos" | "/impacto" | "/article";
   backFallback: string;
   breadcrumbs: BreadcrumbItem[];
 };
@@ -40,6 +40,17 @@ export const getNavigationState = (pathname: string): NavigationState => {
       breadcrumbs: [
         { href: "/", label: "Inicio" },
         { href: "/datos", label: "Datos" },
+      ],
+    };
+  }
+
+  if (pathname.startsWith("/impacto")) {
+    return {
+      activePath: "/impacto",
+      backFallback: "/",
+      breadcrumbs: [
+        { href: "/", label: "Inicio" },
+        { href: "/impacto", label: "Impacto" },
       ],
     };
   }

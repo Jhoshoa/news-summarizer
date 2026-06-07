@@ -34,6 +34,15 @@ assertNavigationState(getNavigationState("/datos"), {
   ],
 });
 
+assertNavigationState(getNavigationState("/impacto"), {
+  activePath: "/impacto",
+  backFallback: "/",
+  breadcrumbs: [
+    { href: "/", label: "Inicio" },
+    { href: "/impacto", label: "Impacto" },
+  ],
+});
+
 assertNavigationState(getNavigationState("/article/42"), {
   activePath: "/article",
   backFallback: "/news",

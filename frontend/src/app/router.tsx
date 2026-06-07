@@ -12,6 +12,7 @@ import {
 } from "react";
 
 type RouterLocation = {
+  hash: string;
   pathname: string;
   search: string;
 };
@@ -31,6 +32,7 @@ type LinkProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
 const RouterContext = createContext<RouterContextValue | null>(null);
 
 const getCurrentLocation = (): RouterLocation => ({
+  hash: window.location.hash,
   pathname: window.location.pathname,
   search: window.location.search,
 });
@@ -87,11 +89,18 @@ export const RouterProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    const nextUrl = new URL(next, window.location.origin);
     const nextIndex = appHistoryIndex + 1;
     window.history.pushState({ appHistoryIndex: nextIndex }, "", next);
     setAppHistoryIndex(nextIndex);
     setLocation(getCurrentLocation());
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (nextUrl.hash) {
+      window.setTimeout(() => {
+        document.getElementById(nextUrl.hash.slice(1))?.scrollIntoView({ behavior: "smooth" });
+      }, 0);
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, [appHistoryIndex]);
 
   const replace = useCallback((to: string) => {
