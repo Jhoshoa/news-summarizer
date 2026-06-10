@@ -26,6 +26,12 @@ from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
+from src.processors.story_fingerprint import (
+    build_canonical_key,
+    build_content_fingerprint,
+    story_similarity,
+)
+
 Base = declarative_base()
 
 DEFAULT_CATEGORIES = {
@@ -106,6 +112,12 @@ class NewsArticle(Base):
     title = Column(String(500), nullable=False)
     url = Column(String(1000), nullable=False, index=True)
     url_hash = Column(String(64), nullable=False, index=True)
+    canonical_key = Column(String(500), nullable=True)
+    content_fingerprint = Column(String(64), nullable=True, index=True)
+    story_cluster_id = Column(String(64), nullable=True, index=True)
+    duplicate_of_article_id = Column(Integer, ForeignKey("news_articles.id"), nullable=True, index=True)
+    duplicate_reason = Column(String(50), nullable=True)
+    similarity_score = Column(Float, nullable=True)
     description = Column(Text, nullable=True)
     content = Column(Text, nullable=True)
     author = Column(String(200), nullable=True)
@@ -162,6 +174,8 @@ class NewsSummary(Base):
     id = Column(Integer, primary_key=True)
     article_id = Column(Integer, ForeignKey("news_articles.id"), nullable=True, index=True)
     category_id = Column(Integer, ForeignKey("news_categories.id"), nullable=False, index=True)
+    story_cluster_id = Column(String(64), nullable=True, index=True)
+    source_article_count = Column(Integer, nullable=False, default=1)
     title = Column(String(500), nullable=False)
     summary = Column(Text, nullable=False)
     fact = Column(Text, nullable=True)
@@ -176,6 +190,8 @@ class Database:
 
     IMPACT_MINUTES_PER_ARTICLE = 0.5
     IMPACT_MB_PER_PAGE = 0.8
+    STORY_LOOKBACK_DAYS = 3
+    STORY_SIMILARITY_THRESHOLD = 0.85
     IMPACT_METHODOLOGY_NOTE = (
         "Estimaciones orientativas basadas en articulos evitados, no medicion energetica directa."
     )
@@ -676,6 +692,7 @@ class Database:
     async def upsert_articles(self, articles: list[dict]) -> dict[str, int]:
         inserted = 0
         updated = 0
+        historical_duplicates = 0
 
         async with self.session_maker() as session:
             category_cache: dict[str, NewsCategory] = {}
@@ -708,7 +725,10 @@ class Database:
                 )
 
                 existing = await self._get_article_by_hash(session, url_hash)
-                payload = self._normalize_payload(article)
+                canonical_key = build_canonical_key(article)
+                content_fingerprint = build_content_fingerprint(article)
+                article["canonical_key"] = canonical_key
+                article["content_fingerprint"] = content_fingerprint
                 published_at = self._coerce_datetime(article.get("published_at"))
                 score = self._coerce_score(article.get("score"))
 
@@ -722,18 +742,54 @@ class Database:
                     existing.image_url = article.get("image")
                     existing.source_id = source.id
                     existing.category_id = category.id
+                    existing.canonical_key = canonical_key
+                    existing.content_fingerprint = content_fingerprint
+                    existing.story_cluster_id = existing.story_cluster_id or content_fingerprint
                     existing.country = article.get("country")
                     existing.published_at = published_at
                     existing.collected_at = datetime.utcnow()
-                    existing.raw_payload = payload
                     existing.score = score
                     existing.is_active = True
+                    self._copy_story_metadata_to_payload(article, existing)
+                    existing.raw_payload = self._normalize_payload(article)
                     updated += 1
                 else:
+                    story_match = await self.find_recent_story_match(
+                        session,
+                        article,
+                        category_id=int(category.id),
+                        published_at=published_at,
+                    )
+                    duplicate_of_article_id = None
+                    duplicate_reason = None
+                    similarity_score = None
+                    story_cluster_id = content_fingerprint
+                    if story_match:
+                        matched_article, duplicate_reason, similarity_score = story_match
+                        duplicate_of_article_id = matched_article.id
+                        story_cluster_id = (
+                            matched_article.story_cluster_id
+                            or matched_article.content_fingerprint
+                            or content_fingerprint
+                        )
+                        historical_duplicates += 1
+
+                    article["story_cluster_id"] = story_cluster_id
+                    article["duplicate_of_article_id"] = duplicate_of_article_id
+                    article["duplicate_reason"] = duplicate_reason
+                    article["similarity_score"] = similarity_score
+                    payload = self._normalize_payload(article)
+
                     news_article = NewsArticle(
                         title=title,
                         url=url,
                         url_hash=url_hash,
+                        canonical_key=canonical_key,
+                        content_fingerprint=content_fingerprint,
+                        story_cluster_id=story_cluster_id,
+                        duplicate_of_article_id=duplicate_of_article_id,
+                        duplicate_reason=duplicate_reason,
+                        similarity_score=similarity_score,
                         description=article.get("description"),
                         content=article.get("content"),
                         author=article.get("author"),
@@ -754,7 +810,73 @@ class Database:
 
             await session.commit()
 
-        return {"inserted": inserted, "updated": updated}
+        return {
+            "inserted": inserted,
+            "updated": updated,
+            "historical_duplicates": historical_duplicates,
+        }
+
+    async def find_recent_story_match(
+        self,
+        session: AsyncSession,
+        article: dict,
+        *,
+        category_id: int,
+        published_at: datetime,
+        lookback_days: int | None = None,
+    ) -> tuple[NewsArticle, str, float] | None:
+        lookback = max(int(lookback_days or self.STORY_LOOKBACK_DAYS), 1)
+        cutoff = published_at - timedelta(days=lookback)
+        fingerprint = article.get("content_fingerprint") or build_content_fingerprint(article)
+
+        exact_stmt = (
+            select(NewsArticle)
+            .where(
+                NewsArticle.is_active.is_(True),
+                NewsArticle.category_id == category_id,
+                NewsArticle.published_at >= cutoff,
+                NewsArticle.content_fingerprint == fingerprint,
+            )
+            .order_by(
+                NewsArticle.duplicate_of_article_id.isnot(None),
+                NewsArticle.published_at.desc(),
+                NewsArticle.id.asc(),
+            )
+            .limit(1)
+        )
+        exact_result = await session.execute(exact_stmt)
+        exact_match = exact_result.scalar_one_or_none()
+        if exact_match:
+            return exact_match, "fingerprint", 1.0
+
+        candidates_stmt = (
+            select(NewsArticle)
+            .where(
+                NewsArticle.is_active.is_(True),
+                NewsArticle.category_id == category_id,
+                NewsArticle.published_at >= cutoff,
+            )
+            .order_by(NewsArticle.published_at.desc(), NewsArticle.collected_at.desc())
+            .limit(100)
+        )
+        candidates_result = await session.execute(candidates_stmt)
+
+        best_match: NewsArticle | None = None
+        best_score = 0.0
+        for candidate in candidates_result.scalars().all():
+            score = story_similarity(
+                article,
+                self._article_for_story_matching(candidate, article.get("category")),
+            )
+            if score > best_score:
+                best_score = score
+                best_match = candidate
+
+        if best_match and best_score >= self.STORY_SIMILARITY_THRESHOLD:
+            reason = "title_similarity" if best_score < 0.96 else "content_similarity"
+            return best_match, reason, best_score
+
+        return None
 
     async def get_recent_articles(
         self,
@@ -950,6 +1072,50 @@ class Database:
 
         return self._article_row_to_dict(row) if row else None
 
+    async def get_related_articles(self, article_id: int) -> dict | None:
+        async with self.session_maker() as session:
+            article = await session.get(NewsArticle, article_id)
+            if not article or not article.is_active:
+                return None
+
+            cluster_id = article.story_cluster_id
+            canonical_article_id = article.duplicate_of_article_id or article.id
+            if not cluster_id:
+                return {
+                    "story_cluster_id": None,
+                    "canonical_article_id": canonical_article_id,
+                    "items": [],
+                }
+
+            stmt = (
+                select(NewsArticle, NewsCategory.name, NewsSource.name, NewsSource.source_type)
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(
+                    NewsArticle.is_active.is_(True),
+                    NewsArticle.story_cluster_id == cluster_id,
+                )
+                .order_by(
+                    NewsArticle.duplicate_of_article_id.isnot(None),
+                    NewsArticle.published_at.asc(),
+                    NewsArticle.id.asc(),
+                )
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+
+        items = [self._article_row_to_dict(row) for row in rows]
+        for item in items:
+            if item["duplicate_of_article_id"] is None:
+                canonical_article_id = item["id"]
+                break
+
+        return {
+            "story_cluster_id": cluster_id,
+            "canonical_article_id": canonical_article_id,
+            "items": items,
+        }
+
     async def save_summaries(
         self,
         summaries: list[dict],
@@ -963,6 +1129,7 @@ class Database:
 
         async with self.session_maker() as session:
             category_cache: dict[str, NewsCategory] = {}
+            seen_story_keys: set[str] = set()
 
             for summary in summaries:
                 title = str(summary.get("title") or "").strip()
@@ -971,11 +1138,18 @@ class Database:
                 if not title or not body:
                     continue
 
+                story_key = f"{category_name}:{self._summary_story_key(summary)}"
+                if story_key in seen_story_keys:
+                    continue
+                seen_story_keys.add(story_key)
+
                 category = await self._get_or_create_category(
                     session, category_name, category_cache
                 )
                 article_id = summary.get("article_id")
                 fact = summary.get("fact")
+                story_cluster_id = summary.get("story_cluster_id")
+                source_article_count = self._safe_int(summary.get("source_article_count")) or 1
 
                 existing = await self._get_summary(session, category.id, summary_date, title)
                 if existing:
@@ -984,12 +1158,16 @@ class Database:
                     existing.llm_provider = llm_provider
                     existing.llm_model = llm_model
                     existing.article_id = article_id
+                    existing.story_cluster_id = story_cluster_id
+                    existing.source_article_count = source_article_count
                     updated += 1
                 else:
                     session.add(
                         NewsSummary(
                             article_id=article_id,
                             category_id=category.id,
+                            story_cluster_id=story_cluster_id,
+                            source_article_count=source_article_count,
                             title=title,
                             summary=body,
                             fact=fact,
@@ -1274,6 +1452,24 @@ class Database:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    def _article_for_story_matching(self, article: NewsArticle, category: str | None = None) -> dict:
+        return {
+            "title": article.title,
+            "description": article.description,
+            "content": article.content,
+            "category": category or "",
+            "canonical_key": article.canonical_key,
+            "content_fingerprint": article.content_fingerprint,
+        }
+
+    def _copy_story_metadata_to_payload(self, target: dict, article: NewsArticle) -> None:
+        target["canonical_key"] = article.canonical_key
+        target["content_fingerprint"] = article.content_fingerprint
+        target["story_cluster_id"] = article.story_cluster_id
+        target["duplicate_of_article_id"] = article.duplicate_of_article_id
+        target["duplicate_reason"] = article.duplicate_reason
+        target["similarity_score"] = article.similarity_score
+
     async def _get_summary(
         self,
         session: AsyncSession,
@@ -1332,6 +1528,12 @@ class Database:
             "country": article.country,
             "hash": article.url_hash,
             "score": article.score,
+            "canonical_key": getattr(article, "canonical_key", None),
+            "content_fingerprint": getattr(article, "content_fingerprint", None),
+            "story_cluster_id": getattr(article, "story_cluster_id", None),
+            "duplicate_of_article_id": getattr(article, "duplicate_of_article_id", None),
+            "duplicate_reason": getattr(article, "duplicate_reason", None),
+            "similarity_score": getattr(article, "similarity_score", None),
             "raw_payload": article.raw_payload,
         }
 
@@ -1362,6 +1564,12 @@ class Database:
         normalized = re.sub(r"[^\w\s]", "", normalized)
         return re.sub(r"\s+", " ", normalized).strip()
 
+    def _summary_story_key(self, summary: dict) -> str:
+        story_cluster_id = str(summary.get("story_cluster_id") or "").strip()
+        if story_cluster_id:
+            return f"cluster:{story_cluster_id}"
+        return f"title:{self._summary_title_key(summary.get('title'))}"
+
     def _summary_row_to_dict(self, row: Any) -> dict:
         summary = row[0]
         category_name = row[1]
@@ -1374,6 +1582,8 @@ class Database:
         return {
             "id": summary.id,
             "article_id": summary.article_id,
+            "story_cluster_id": getattr(summary, "story_cluster_id", None),
+            "source_article_count": getattr(summary, "source_article_count", 1),
             "category": category_name,
             "title": summary.title,
             "summary": summary.summary,

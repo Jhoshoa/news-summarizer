@@ -49,6 +49,8 @@ def test_parse_json_response_preserves_article_metadata_from_original_news():
                 "title": "Titulo original completo de la fuente",
                 "source": "Unitel",
                 "url": "https://unitel.bo/noticia",
+                "story_cluster_id": "story-42",
+                "corroborating_sources": ["unitel", "reduno"],
             }
         ],
     )
@@ -60,6 +62,8 @@ def test_parse_json_response_preserves_article_metadata_from_original_news():
             "fact": "Dato clave",
             "category": "politica",
             "article_id": 42,
+            "story_cluster_id": "story-42",
+            "source_article_count": 2,
             "source": "Unitel",
             "url": "https://unitel.bo/noticia",
         }
@@ -94,6 +98,8 @@ def test_parse_json_response_extracts_array_from_extra_text_and_skips_bad_items(
             "fact": "",
             "category": "general",
             "article_id": None,
+            "story_cluster_id": None,
+            "source_article_count": 1,
             "source": "Red Uno",
             "url": "https://reduno.com.bo/noticia",
         }

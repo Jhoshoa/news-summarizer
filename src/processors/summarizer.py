@@ -184,6 +184,8 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                     "article_id": item.get("article_id")
                     or original.get("id")
                     or original.get("article_id"),
+                    "story_cluster_id": original.get("story_cluster_id"),
+                    "source_article_count": self._source_article_count(original),
                     "source": item.get("source") or original.get("source"),
                     "url": item.get("url") or original.get("url"),
                 }
@@ -252,6 +254,8 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                         else "",
                         "category": category,
                         "article_id": original.get("id") or original.get("article_id"),
+                        "story_cluster_id": original.get("story_cluster_id"),
+                        "source_article_count": self._source_article_count(original),
                         "source": original.get("source"),
                         "url": original.get("url"),
                     }
@@ -302,6 +306,12 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
         if not normalized_sentence:
             return False
         return normalized_sentence not in normalized_current and normalized_current not in normalized_sentence
+
+    def _source_article_count(self, article: dict) -> int:
+        sources = article.get("corroborating_sources")
+        if isinstance(sources, list) and sources:
+            return len({str(source).strip().lower() for source in sources if str(source).strip()})
+        return 1
 
     def _limit_text(self, value: str, max_chars: int) -> str:
         if len(value) <= max_chars:

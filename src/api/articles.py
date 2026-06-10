@@ -70,6 +70,18 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             page_size=page_size,
         )
 
+    @router.get("/{article_id}/related")
+    async def get_related_articles(article_id: int):
+        app_instance = get_app_instance()
+        if not app_instance or not app_instance.db:
+            raise HTTPException(status_code=503, detail="DB no disponible")
+
+        related = await app_instance.db.get_related_articles(article_id)
+        if related is None:
+            raise HTTPException(status_code=404, detail="Articulo no encontrado")
+
+        return related
+
     @router.get("/{article_id}")
     async def get_article(article_id: int):
         app_instance = get_app_instance()

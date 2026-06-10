@@ -82,12 +82,22 @@ def test_article_row_to_dict_preserves_float_score():
         country="bolivia",
         url_hash="abc",
         score=0.885,
+        canonical_key="politica | titulo",
+        content_fingerprint="fingerprint",
+        story_cluster_id="story-1",
+        duplicate_of_article_id=10,
+        duplicate_reason="fingerprint",
+        similarity_score=1.0,
         raw_payload={"score": 0.885},
     )
 
     result = db._article_row_to_dict((article, "politica", "Example", "scraper"))
 
     assert result["score"] == 0.885
+    assert result["story_cluster_id"] == "story-1"
+    assert result["duplicate_of_article_id"] == 10
+    assert result["duplicate_reason"] == "fingerprint"
+    assert result["similarity_score"] == 1.0
     assert result["raw_payload"]["score"] == 0.885
 
 
@@ -241,3 +251,15 @@ def test_summary_title_key_normalizes_duplicate_titles():
     assert db._summary_title_key("Video: Reportera cae al intentar atrapar regalo") == (
         db._summary_title_key(" video reportera cae al intentar atrapar regalo ")
     )
+
+
+def test_summary_story_key_prefers_cluster_over_title():
+    db = object.__new__(Database)
+
+    assert db._summary_story_key(
+        {
+            "story_cluster_id": "cluster-1",
+            "title": "Titulo cualquiera",
+        }
+    ) == "cluster:cluster-1"
+    assert db._summary_story_key({"title": "Video: Titulo"}) == "title:video titulo"

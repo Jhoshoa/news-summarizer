@@ -2,7 +2,13 @@ import { useCallback, useMemo } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
 import { useRouter } from "../app/router";
-import { findByExactCode, findIndicator, formatNumber } from "../components/indicators/indicatorUtils";
+import {
+  findByExactCode,
+  findGoldIndicator,
+  findIndicator,
+  findUfvIndicator,
+  formatNumber,
+} from "../components/indicators/indicatorUtils";
 import { ArticleImage } from "../components/news/ArticleImage";
 import { ArticleDetailSkeleton, PanelSkeleton } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
@@ -72,8 +78,8 @@ export const ArticleDetailPage = () => {
   )?.value;
   const p2pBuy = findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value;
   const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
-  const ufv = findIndicator(indicators, ["ufv"]);
-  const gold = findIndicator(indicators, ["oro"]);
+  const ufv = findUfvIndicator(indicators);
+  const gold = findGoldIndicator(indicators);
   const treMn = findIndicator(indicators, ["tre", "mn"]);
   const treMe = findIndicator(indicators, ["tre", "me"]);
   const showArticleSkeleton = articleId === null || isFetchingArticle || isFetchingSummary;

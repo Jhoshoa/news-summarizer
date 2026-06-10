@@ -233,6 +233,85 @@ def test_reduno_fallback_skips_related_blocks_but_keeps_later_body():
     assert "Mas leidas" not in content
 
 
+def test_reduno_current_detail_markup_uses_body_cuerpo_paragraphs():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedUno",
+        url="https://www.reduno.com.bo/",
+        body_selector=".body__cuerpo p, .contenedor.body p",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <body>
+            <h1>Las frases que dejo Paz al promulgar Ley de Estados de Excepcion</h1>
+            <p>Entradilla que pertenece a la cabecera y no debe entrar como cuerpo.</p>
+            <div class="body__cuerpo">
+              <p class="texto-justify">El presidente del Estado promulgo este lunes la Ley de Regulacion de los Estados de Excepcion con procedimientos y alcances definidos.</p>
+              <p class="texto-justify blockquote">Durante el acto de promulgacion, el mandatario dejo una serie de frases sobre seguridad y economia.</p>
+              <div class="link_nota_propia">
+                <div class="nota__relacionada">Te puede interesar:</div>
+                <div class="titulo"><a>Paz promulga la Ley que regula los Estados de Excepcion en Bolivia</a></div>
+              </div>
+              <p class="texto-justify">Paz advirtio que el principal riesgo para el pais es la inseguridad vinculada a grupos criminales.</p>
+            </div>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    content = scraper._extract_body_content(soup, source)
+
+    assert "El presidente del Estado promulgo" in content
+    assert "Durante el acto de promulgacion" in content
+    assert "Paz advirtio que el principal riesgo" in content
+    assert "Entradilla que pertenece" not in content
+    assert "Te puede interesar" not in content
+    assert "Paz promulga la Ley que regula" not in content
+
+
+@pytest.mark.asyncio
+async def test_enrich_article_prefers_meta_description_over_generated_excerpt():
+    detail_html = """
+        <html>
+          <head>
+            <meta property="og:description" content="Entradilla real de RedUno con contexto de la noticia." />
+          </head>
+          <body>
+            <div class="body__cuerpo">
+              <p>Primer parrafo completo de la noticia con informacion suficiente para el lector y detalles centrales del hecho investigado por las autoridades.</p>
+              <p>Segundo parrafo completo con mas contexto y detalles importantes del acontecimiento para superar el minimo de palabras del extractor.</p>
+            </div>
+          </body>
+        </html>
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=detail_html)
+
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedUno",
+        url="https://www.reduno.com.bo/",
+        body_selector=".body__cuerpo p",
+    )
+    article = {
+        "title": "Titulo de prueba",
+        "url": "https://www.reduno.com.bo/noticias/test",
+        "source": "RedUno",
+        "published_at": datetime.now(),
+        "description": "",
+        "image": None,
+    }
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        enriched = await scraper._enrich_article(client, article, source)
+
+    assert enriched["description"] == "Entradilla real de RedUno con contexto de la noticia."
+    assert "Primer parrafo completo" in enriched["content"]
+
+
 def test_reduno_listing_extracts_current_article_card_markup():
     scraper = NewsScraper(sources=[])
     source = NewsSource(

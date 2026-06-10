@@ -39,7 +39,7 @@ sources:
     date_selector: "input.nota_fecha_input"
     date_attr: "data-fecha-a"
     image_selector: "figure.nota__media img"
-    body_selector: "main article p, article p, .nota__body p, .nota-contenido p, .nota__content p, .content_nota p"
+    body_selector: ".body__cuerpo p, .contenedor.body p, .item.is-body .body__cuerpo p, main article p, article p, .nota__body p, .nota-contenido p, .nota__content p, .content_nota p"
     category_selector: "div.volanta span"
     category_link_selector: "div.volanta a"
     enabled: true

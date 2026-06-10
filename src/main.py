@@ -6,6 +6,7 @@ import traceback
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from loguru import logger
@@ -118,7 +119,7 @@ class NewsSummarizerApp:
         collection_stats = {"scraper": 0, "newsapi": 0, "inserted": 0, "updated": 0}
         collection_run_id: int | None = None
         collected_fresh_articles = False
-        pipeline_metrics: dict[str, object] = {
+        pipeline_metrics: dict[str, Any] = {
             "raw_collected_count": 0,
             "usable_count": 0,
             "quality_dropped_count": 0,
@@ -158,6 +159,14 @@ class NewsSummarizerApp:
                         pipeline_metrics["raw_collected_count"] = len(news)
             except Exception as e:
                 logger.error(f"Cache/DB error: {e}")
+                pipeline_metrics["metrics_payload"] = {
+                    **dict(pipeline_metrics.get("metrics_payload") or {}),
+                    "cache_db_error": str(e),
+                }
+                if not used_cached_summaries and not news:
+                    news, collection_stats, collection_run_id = await self._collect_news(categories)
+                    collected_fresh_articles = True
+                    pipeline_metrics["raw_collected_count"] = len(news)
 
         if not used_cached_summaries:
             if not news:
@@ -232,6 +241,12 @@ class NewsSummarizerApp:
                     db_stats = await self.db.upsert_articles(news)
                     collection_stats["inserted"] += db_stats["inserted"]
                     collection_stats["updated"] += db_stats["updated"]
+                    pipeline_metrics["metrics_payload"] = {
+                        **dict(pipeline_metrics.get("metrics_payload") or {}),
+                        "historical_duplicates_detected": db_stats.get(
+                            "historical_duplicates", 0
+                        ),
+                    }
                 except Exception as e:
                     if collection_run_id is not None:
                         await self.db.finish_collection_run(
@@ -277,6 +292,7 @@ class NewsSummarizerApp:
                     summaries = await rewriter.rewrite(summaries)
                 except Exception as e:
                     logger.warning(f"Error reescribiendo: {e}")
+            summaries = self._deduplicate_summaries_for_storage(summaries)
             pipeline_metrics["summaries_count"] = len(summaries)
 
             if self.db and summaries:
@@ -467,6 +483,7 @@ class NewsSummarizerApp:
     ) -> list[dict]:
         selected: list[dict] = []
         selected_ids: set[int] = set()
+        news = self._select_unique_story_articles(news)
 
         for category in categories:
             category_news = [article for article in news if article.get("category") == category]
@@ -482,6 +499,24 @@ class NewsSummarizerApp:
                     selected_ids.add(article_key)
 
         return selected
+
+    def _select_unique_story_articles(self, articles: list[dict]) -> list[dict]:
+        unique: list[dict] = []
+        seen_clusters: set[str] = set()
+
+        for article in articles:
+            if article.get("duplicate_of_article_id"):
+                continue
+
+            cluster_id = str(article.get("story_cluster_id") or article.get("cluster_id") or "").strip()
+            if cluster_id:
+                if cluster_id in seen_clusters:
+                    continue
+                seen_clusters.add(cluster_id)
+
+            unique.append(article)
+
+        return unique
 
     def _select_diverse_articles(
         self,
@@ -548,13 +583,33 @@ class NewsSummarizerApp:
         seen: set[str] = set()
 
         for summary in summaries:
-            title_key = self._summary_title_key(summary.get("title"))
+            title_key = self._summary_delivery_key(summary)
             if title_key in seen:
                 continue
             seen.add(title_key)
             unique.append(summary)
 
         return unique
+
+    def _deduplicate_summaries_for_storage(self, summaries: list[dict]) -> list[dict]:
+        unique: list[dict] = []
+        seen: set[str] = set()
+
+        for summary in summaries:
+            category = str(summary.get("category") or "general").strip().lower()
+            key = f"{category}:{self._summary_delivery_key(summary)}"
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(summary)
+
+        return unique
+
+    def _summary_delivery_key(self, summary: dict) -> str:
+        story_cluster_id = str(summary.get("story_cluster_id") or "").strip()
+        if story_cluster_id:
+            return f"cluster:{story_cluster_id}"
+        return f"title:{self._summary_title_key(summary.get('title'))}"
 
     def _summary_title_key(self, title: object) -> str:
         import re

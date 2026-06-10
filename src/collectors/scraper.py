@@ -111,7 +111,10 @@ class NewsScraper:
             title_selector="h2 a, h3 a",
             url_selector="a",
             date_selector=".fecha, .date-published, time",
-            body_selector="article p, main p, .nota__body p, .nota-contenido p",
+            body_selector=(
+                ".body__cuerpo p, .contenedor.body p, .item.is-body .body__cuerpo p, "
+                "article p, main p, .nota__body p, .nota-contenido p"
+            ),
         ),
         NewsSource(
             name="RedBolivision",
@@ -336,6 +339,7 @@ class NewsScraper:
         soup = BeautifulSoup(response.text, "lxml")
         content = self._extract_body_content(soup, source, article.get("title"))
         word_count = self._count_words(content)
+        meta_description = self._extract_meta_description(soup)
 
         if not content:
             logger.warning(
@@ -348,7 +352,9 @@ class NewsScraper:
         article["content_word_count"] = word_count
         article["content_collected_at"] = datetime.now()
 
-        if content and not article.get("description"):
+        if meta_description and not article.get("description"):
+            article["description"] = meta_description
+        elif content and not article.get("description"):
             article["description"] = article["excerpt"]
 
         detail_image = self._extract_image(soup, source)
@@ -366,6 +372,15 @@ class NewsScraper:
         json_ld_content = self._extract_json_ld_article_body(soup)
         if json_ld_content:
             return json_ld_content
+
+        if self._should_prefer_source_body_selector(source):
+            content = self._extract_content_with_selector(
+                soup,
+                source,
+                source.body_selector,
+            )
+            if self._count_words(content) >= self.MIN_CONTENT_WORDS:
+                return content
 
         title_anchored_content = self._extract_readable_text_fallback(
             soup,
@@ -401,6 +416,11 @@ class NewsScraper:
 
         return best_content
 
+    def _should_prefer_source_body_selector(self, source: NewsSource) -> bool:
+        source_name = source.name.lower()
+        selector = source.body_selector or ""
+        return source_name in {"reduno", "red uno"} and ".body__cuerpo" in selector
+
     def _extract_json_ld_article_body(self, soup: BeautifulSoup) -> str:
         candidates = []
 
@@ -428,6 +448,20 @@ class NewsScraper:
                 text_parts.append(str(article_body))
 
         return self._clean_text("\n\n".join(text_parts))
+
+    def _extract_meta_description(self, soup: BeautifulSoup) -> str:
+        for selector in (
+            "meta[property='og:description']",
+            "meta[name='description']",
+            "meta[name='twitter:description']",
+        ):
+            element = soup.select_one(selector)
+            if not element:
+                continue
+            content = self._clean_text(element.get("content", ""))
+            if content:
+                return content
+        return ""
 
     def _iter_json_ld_nodes(self, data):
         if isinstance(data, dict):

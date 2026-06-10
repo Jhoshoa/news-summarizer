@@ -33,6 +33,27 @@ BCB_HTML = """
         <div class="bcb-row"><div class="bcb-lbl">ME</div><div class="bcb-val sm">0,51</div></div>
       </div>
     </article>
+    <article class="bcb-kpi2-card">
+      <div class="bcb-kpi2-hd">
+        <p class="bcb-kpi2-name">Unidad de fomento a la vivienda</p>
+        <div class="bcb-kpi2-asof"><time>domingo 10 de mayo, 2026</time></div>
+      </div>
+      <div class="bcb-kpi2-body">
+        <div class="bcb-lbl">UFV</div>
+        <div class="bcb-val">Bs 3,27232</div>
+      </div>
+    </article>
+    <article class="bcb-kpi2-card">
+      <div class="bcb-kpi2-hd">
+        <p class="bcb-kpi2-name">Cotización internacional del oro</p>
+        <div class="bcb-kpi2-sub">USD / O.T.F.</div>
+        <div class="bcb-kpi2-asof"><time>domingo 10 de mayo, 2026</time></div>
+      </div>
+      <div class="bcb-kpi2-body">
+        <div class="bcb-lbl">Valor</div>
+        <div class="bcb-val">4.269,71</div>
+      </div>
+    </article>
   </div>
 </section>
 """
@@ -56,6 +77,10 @@ async def test_fetch_bcb_parses_key_indicator_cards():
     assert by_code["bcb_tipo_de_cambio_venta"].value == Decimal("6.96")
     assert by_code["bcb_tasa_de_referencia_tre_mn"].value == Decimal("3.53")
     assert by_code["bcb_tasa_de_referencia_tre_me"].unit == "%"
+    assert by_code["bcb_unidad_de_fomento_a_la_vivienda_ufv"].value == Decimal("3.27232")
+    assert by_code["bcb_unidad_de_fomento_a_la_vivienda_ufv"].asset == "UFV"
+    assert by_code["bcb_cotizacion_internacional_del_oro_valor"].value == Decimal("4269.71")
+    assert by_code["bcb_cotizacion_internacional_del_oro_valor"].asset == "GOLD"
 
 
 @pytest.mark.asyncio

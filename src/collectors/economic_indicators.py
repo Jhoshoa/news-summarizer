@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -184,15 +185,13 @@ class EconomicIndicatorCollector:
         subtitle = self._clean_text(card.select_one(".bcb-kpi2-sub"))
         observed_label = self._clean_text(card.select_one(".bcb-kpi2-asof"))
         observed_at = self._parse_spanish_date(observed_label)
-        unit = self._infer_bcb_unit(group_name, subtitle)
-
         indicators = []
-        for row in card.select(".bcb-row"):
-            label = self._clean_text(row.select_one(".bcb-lbl"))
-            value_text = self._clean_text(row.select_one(".bcb-val"))
+        for label, value_text in self._iter_bcb_values(card):
             value = self._parse_decimal(value_text)
             if not group_name or not label or value is None:
                 continue
+            unit = self._infer_bcb_unit(group_name, f"{subtitle} {label}")
+            currency, asset = self._infer_bcb_market(group_name, subtitle, label)
 
             indicators.append(
                 EconomicIndicator(
@@ -202,8 +201,8 @@ class EconomicIndicatorCollector:
                     indicator_group=group_name,
                     value=value,
                     unit=unit,
-                    currency="BOB" if "dólar" in f"{group_name} {subtitle}".lower() else None,
-                    asset="USD" if "dólar" in f"{group_name} {subtitle}".lower() else None,
+                    currency=currency,
+                    asset=asset,
                     side=self._normalize_side(label),
                     observed_at=observed_at,
                     collected_at=collected_at or datetime.utcnow(),
@@ -219,6 +218,22 @@ class EconomicIndicatorCollector:
             )
 
         return indicators
+
+    def _iter_bcb_values(self, card) -> list[tuple[str, str]]:
+        rows = []
+        for row in card.select(".bcb-row"):
+            rows.append(
+                (
+                    self._clean_text(row.select_one(".bcb-lbl")),
+                    self._clean_text(row.select_one(".bcb-val")),
+                )
+            )
+        if rows:
+            return rows
+
+        labels = [self._clean_text(label) for label in card.select(".bcb-lbl")]
+        values = [self._clean_text(value) for value in card.select(".bcb-val")]
+        return list(zip(labels, values, strict=False))
 
     def _lowest_binance_price(self, data: dict[str, Any]) -> tuple[Decimal | None, dict[str, Any]]:
         candidates = []
@@ -236,16 +251,33 @@ class EconomicIndicatorCollector:
         return price, item
 
     def _infer_bcb_unit(self, group_name: str, subtitle: str) -> str | None:
-        text = f"{group_name} {subtitle}".lower()
-        if "%" in text or "tasa" in text or "inflación" in text:
+        text = self._strip_accents(f"{group_name} {subtitle}".lower())
+        if "%" in text or "tasa" in text or "inflacion" in text:
             return "%"
         if "ufv" in text:
             return "BOB"
         if "oro" in text:
             return "USD / O.T.F."
-        if "dólar" in text or "dolar" in text:
+        if "dolar" in text:
             return "BOB per USD"
         return None
+
+    def _infer_bcb_market(
+        self,
+        group_name: str,
+        subtitle: str,
+        label: str = "",
+    ) -> tuple[str | None, str | None]:
+        text = self._strip_accents(f"{group_name} {subtitle} {label}".lower())
+        if "%" in text or "tasa" in text or "inflacion" in text:
+            return None, None
+        if "dolar" in text:
+            return "BOB", "USD"
+        if "oro" in text:
+            return "USD", "GOLD"
+        if "ufv" in text:
+            return "BOB", "UFV"
+        return None, None
 
     def _normalize_side(self, label: str) -> str | None:
         normalized = label.strip().lower()
@@ -305,7 +337,9 @@ class EconomicIndicatorCollector:
 
     def _strip_accents(self, text: str) -> str:
         replacements = str.maketrans("áéíóúñ", "aeioun")
-        return text.translate(replacements)
+        text = text.translate(replacements)
+        normalized = unicodedata.normalize("NFKD", text)
+        return "".join(char for char in normalized if not unicodedata.combining(char))
 
     def _slugify(self, text: str) -> str:
         text = self._strip_accents(text.lower())

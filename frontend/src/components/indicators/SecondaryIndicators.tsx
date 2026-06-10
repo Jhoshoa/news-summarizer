@@ -1,5 +1,5 @@
 import type { EconomicIndicator } from "../../services/types";
-import { findIndicator, formatNumber } from "./indicatorUtils";
+import { findGoldIndicator, findIndicator, findUfvIndicator, formatNumber } from "./indicatorUtils";
 
 type SecondaryIndicatorsProps = {
   indicators: EconomicIndicator[];
@@ -20,8 +20,8 @@ const MiniIndicator = ({ label, value, source = "BCB" }: MiniIndicatorProps) => 
 );
 
 export const SecondaryIndicators = ({ indicators }: SecondaryIndicatorsProps) => {
-  const ufv = findIndicator(indicators, ["ufv"]);
-  const gold = findIndicator(indicators, ["oro"]);
+  const ufv = findUfvIndicator(indicators);
+  const gold = findGoldIndicator(indicators);
   const treMn = findIndicator(indicators, ["tre", "mn"]);
   const treMe = findIndicator(indicators, ["tre", "me"]);
 

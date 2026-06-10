@@ -24,7 +24,7 @@ class FakeDatabase:
         self.upserted_articles = articles
         for index, article in enumerate(articles, 1):
             article["id"] = index
-        return {"inserted": len(articles), "updated": 0}
+        return {"inserted": len(articles), "updated": 0, "historical_duplicates": 0}
 
     async def finish_collection_run(self, run_id, **kwargs):
         self.finished_runs.append({"run_id": run_id, **kwargs})
@@ -35,6 +35,11 @@ class FakeDatabase:
 
     async def get_active_subscribers(self):
         return []
+
+
+class CacheFailingDatabase(FakeDatabase):
+    async def get_recent_summaries(self, categories):
+        raise RuntimeError("schema cache read failed")
 
 
 class FakeLLM:
@@ -107,6 +112,46 @@ async def test_fresh_collection_is_classified_persisted_and_summarized():
     assert db.finished_runs[0]["ranked_count"] == 1
     assert db.finished_runs[0]["summary_candidates_count"] == 1
     assert db.finished_runs[0]["summaries_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_refresh_collects_fresh_news_when_cache_db_read_fails():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+    )
+    db = CacheFailingDatabase()
+    app = NewsSummarizerApp(settings)
+    app.db = db
+    app.llm = FakeLLM()
+
+    async def collect_news(categories):
+        return (
+            [
+                {
+                    "title": "Presidente anuncia nueva medida",
+                    "url": "https://example.com/noticia",
+                    "description": "",
+                    "content": "El gobierno y el presidente anunciaron una decision politica importante.",
+                    "source": "Example",
+                    "source_type": "scraper",
+                    "source_url": "https://example.com/",
+                    "category": "politica",
+                    "hash": "abc",
+                }
+            ],
+            {"scraper": 1, "newsapi": 0, "inserted": 0, "updated": 0},
+            123,
+        )
+
+    app._collect_news = collect_news
+
+    result = await app.send_summaries("manual", refresh=True)
+
+    assert result["collected"] == 1
+    assert result["summaries"] == 1
+    assert db.finished_runs[0]["metrics_payload"]["cache_db_error"] == "schema cache read failed"
 
 
 @pytest.mark.asyncio
@@ -206,6 +251,50 @@ def test_summary_candidates_do_not_drop_articles_when_only_one_source_exists():
     ]
 
 
+def test_summary_candidates_exclude_historical_duplicates_and_repeated_clusters():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+    )
+    app = NewsSummarizerApp(settings)
+    news = [
+        {
+            "title": "Canonica",
+            "category": "politica",
+            "source": "Unitel",
+            "story_cluster_id": "story-1",
+            "score": 0.9,
+        },
+        {
+            "title": "Duplicada historica",
+            "category": "politica",
+            "source": "RedUno",
+            "story_cluster_id": "story-1",
+            "duplicate_of_article_id": 1,
+            "score": 0.8,
+        },
+        {
+            "title": "Otra cobertura misma historia",
+            "category": "politica",
+            "source": "RadioFides",
+            "story_cluster_id": "story-1",
+            "score": 0.7,
+        },
+        {
+            "title": "Historia nueva",
+            "category": "politica",
+            "source": "RedUno",
+            "story_cluster_id": "story-2",
+            "score": 0.6,
+        },
+    ]
+
+    selected = app._select_summary_candidates(news, ["politica"])
+
+    assert [article["title"] for article in selected] == ["Canonica", "Historia nueva"]
+
+
 def test_delivery_summaries_are_deduplicated_by_normalized_title():
     settings = SimpleNamespace(
         categories_list=["deportes"],
@@ -237,3 +326,41 @@ def test_delivery_summaries_are_deduplicated_by_normalized_title():
         "Video: Reportera cae al intentar atrapar regalo",
         "Bolivia cayo ante Escocia",
     ]
+
+
+def test_summaries_are_deduplicated_by_story_cluster_for_storage_and_delivery():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+    )
+    app = NewsSummarizerApp(settings)
+    summaries = [
+        {
+            "title": "Titulo A",
+            "summary": "Primer resumen.",
+            "category": "politica",
+            "story_cluster_id": "story-1",
+        },
+        {
+            "title": "Titulo B",
+            "summary": "Segundo resumen.",
+            "category": "politica",
+            "story_cluster_id": "story-1",
+        },
+        {
+            "title": "Titulo B",
+            "summary": "Tercera version.",
+            "category": "economia",
+            "story_cluster_id": "story-1",
+        },
+    ]
+
+    storage_result = app._deduplicate_summaries_for_storage(summaries)
+    delivery_result = app._deduplicate_summaries_for_delivery(summaries)
+
+    assert [summary["summary"] for summary in storage_result] == [
+        "Primer resumen.",
+        "Tercera version.",
+    ]
+    assert [summary["summary"] for summary in delivery_result] == ["Primer resumen."]
