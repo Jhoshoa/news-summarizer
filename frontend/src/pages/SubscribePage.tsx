@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   useGetPreferenceOptionsQuery,
@@ -9,6 +9,9 @@ import {
 import type { PreferenceOption } from "../services/types";
 import {
   buildSubscribePayload,
+  getSubscribeApiErrorMessage,
+  isValidEmail,
+  isValidInternationalPhone,
   normalizePhone,
   sanitizePhoneInput,
   type SubscribeFormState,
@@ -16,7 +19,8 @@ import {
 } from "../utils/subscribe";
 
 const defaultForm: SubscribeFormState = {
-  channel: "whatsapp",
+  channel: "email",
+  email: "",
   phone: "",
   telegramId: "",
   categories: ["general"],
@@ -42,6 +46,9 @@ export const SubscribePage = () => {
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [unsubscribeMessage, setUnsubscribeMessage] = useState("");
   const [subscribeMessage, setSubscribeMessage] = useState("");
+  const [isConfirmingSubscribe, setIsConfirmingSubscribe] = useState(false);
+  const [toast, setToast] = useState<{ message: string; tone: "error" | "success" } | null>(null);
+  const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
   const selectedChannel = options?.channels.find((channel) => channel.slug === form.channel);
   const selectedCategories = useMemo(
@@ -49,6 +56,21 @@ export const SubscribePage = () => {
       (options?.categories ?? []).filter((category) => form.categories.includes(category.slug)),
     [form.categories, options?.categories],
   );
+
+  useEffect(() => {
+    if (!isConfirmingSubscribe) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsConfirmingSubscribe(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isConfirmingSubscribe]);
 
   const toggleCategory = (slug: string) => {
     setForm((current) => {
@@ -61,6 +83,26 @@ export const SubscribePage = () => {
       };
     });
   };
+
+  const markFieldTouched = (field: string) => {
+    setTouchedFields((current) => ({
+      ...current,
+      [field]: true,
+    }));
+  };
+
+  const emailInputError =
+    form.channel === "email" && touchedFields.email && !isValidEmail(form.email)
+      ? "Ingresa un correo electronico valido."
+      : "";
+  const phoneInputError =
+    form.channel === "whatsapp" && touchedFields.phone && !isValidInternationalPhone(form.phone)
+      ? "Ingresa un numero de WhatsApp en formato internacional."
+      : "";
+  const telegramInputError =
+    form.channel === "telegram" && touchedFields.telegramId && !form.telegramId.trim()
+      ? "Telegram requiere un identificador o usar el bot configurado."
+      : "";
 
   const handlePreview = async () => {
     const errors = validateSubscribeForm({ ...form, consentAccepted: true }, options);
@@ -81,17 +123,34 @@ export const SubscribePage = () => {
     const errors = validateSubscribeForm(form, options);
     setFormErrors(errors);
     setSubscribeMessage("");
+    setToast(null);
 
     if (errors.length) {
       return;
     }
 
+    setIsConfirmingSubscribe(true);
+  };
+
+  const handleConfirmSubscribe = async () => {
     const payload = buildSubscribePayload(form, options);
     try {
       const response = await subscribe(payload).unwrap();
       setSubscribeMessage(response.message);
-    } catch {
-      setFormErrors(["No se pudo guardar la suscripcion. Revisa el backend e intenta de nuevo."]);
+      setToast({ message: "Suscripcion guardada correctamente.", tone: "success" });
+      setForm(defaultForm);
+      setTouchedFields({});
+      setFormErrors([]);
+      setIsConfirmingSubscribe(false);
+      previewState.reset();
+    } catch (error) {
+      const message = getSubscribeApiErrorMessage(error);
+      setIsConfirmingSubscribe(false);
+      setFormErrors([message]);
+      setToast({
+        message,
+        tone: "error",
+      });
     }
   };
 
@@ -120,6 +179,15 @@ export const SubscribePage = () => {
 
   return (
     <section className="subscribe-page">
+      {toast && (
+        <div className={`toast ${toast.tone}`} role="status" aria-live="polite">
+          <span>{toast.message}</span>
+          <button type="button" aria-label="Cerrar notificacion" onClick={() => setToast(null)}>
+            x
+          </button>
+        </div>
+      )}
+
       <header className="data-hero subscribe-hero">
         <div>
           <span className="eyebrow">Preferencias EcoBrief</span>
@@ -131,8 +199,8 @@ export const SubscribePage = () => {
         </div>
         <div className="data-status-card">
           <span>Canal recomendado</span>
-          <strong>WhatsApp</strong>
-          <small>Telegram se activa cuando el bot este configurado.</small>
+          <strong>Email</strong>
+          <small>WhatsApp queda disponible para demo y Telegram cuando el bot este configurado.</small>
         </div>
       </header>
 
@@ -175,32 +243,67 @@ export const SubscribePage = () => {
               <label className="form-field">
                 <span>Numero de WhatsApp</span>
                 <input
+                  aria-describedby={phoneInputError ? "phone-error" : undefined}
+                  aria-invalid={Boolean(phoneInputError)}
+                  className={phoneInputError ? "invalid" : ""}
                   inputMode="tel"
                   placeholder="+59170000000"
                   type="tel"
                   value={form.phone}
-                  onChange={(event) =>
+                  onBlur={() => markFieldTouched("phone")}
+                  onChange={(event) => {
+                    markFieldTouched("phone");
                     setForm((current) => ({
                       ...current,
                       phone: sanitizePhoneInput(event.target.value),
-                    }))
-                  }
+                    }));
+                  }}
                 />
+                {phoneInputError && <small className="field-error" id="phone-error">{phoneInputError}</small>}
+              </label>
+            ) : form.channel === "email" ? (
+              <label className="form-field">
+                <span>Correo electronico</span>
+                <input
+                  aria-describedby={emailInputError ? "email-error" : undefined}
+                  aria-invalid={Boolean(emailInputError)}
+                  autoComplete="email"
+                  className={emailInputError ? "invalid" : ""}
+                  inputMode="email"
+                  placeholder="tu-correo@gmail.com"
+                  type="email"
+                  value={form.email}
+                  onBlur={() => markFieldTouched("email")}
+                  onChange={(event) => {
+                    markFieldTouched("email");
+                    setForm((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }));
+                  }}
+                />
+                {emailInputError && <small className="field-error" id="email-error">{emailInputError}</small>}
               </label>
             ) : (
               <label className="form-field">
                 <span>Telegram ID</span>
                 <input
+                  aria-describedby={telegramInputError ? "telegram-error" : undefined}
+                  aria-invalid={Boolean(telegramInputError)}
+                  className={telegramInputError ? "invalid" : ""}
                   placeholder="chat_id o identificador de demo"
                   type="text"
                   value={form.telegramId}
-                  onChange={(event) =>
+                  onBlur={() => markFieldTouched("telegramId")}
+                  onChange={(event) => {
+                    markFieldTouched("telegramId");
                     setForm((current) => ({
                       ...current,
                       telegramId: event.target.value,
-                    }))
-                  }
+                    }));
+                  }}
                 />
+                {telegramInputError && <small className="field-error" id="telegram-error">{telegramInputError}</small>}
                 <small>Para usuarios reales, lo ideal es conectar desde el bot con /preferencias.</small>
               </label>
             )}
@@ -331,7 +434,13 @@ export const SubscribePage = () => {
         </div>
         <div className="unsubscribe-row">
           <input
-            placeholder={form.channel === "whatsapp" ? "+59170000000" : "Telegram ID"}
+            placeholder={
+              form.channel === "whatsapp"
+                ? "+59170000000"
+                : form.channel === "email"
+                  ? "tu-correo@gmail.com"
+                  : "Telegram ID"
+            }
             type="text"
             value={unsubscribeIdentifier}
             onChange={(event) =>
@@ -353,6 +462,59 @@ export const SubscribePage = () => {
         </div>
         {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
       </section>
+
+      {isConfirmingSubscribe && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            aria-labelledby="subscribe-confirm-title"
+            aria-modal="true"
+            className="confirm-modal"
+            role="dialog"
+          >
+            <div>
+              <span className="panel-title" id="subscribe-confirm-title">
+                Confirmar suscripcion
+              </span>
+              <p>
+                Revisa tus preferencias antes de guardar. Podras cambiarlas o darte de baja cuando
+                quieras.
+              </p>
+            </div>
+            <dl className="confirm-summary">
+              <div>
+                <dt>Canal</dt>
+                <dd>{selectedChannel?.label ?? form.channel}</dd>
+              </div>
+              <div>
+                <dt>Categorias</dt>
+                <dd>{selectedCategories.map((category) => category.label).join(", ")}</dd>
+              </div>
+              <div>
+                <dt>Frecuencia</dt>
+                <dd>
+                  {options?.frequencies.find((frequency) => frequency.slug === form.frequency)?.label ??
+                    form.frequency}
+                </dd>
+              </div>
+              <div>
+                <dt>Ventana</dt>
+                <dd>
+                  {options?.preferred_times.find((time) => time.slug === form.preferredTime)?.label ??
+                    form.preferredTime}
+                </dd>
+              </div>
+            </dl>
+            <div className="form-actions">
+              <button className="secondary-button" type="button" onClick={() => setIsConfirmingSubscribe(false)}>
+                Cancelar
+              </button>
+              <button className="button" disabled={subscribeState.isLoading} type="button" onClick={handleConfirmSubscribe}>
+                {subscribeState.isLoading ? "Guardando" : "Confirmar suscripcion"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 };

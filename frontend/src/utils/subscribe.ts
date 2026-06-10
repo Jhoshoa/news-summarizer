@@ -1,7 +1,8 @@
 import type { PreferenceOptionsResponse, SubscribeRequest } from "../services/types";
 
 export type SubscribeFormState = {
-  channel: "whatsapp" | "telegram";
+  channel: "whatsapp" | "telegram" | "email";
+  email: string;
   phone: string;
   telegramId: string;
   categories: string[];
@@ -32,6 +33,46 @@ export const sanitizePhoneInput = (value: string) => {
 
 export const isValidInternationalPhone = (value: string) => /^\+\d{8,15}$/.test(normalizePhone(value));
 
+export const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+export const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalizeEmail(value));
+
+export const getSubscribeApiErrorMessage = (error: unknown) => {
+  if (!error || typeof error !== "object") {
+    return "No se pudo guardar la suscripcion. Revisa los datos e intenta de nuevo.";
+  }
+
+  const maybeError = error as {
+    data?: { detail?: unknown };
+    status?: number | string;
+  };
+  const detail = maybeError.data?.detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (item && typeof item === "object" && "msg" in item) {
+          return String((item as { msg: unknown }).msg);
+        }
+        return "";
+      })
+      .filter(Boolean);
+    if (messages.length) {
+      return messages.join(" ");
+    }
+  }
+
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (maybeError.status === 500) {
+    return "No se pudo guardar en la base de datos. Revisa que la migracion de email este aplicada.";
+  }
+
+  return "No se pudo guardar la suscripcion. Revisa los datos e intenta de nuevo.";
+};
+
 export const validateSubscribeForm = (
   form: SubscribeFormState,
   options?: PreferenceOptionsResponse,
@@ -48,6 +89,10 @@ export const validateSubscribeForm = (
 
   if (form.channel === "telegram" && !form.telegramId.trim()) {
     errors.push("Telegram requiere un identificador o usar el bot configurado.");
+  }
+
+  if (form.channel === "email" && !isValidEmail(form.email)) {
+    errors.push("Ingresa un correo electronico valido.");
   }
 
   if (!selectedCategories.length) {
@@ -80,6 +125,7 @@ export const buildSubscribePayload = (
     channel: form.channel,
     phone: form.channel === "whatsapp" ? normalizePhone(form.phone) : null,
     telegram_id: form.channel === "telegram" ? form.telegramId.trim() : null,
+    email: form.channel === "email" ? normalizeEmail(form.email) : null,
     categories,
     frequency: form.frequency,
     preferred_time: form.preferredTime,

@@ -108,9 +108,10 @@ export type PreferenceOptionsResponse = {
 };
 
 export type SubscribeRequest = {
-  channel: "whatsapp" | "telegram";
+  channel: "whatsapp" | "telegram" | "email";
   phone?: string | null;
   telegram_id?: string | null;
+  email?: string | null;
   categories: string[];
   frequency: string;
   preferred_time: string;
@@ -128,7 +129,7 @@ export type SubscribeResponse = {
 };
 
 export type UnsubscribeRequest = {
-  channel: "whatsapp" | "telegram";
+  channel: "whatsapp" | "telegram" | "email";
   identifier: string;
 };
 

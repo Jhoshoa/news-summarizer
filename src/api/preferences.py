@@ -9,12 +9,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.db.repository import DEFAULT_CATEGORIES
 
-ChannelSlug = Literal["whatsapp", "telegram"]
+ChannelSlug = Literal["whatsapp", "telegram", "email"]
 FrequencySlug = Literal["diario", "dias_habiles", "tres_veces_semana", "semanal"]
 PreferredTimeSlug = Literal["manana", "tarde", "noche"]
 
 VALID_FREQUENCIES = {"diario", "dias_habiles", "tres_veces_semana", "semanal"}
 VALID_PREFERRED_TIMES = {"manana", "tarde", "noche"}
+EMAIL_PATTERN = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 
 
 class PreferenceOption(BaseModel):
@@ -35,6 +36,7 @@ class SubscribeRequest(BaseModel):
     channel: ChannelSlug
     phone: str | None = None
     telegram_id: str | None = None
+    email: str | None = None
     categories: list[str] = Field(min_length=1)
     frequency: FrequencySlug = "diario"
     preferred_time: PreferredTimeSlug = "manana"
@@ -58,6 +60,16 @@ class SubscribeRequest(BaseModel):
     def normalize_telegram_id(cls, value: str | None) -> str | None:
         normalized = str(value or "").strip()
         return normalized or None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str | None) -> str | None:
+        normalized = str(value or "").strip().lower()
+        if not normalized:
+            return None
+        if len(normalized) > 254 or not EMAIL_PATTERN.fullmatch(normalized):
+            raise ValueError("Email invalido")
+        return normalized
 
     @field_validator("categories")
     @classmethod
@@ -89,6 +101,8 @@ class SubscribeRequest(BaseModel):
                 raise ValueError("Telefono invalido; usa formato internacional, por ejemplo +59170000000")
         if self.channel == "telegram" and not self.telegram_id:
             raise ValueError("Telegram requiere un identificador o usar el bot configurado")
+        if self.channel == "email" and not self.email:
+            raise ValueError("Email requiere un correo electronico valido")
         return self
 
 
@@ -107,16 +121,27 @@ class UnsubscribeRequest(BaseModel):
 
     @field_validator("identifier")
     @classmethod
-    def normalize_identifier(cls, value: str) -> str:
+    def strip_identifier(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
             raise ValueError("Identificador requerido")
-        normalized = re.sub(r"[\s().-]+", "", normalized)
-        if normalized.startswith("00"):
-            normalized = f"+{normalized[2:]}"
-        if normalized.isdigit():
-            normalized = f"+{normalized}"
         return normalized
+
+    @model_validator(mode="after")
+    def normalize_identifier_for_channel(self):
+        if self.channel == "whatsapp":
+            normalized = re.sub(r"[\s().-]+", "", self.identifier)
+            if normalized.startswith("00"):
+                normalized = f"+{normalized[2:]}"
+            if normalized.isdigit():
+                normalized = f"+{normalized}"
+            self.identifier = normalized
+        elif self.channel == "email":
+            normalized = self.identifier.lower()
+            if len(normalized) > 254 or not EMAIL_PATTERN.fullmatch(normalized):
+                raise ValueError("Email invalido")
+            self.identifier = normalized
+        return self
 
 
 class UnsubscribeResponse(BaseModel):
@@ -158,12 +183,23 @@ def _channel_options(app_instance: Any) -> list[PreferenceOption]:
     settings = getattr(app_instance, "settings", None)
     whatsapp_enabled = bool(getattr(settings, "twilio_account_sid", None))
     telegram_enabled = bool(getattr(settings, "telegram_bot_token", None))
+    email_enabled = bool(getattr(settings, "email_enabled", False))
     return [
+        PreferenceOption(
+            slug="email",
+            label="Email",
+            enabled=True,
+            note=None if email_enabled else "Guardado disponible; envio requiere SMTP configurado.",
+        ),
         PreferenceOption(
             slug="whatsapp",
             label="WhatsApp",
             enabled=True,
-            note=None if whatsapp_enabled else "Guardado disponible; envio requiere Twilio configurado.",
+            note=(
+                "Disponible para demo; envio real requiere Twilio configurado."
+                if not whatsapp_enabled
+                else "Disponible para demo inicial; puede requerir plan premium despues."
+            ),
         ),
         PreferenceOption(
             slug="telegram",
@@ -211,6 +247,7 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         saved = await app_instance.db.save_subscription(
             phone=request.phone if request.channel == "whatsapp" else None,
             telegram_id=request.telegram_id if request.channel == "telegram" else None,
+            email=request.email if request.channel == "email" else None,
             channel=request.channel,
             categories=set(request.categories),
             frequency=request.frequency,

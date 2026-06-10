@@ -46,6 +46,16 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_url: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_URL")
 
+    email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
+    email_provider: str = Field(default="smtp", alias="EMAIL_PROVIDER")
+    smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_username: str | None = Field(default=None, alias="SMTP_USERNAME")
+    smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
+    smtp_from_email: str | None = Field(default=None, alias="SMTP_FROM_EMAIL")
+    smtp_from_name: str = Field(default="EcoBrief Bolivia", alias="SMTP_FROM_NAME")
+    email_require_verification: bool = Field(default=False, alias="EMAIL_REQUIRE_VERIFICATION")
+
     database_url: str = Field(
         default="postgresql+asyncpg://user:pass@localhost:5433/news_summarizer",
         alias="DATABASE_URL",

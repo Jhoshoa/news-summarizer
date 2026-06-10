@@ -50,6 +50,8 @@ class Subscriber(Base):
     id = Column(Integer, primary_key=True)
     phone = Column(String(50), nullable=True, unique=True, index=True)
     telegram_id = Column(String(50), nullable=True, unique=True, index=True)
+    email = Column(String(255), nullable=True, unique=True, index=True)
+    email_verified = Column(Boolean, nullable=False, default=False)
     channel = Column(String(20), nullable=False, default="whatsapp")
     categories = Column(JSON, nullable=False, default=list)
     frequency = Column(String(20), nullable=False, default="diario")
@@ -67,7 +69,7 @@ class Subscriber(Base):
     unsubscribed_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
-        return f"<Subscriber {self.phone or self.telegram_id} active={self.is_active}>"
+        return f"<Subscriber {self.phone or self.telegram_id or self.email} active={self.is_active}>"
 
 
 class NewsCategory(Base):
@@ -227,6 +229,7 @@ class Database:
         self,
         phone: str | None = None,
         telegram_id: str | None = None,
+        email: str | None = None,
         channel: str = "whatsapp",
         categories: set[str] | None = None,
         frequency: str = "diario",
@@ -236,16 +239,19 @@ class Database:
     ) -> bool:
         """Guarda o actualiza una suscripcion."""
 
-        if not phone and not telegram_id:
-            logger.error("Se requiere phone o telegram_id")
+        if not phone and not telegram_id and not email:
+            logger.error("Se requiere phone, telegram_id o email")
             return False
 
         async with self.session_maker() as session:
-            subscriber = await self._find_subscriber(session, phone, telegram_id)
+            subscriber = await self._find_subscriber(session, phone, telegram_id, email)
 
             if subscriber:
                 if categories:
                     subscriber.categories = sorted(categories)
+                subscriber.phone = phone
+                subscriber.telegram_id = telegram_id
+                subscriber.email = email
                 subscriber.channel = channel
                 subscriber.frequency = frequency
                 subscriber.preferred_time = preferred_time
@@ -254,11 +260,12 @@ class Database:
                 subscriber.updated_at = datetime.utcnow()
                 subscriber.is_active = True
                 subscriber.unsubscribed_at = None
-                logger.info(f"Actualizada suscripcion: {phone or telegram_id}")
+                logger.info(f"Actualizada suscripcion: {phone or telegram_id or email}")
             else:
                 subscriber = Subscriber(
                     phone=phone,
                     telegram_id=telegram_id,
+                    email=email,
                     channel=channel,
                     categories=sorted(categories) if categories else ["general"],
                     frequency=frequency,
@@ -267,7 +274,7 @@ class Database:
                     consent_accepted=consent_accepted,
                 )
                 session.add(subscriber)
-                logger.info(f"Nueva suscripcion: {phone or telegram_id}")
+                logger.info(f"Nueva suscripcion: {phone or telegram_id or email}")
 
             await session.commit()
             return True
@@ -309,6 +316,7 @@ class Database:
                 .where(
                     (Subscriber.phone == identifier)
                     | (Subscriber.telegram_id == identifier)
+                    | (Subscriber.email == identifier)
                 )
                 .values(
                     is_active=False,
@@ -1644,12 +1652,15 @@ class Database:
         session: AsyncSession,
         phone: str | None,
         telegram_id: str | None,
+        email: str | None,
     ) -> Subscriber | None:
         filters = []
         if phone:
             filters.append(Subscriber.phone == phone)
         if telegram_id:
             filters.append(Subscriber.telegram_id == telegram_id)
+        if email:
+            filters.append(Subscriber.email == email)
 
         if not filters:
             return None

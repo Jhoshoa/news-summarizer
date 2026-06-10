@@ -1434,10 +1434,27 @@ p {
   outline: none;
 }
 
+.form-field input.invalid,
+.form-field select.invalid {
+  border-color: rgba(169, 65, 56, 0.72);
+  background: var(--color-accent-soft);
+}
+
+.form-field input.invalid:focus,
+.form-field select.invalid:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(169, 65, 56, 0.12);
+}
+
 .form-field small,
 .subscribe-preview-panel small {
   color: var(--color-muted);
   font-size: var(--text-xs);
+}
+
+.form-field .field-error {
+  color: var(--color-accent);
+  font-weight: 700;
 }
 
 .segmented-options,
@@ -1566,6 +1583,96 @@ p {
   color: var(--color-primary-dark);
   font-size: var(--text-sm);
   font-weight: 700;
+}
+
+.toast {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(360px, calc(100vw - 32px));
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-subtle);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.toast.error {
+  border-left-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.toast button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(33, 25, 20, 0.42);
+}
+
+.confirm-modal {
+  display: grid;
+  gap: 16px;
+  width: min(520px, 100%);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-shell);
+}
+
+.confirm-modal p {
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.confirm-summary {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.confirm-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.confirm-summary dt {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.confirm-summary dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: right;
 }
 
 .preview-list {

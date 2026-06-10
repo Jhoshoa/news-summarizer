@@ -1,0 +1,72 @@
+from email.message import EmailMessage
+from types import SimpleNamespace
+
+import pytest
+
+from src.distributors.email_handler import EmailHandler
+
+
+def _settings(**overrides):
+    base = {
+        "email_enabled": True,
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_username": "sender@example.com",
+        "smtp_password": "app-password",
+        "smtp_from_email": "sender@example.com",
+        "smtp_from_name": "EcoBrief Bolivia",
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def test_email_handler_requires_full_smtp_configuration():
+    handler = EmailHandler(settings=_settings(smtp_password=None))
+
+    assert handler.is_configured is False
+
+
+def test_email_handler_builds_plain_text_message():
+    handler = EmailHandler(settings=_settings())
+
+    message = handler._build_message(
+        "reader@example.com",
+        "EcoBrief Bolivia - Brief del dia",
+        "Contenido",
+    )
+
+    assert isinstance(message, EmailMessage)
+    assert message["Subject"] == "EcoBrief Bolivia - Brief del dia"
+    assert message["From"] == "EcoBrief Bolivia <sender@example.com>"
+    assert message["To"] == "reader@example.com"
+    assert message.get_content().strip() == "Contenido"
+
+
+@pytest.mark.asyncio
+async def test_email_handler_sends_with_configured_smtp(monkeypatch):
+    sent_messages = []
+    handler = EmailHandler(settings=_settings())
+
+    def fake_send(message):
+        sent_messages.append(message)
+
+    monkeypatch.setattr(handler, "_send_sync", fake_send)
+
+    result = await handler.send_message("reader@example.com", "Asunto", "Contenido")
+
+    assert result is True
+    assert sent_messages[0]["To"] == "reader@example.com"
+
+
+@pytest.mark.asyncio
+async def test_email_handler_does_not_send_when_disabled(monkeypatch):
+    handler = EmailHandler(settings=_settings(email_enabled=False))
+
+    def fail_send(message):
+        raise AssertionError("SMTP should not be called")
+
+    monkeypatch.setattr(handler, "_send_sync", fail_send)
+
+    result = await handler.send_message("reader@example.com", "Asunto", "Contenido")
+
+    assert result is False

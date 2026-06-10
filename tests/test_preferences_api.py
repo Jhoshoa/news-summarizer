@@ -43,6 +43,7 @@ def fake_app_instance():
         settings=SimpleNamespace(
             telegram_bot_token=None,
             twilio_account_sid=None,
+            email_enabled=False,
         ),
     )
     try:
@@ -62,10 +63,12 @@ async def test_preference_options_returns_categories_channels_and_frequencies(fa
     assert {"slug": "economia", "label": "Economia", "enabled": True, "note": None} in payload[
         "categories"
     ]
-    assert payload["channels"][0]["slug"] == "whatsapp"
+    assert payload["channels"][0]["slug"] == "email"
     assert payload["channels"][0]["enabled"] is True
-    assert payload["channels"][1]["slug"] == "telegram"
-    assert payload["channels"][1]["enabled"] is False
+    assert payload["channels"][1]["slug"] == "whatsapp"
+    assert payload["channels"][1]["enabled"] is True
+    assert payload["channels"][2]["slug"] == "telegram"
+    assert payload["channels"][2]["enabled"] is False
     assert {item["slug"] for item in payload["frequencies"]} == {
         "diario",
         "dias_habiles",
@@ -100,6 +103,7 @@ async def test_subscribe_saves_normalized_whatsapp_preferences(fake_app_instance
         {
             "phone": "+59170000000",
             "telegram_id": None,
+            "email": None,
             "channel": "whatsapp",
             "categories": {"economia", "politica"},
             "frequency": "diario",
@@ -121,6 +125,57 @@ async def test_subscribe_rejects_missing_consent(fake_app_instance):
                 "phone": "+59170000000",
                 "categories": ["economia"],
                 "consent_accepted": False,
+            },
+        )
+
+    assert response.status_code == 422
+    assert fake_app_instance.saved == []
+
+
+@pytest.mark.asyncio
+async def test_subscribe_saves_normalized_email_preferences(fake_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/subscribe",
+            json={
+                "channel": "email",
+                "email": " Persona@Example.COM ",
+                "categories": ["general"],
+                "frequency": "semanal",
+                "preferred_time": "noche",
+                "timezone": "America/La_Paz",
+                "consent_accepted": True,
+            },
+        )
+
+    assert response.status_code == 200
+    assert fake_app_instance.saved == [
+        {
+            "phone": None,
+            "telegram_id": None,
+            "email": "persona@example.com",
+            "channel": "email",
+            "categories": {"general"},
+            "frequency": "semanal",
+            "preferred_time": "noche",
+            "timezone": "America/La_Paz",
+            "consent_accepted": True,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_subscribe_rejects_invalid_email(fake_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/subscribe",
+            json={
+                "channel": "email",
+                "email": "bad",
+                "categories": ["general"],
+                "consent_accepted": True,
             },
         )
 
@@ -158,6 +213,19 @@ async def test_unsubscribe_is_idempotent_and_normalizes_phone(fake_app_instance)
     assert response.status_code == 200
     assert response.json()["status"] == "unsubscribed"
     assert fake_app_instance.unsubscribed == ["+59170000000"]
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_normalizes_email_without_stripping_dots(fake_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/unsubscribe",
+            json={"channel": "email", "identifier": " Persona.Name@Example.COM "},
+        )
+
+    assert response.status_code == 200
+    assert fake_app_instance.unsubscribed == ["persona.name@example.com"]
 
 
 @pytest.mark.asyncio
