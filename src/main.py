@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import FastAPI, HTTPException
 from loguru import logger
@@ -345,6 +346,15 @@ class NewsSummarizerApp:
 
         for sub in subscribers:
             try:
+                if not self._should_send_to_subscriber(sub, time_of_day):
+                    logger.info(
+                        "Skipping subscriber outside preferences: "
+                        f"channel={getattr(sub, 'channel', None)} "
+                        f"preferred_time={getattr(sub, 'preferred_time', None)} "
+                        f"frequency={getattr(sub, 'frequency', None)}"
+                    )
+                    continue
+
                 user_categories = sub.categories or categories
                 user_news = [n for n in summaries if n.get("category") in user_categories]
                 user_news = self._deduplicate_summaries_for_delivery(user_news)
@@ -560,7 +570,8 @@ class NewsSummarizerApp:
     def _format_summary(self, news: list[dict]) -> str:
         """Formats the summary for delivery."""
 
-        text = "Resumen de Hoy - Bolivia\n\n"
+        text = "EcoBrief Bolivia - Brief del dia\n\n"
+        text += "Noticias locales resumidas con menos ruido.\n\n"
 
         for i, article in enumerate(news, 1):
             title = article.get("title", "")[:80]
@@ -577,6 +588,49 @@ class NewsSummarizerApp:
         text += "/preferencias | /cancelar"
 
         return text
+
+    def _should_send_to_subscriber(self, subscriber: Any, time_of_day: str) -> bool:
+        if time_of_day == "manual":
+            return True
+
+        if not self._matches_preferred_time(subscriber, time_of_day):
+            return False
+
+        return self._matches_frequency(subscriber)
+
+    def _matches_preferred_time(self, subscriber: Any, time_of_day: str) -> bool:
+        preferred_time = str(getattr(subscriber, "preferred_time", "manana") or "manana").lower()
+        if time_of_day == "morning":
+            return preferred_time == "manana"
+        if time_of_day == "evening":
+            return preferred_time in {"tarde", "noche"}
+        return True
+
+    def _matches_frequency(self, subscriber: Any) -> bool:
+        frequency = str(getattr(subscriber, "frequency", "diario") or "diario").lower()
+        local_date = self._subscriber_local_now(subscriber).date()
+        weekday = local_date.weekday()
+
+        if frequency == "diario":
+            return True
+        if frequency == "dias_habiles":
+            return weekday < 5
+        if frequency == "tres_veces_semana":
+            return weekday in {0, 2, 4}
+        if frequency == "semanal":
+            return weekday == 0
+        return True
+
+    def _subscriber_local_now(self, subscriber: Any) -> datetime:
+        timezone_name = str(
+            getattr(subscriber, "timezone", None)
+            or getattr(self.settings, "schedule_timezone", "America/La_Paz")
+            or "America/La_Paz"
+        )
+        try:
+            return datetime.now(ZoneInfo(timezone_name))
+        except ZoneInfoNotFoundError:
+            return datetime.now(ZoneInfo("America/La_Paz"))
 
     def _deduplicate_summaries_for_delivery(self, summaries: list[dict]) -> list[dict]:
         unique: list[dict] = []

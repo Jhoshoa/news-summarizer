@@ -52,8 +52,8 @@ class TelegramHandler:
         return await self._handle_selection(update, context, chat_id, text)
 
     async def _handle_start(self, update, context) -> str:
-        text = "*NewsDaily Bolivia*\n\n"
-        text += "Resumen de noticias diarias de Bolivia\n\n"
+        text = "*EcoBrief Bolivia*\n\n"
+        text += "Briefs de noticias bolivianas con menos ruido y segun tus preferencias.\n\n"
         text += "Selecciona las categorias que te interesan:"
 
         await update.message.reply_text(text, parse_mode="Markdown")
@@ -96,12 +96,12 @@ class TelegramHandler:
             await self.db.unsubscribe(chat_id)
 
         await update.message.reply_text(
-            "Te has dado de baja. Para volver: /preferencias"
+            "Te has dado de baja de EcoBrief Bolivia. Para volver: /preferencias"
         )
         return "Dado de baja"
 
     async def _handle_help(self, update, context) -> str:
-        text = "*Ayuda*\n\n"
+        text = "*Ayuda EcoBrief Bolivia*\n\n"
         text += "/start - Iniciar suscripcion\n"
         text += "/preferencias - Cambiar categorias\n"
         text += "/cancelar - Darse de baja\n"
@@ -143,8 +143,8 @@ class TelegramHandler:
             for key in sorted(selected_keys)
         ]
 
-        text = "*Guardado!*\n\n"
-        text += "Te enviare resumenes de:\n"
+        text = "*Preferencias guardadas en EcoBrief Bolivia*\n\n"
+        text += "Te enviare briefs de:\n"
         for name in names:
             text += f"- {name}\n"
 
@@ -179,7 +179,8 @@ class TelegramHandler:
     def _format_summary(self, news: list[dict]) -> str:
         """Formatea el resumen para Telegram."""
 
-        text = "*Resumen de Hoy - Bolivia*\n\n"
+        text = "*EcoBrief Bolivia - Brief del dia*\n\n"
+        text += "Noticias locales resumidas con menos ruido.\n\n"
 
         for i, article in enumerate(news[:10], 1):
             text += f"{i}. *{article.get('title', '')}*\n"

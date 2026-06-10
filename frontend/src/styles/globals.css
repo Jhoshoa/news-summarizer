@@ -1402,6 +1402,7 @@ p {
 
 .form-field {
   display: grid;
+  align-content: start;
   gap: 7px;
   min-width: 0;
 }

@@ -65,8 +65,8 @@ class WhatsAppHandler:
         return self._handle_selection(from_number, body)
 
     def _handle_start(self, from_number: str) -> str:
-        text = "*NewsDaily Bolivia*\n\n"
-        text += "Resumen de noticias diarias de Bolivia\n\n"
+        text = "*EcoBrief Bolivia*\n\n"
+        text += "Briefs de noticias bolivianas con menos ruido y segun tus preferencias.\n\n"
         text += "Selecciona las categorias que te interesan:\n\n"
 
         for key, cat in self.CATEGORIES.items():
@@ -84,10 +84,10 @@ class WhatsAppHandler:
         if self.db:
             asyncio.create_task(self.db.unsubscribe(from_number))
 
-        return "Te has dado de baja. Para volver a suscribirte, envia Hola."
+        return "Te has dado de baja de EcoBrief Bolivia. Para volver a suscribirte, envia Hola."
 
     def _handle_help(self, from_number: str) -> str:
-        text = "*Ayuda*\n\n"
+        text = "*Ayuda EcoBrief Bolivia*\n\n"
         text += "Hola - Iniciar suscripcion\n"
         text += "1,2,3... - Seleccionar categorias\n"
         text += "6 - Todas las categorias\n"
@@ -128,8 +128,8 @@ class WhatsAppHandler:
             for key in sorted(selected_keys)
         ]
 
-        text = "*Guardado!*\n\n"
-        text += "Te enviare resumenes de:\n"
+        text = "*Preferencias guardadas en EcoBrief Bolivia*\n\n"
+        text += "Te enviare briefs de:\n"
         for name in names:
             text += f"- {name}\n"
 
@@ -172,7 +172,8 @@ class WhatsAppHandler:
     def _format_summary(self, news: list[dict]) -> str:
         """Formatea el resumen para WhatsApp."""
 
-        text = "*Resumen de Hoy - Bolivia*\n\n"
+        text = "*EcoBrief Bolivia - Brief del dia*\n\n"
+        text += "Noticias locales resumidas con menos ruido.\n\n"
 
         for i, article in enumerate(news[:10], 1):
             text += f"{i}. *{article.get('title', '')}*\n"

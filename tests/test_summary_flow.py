@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -61,6 +62,37 @@ class FakeLLM:
           }
         ]
         """
+
+
+class CachedSummaryDatabase(FakeDatabase):
+    def __init__(self, summaries, subscribers):
+        super().__init__()
+        self.summaries = summaries
+        self.subscribers = subscribers
+
+    async def get_recent_summaries(self, categories):
+        return self.summaries
+
+    async def get_active_subscribers(self):
+        return self.subscribers
+
+
+class FakeWhatsApp:
+    def __init__(self):
+        self.sent = []
+
+    def send_message(self, phone, message):
+        self.sent.append((phone, message))
+        return True
+
+
+class FakeTelegram:
+    def __init__(self):
+        self.sent = []
+
+    async def send_message(self, telegram_id, message):
+        self.sent.append((telegram_id, message))
+        return True
 
 
 @pytest.mark.asyncio
@@ -364,3 +396,129 @@ def test_summaries_are_deduplicated_by_story_cluster_for_storage_and_delivery():
         "Tercera version.",
     ]
     assert [summary["summary"] for summary in delivery_result] == ["Primer resumen."]
+
+
+@pytest.mark.asyncio
+async def test_morning_delivery_respects_preferred_time():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+    )
+    summaries = [
+        {
+            "title": "Titulo",
+            "summary": "Resumen politico.",
+            "category": "politica",
+        }
+    ]
+    subscribers = [
+        SimpleNamespace(
+            channel="whatsapp",
+            phone="+59170000001",
+            telegram_id=None,
+            categories=["politica"],
+            frequency="diario",
+            preferred_time="manana",
+            timezone="America/La_Paz",
+        ),
+        SimpleNamespace(
+            channel="whatsapp",
+            phone="+59170000002",
+            telegram_id=None,
+            categories=["politica"],
+            frequency="diario",
+            preferred_time="noche",
+            timezone="America/La_Paz",
+        ),
+    ]
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(summaries, subscribers)
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+
+    result = await app.send_summaries("morning")
+
+    assert result["sent"] == 1
+    assert app.whatsapp.sent == [
+        (
+            "+59170000001",
+            "EcoBrief Bolivia - Brief del dia\n\n"
+            "Noticias locales resumidas con menos ruido.\n\n"
+            "1. Titulo\n"
+            "   Resumen politico.\n\n"
+            "---\n"
+            "/preferencias | /cancelar",
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_weekly_frequency_only_sends_on_monday():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+    )
+    subscriber = SimpleNamespace(
+        channel="whatsapp",
+        phone="+59170000001",
+        telegram_id=None,
+        categories=["politica"],
+        frequency="semanal",
+        preferred_time="manana",
+        timezone="America/La_Paz",
+    )
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(
+        [{"title": "Titulo", "summary": "Resumen politico.", "category": "politica"}],
+        [subscriber],
+    )
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+    app._subscriber_local_now = lambda _subscriber: datetime(2026, 6, 9, 8, 0)
+
+    result = await app.send_summaries("morning")
+
+    assert result["sent"] == 0
+    assert app.whatsapp.sent == []
+
+    app._subscriber_local_now = lambda _subscriber: datetime(2026, 6, 8, 8, 0)
+    result = await app.send_summaries("morning")
+
+    assert result["sent"] == 1
+    assert len(app.whatsapp.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_manual_delivery_ignores_frequency_and_preferred_time_for_demo():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+    )
+    subscriber = SimpleNamespace(
+        channel="whatsapp",
+        phone="+59170000001",
+        telegram_id=None,
+        categories=["politica"],
+        frequency="semanal",
+        preferred_time="noche",
+        timezone="America/La_Paz",
+    )
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(
+        [{"title": "Titulo", "summary": "Resumen politico.", "category": "politica"}],
+        [subscriber],
+    )
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+    app._subscriber_local_now = lambda _subscriber: datetime(2026, 6, 9, 8, 0)
+
+    result = await app.send_summaries("manual")
+
+    assert result["sent"] == 1
+    assert len(app.whatsapp.sent) == 1
