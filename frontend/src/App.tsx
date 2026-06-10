@@ -9,6 +9,8 @@ import { NewsPage } from "./pages/NewsPage";
 import { SubscribePage } from "./pages/SubscribePage";
 import { getNavigationState } from "./utils/navigation";
 
+const manualRefreshEnabled = import.meta.env.VITE_ENABLE_MANUAL_REFRESH === "true";
+
 const App = () => {
   const { location } = useRouter();
   const { isRefreshing, onRefresh } = useRefreshControlContext();
@@ -40,8 +42,8 @@ const App = () => {
       backFallback={navigationState.backFallback}
       breadcrumbs={navigationState.breadcrumbs}
       compactHeader={compactHeader}
-      isRefreshing={isRefreshing}
-      onRefresh={onRefresh}
+      isRefreshing={manualRefreshEnabled ? isRefreshing : false}
+      onRefresh={manualRefreshEnabled ? onRefresh : undefined}
     >
       {page}
     </AppShell>

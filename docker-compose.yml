@@ -18,5 +18,30 @@ services:
       timeout: 5s
       retries: 5
 
+  cron-job:
+    build:
+      context: ./cron-job
+    container_name: news-summarizer-cron
+    profiles:
+      - jobs
+    environment:
+      BACKEND_BASE_URL: ${CRON_BACKEND_BASE_URL:-http://backend:8000}
+      API_AUTH_KEY: ${API_AUTH_KEY:-change-me-local-api-auth-key}
+      RUN_ONCE: ${CRON_RUN_ONCE:-false}
+      ECONOMIC_REFRESH_EVERY: ${CRON_ECONOMIC_REFRESH_EVERY:-1}
+      ECONOMIC_REFRESH_UNIT: ${CRON_ECONOMIC_REFRESH_UNIT:-hours}
+      SUMMARY_REFRESH_EVERY: ${CRON_SUMMARY_REFRESH_EVERY:-3}
+      SUMMARY_REFRESH_UNIT: ${CRON_SUMMARY_REFRESH_UNIT:-hours}
+      ECONOMIC_REQUEST_TIMEOUT_SECONDS: ${CRON_ECONOMIC_REQUEST_TIMEOUT_SECONDS:-60}
+      SUMMARY_REQUEST_TIMEOUT_SECONDS: ${CRON_SUMMARY_REQUEST_TIMEOUT_SECONDS:-180}
+      REQUEST_TIMEOUT_SECONDS: ${CRON_REQUEST_TIMEOUT_SECONDS:-180}
+      REQUEST_RETRIES: ${CRON_REQUEST_RETRIES:-2}
+      SUMMARY_TIME_OF_DAY: ${CRON_SUMMARY_TIME_OF_DAY:-manual}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:

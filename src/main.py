@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from loguru import logger
 
 from src.api import (
@@ -20,6 +20,7 @@ from src.api import (
     create_summaries_router,
     create_weather_router,
 )
+from src.api.security import require_cron_key
 from src.collectors import NewsAPICollector, NewsScraper
 from src.config import Settings, get_settings
 from src.db import Database
@@ -737,14 +738,28 @@ async def whatsapp_webhook(sender: str = None, body: str = None):
 
 
 @app.post("/trigger/summary")
-async def trigger_summary(time_of_day: str = "manual", refresh: bool = False):
+async def trigger_summary(
+    time_of_day: str = "manual",
+    refresh: bool = False,
+    x_api_key: str | None = Header(
+        default=None,
+        alias="X-API-Key",
+        description="Clave privada para endpoints internos.",
+    ),
+):
     """Endpoint to trigger the summary manually."""
 
     if not app_instance:
         raise HTTPException(status_code=500, detail="App no inicializada")
+    await require_cron_key(app_instance, x_api_key)
 
     try:
         result = await app_instance.send_summaries(time_of_day, refresh=refresh)
+        logger.info(
+            "Manual summary refresh completed: "
+            f"collected={result.get('collected')} processed={result.get('processed')} "
+            f"summaries={result.get('summaries')} sent={result.get('sent')}"
+        )
         return {
             "status": "success",
             "message": f"Resumen {time_of_day} procesado",
