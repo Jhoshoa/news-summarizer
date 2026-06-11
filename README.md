@@ -277,3 +277,6 @@ Check:
 - Redis is not required unless future queueing, caching, rate limiting, or distributed scheduling is added.
 - `requirements-dev.txt` is optional and exists for linting, typing, tests, and local development checks.
 - Do not commit real `.env` secrets.
+
+### Port fordwarding
+https://c1jx73qz-5173.brs.devtunnels.ms/
