@@ -23,7 +23,7 @@ sources:
     selector: "article, .noticia-item, .news-item"
     title_selector: "h2 a, h3 a, .title a"
     url_selector: "a"
-    date_selector: ".fecha, .date, time"
+    date_selector: ".vu-td-fdp, .fecha, .date, time"
     image_selector: "img"
     body_selector: "main article p, main section p, .article-body p, .nota-contenido p, .news-detail p"
     enabled: true
@@ -36,7 +36,7 @@ sources:
     selector: "article.nota, article.nota_gen, article.nota--general"
     title_selector: "div.titulo a, h2 a, h2"
     url_selector: "div.titulo a"
-    date_selector: "input.nota_fecha_input"
+    date_selector: "input.nota_fecha_input, .autor-fecha .fecha, .autor .fecha, .fecha"
     date_attr: "data-fecha-a"
     image_selector: "figure.nota__media img"
     body_selector: ".body__cuerpo p, .contenedor.body p, .item.is-body .body__cuerpo p, main article p, article p, .nota__body p, .nota-contenido p, .nota__content p, .content_nota p"
@@ -52,19 +52,36 @@ sources:
     selector: "article, .noticia-item, .news-item"
     title_selector: "h2 a, h3 a"
     url_selector: "a"
-    date_selector: ".fecha, time"
+    date_selector: ".single-layout__meta-date, .fecha, time"
     image_selector: "img"
     body_selector: "article .entry-content p, article .post-content p, .entry-content p, .post-content p, article p, main p"
     enabled: true
 
-# Fuentes adicionales (opcionales)
-additional_sources:
+  # Los Tiempos
   - name: "LosTiempos"
-    url: "https://www.lostiempos.com/"
+    url: "https://www.lostiempos.com/actualidad"
     category: "general"
-    enabled: false
-    
+    country: "bolivia"
+    selector: ".views-row"
+    title_selector: ".views-field-title a, h2 a, h3 a"
+    url_selector: ".views-field-title a, a"
+    date_selector: ".date-publish, time"
+    image_selector: "img"
+    body_selector: "article p, main article p, .field--name-body p, .node__content p"
+    enabled: true
+
+  # El Deber
   - name: "ElDeber"
-    url: "https://eldeber.com.bo/"
+    url: "https://eldeber.com.bo/ultimas-noticias"
     category: "general"
-    enabled: false
+    country: "bolivia"
+    selector: "article.nota"
+    title_selector: ".nota__titulo-item a, h2 a, h3 a"
+    url_selector: ".nota__titulo-item a, a"
+    date_selector: ".articulo__fecha, time"
+    image_selector: "img"
+    body_selector: "article p, main article p, .articulo__contenido p, .article-content p"
+    enabled: true
+
+# Fuentes adicionales (opcionales)
+additional_sources: []

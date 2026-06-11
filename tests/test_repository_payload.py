@@ -225,6 +225,13 @@ def test_build_impact_metrics_payload_includes_real_pipeline_fields():
     assert response["cache_reused"] is True
 
 
+def test_impact_summary_count_prefers_stored_daily_total_over_latest_run_count():
+    db = object.__new__(Database)
+
+    assert db._impact_summary_count(stored_summaries=28, run_summaries=5) == 28
+    assert db._impact_summary_count(stored_summaries=0, run_summaries=5) == 5
+
+
 def test_build_impact_metrics_payload_handles_empty_data_without_division_by_zero():
     db = object.__new__(Database)
 

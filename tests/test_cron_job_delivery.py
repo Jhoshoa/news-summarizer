@@ -2,12 +2,14 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import httpx
 import pytest
 
 CRON_SRC = Path(__file__).resolve().parents[1] / "cron-job" / "src"
 if str(CRON_SRC) not in sys.path:
     sys.path.insert(0, str(CRON_SRC))
 
+from news_cron.clients.backend import BackendClient, BackendRequestError  # noqa: E402
 from news_cron.config.settings import CronSettings  # noqa: E402
 from news_cron.jobs.runner import RefreshJobRunner  # noqa: E402
 
@@ -70,6 +72,56 @@ async def test_cron_delivery_window_uses_delivery_endpoint(monkeypatch):
     await runner.run_delivery_window("afternoon")
 
     assert calls == [("/trigger/delivery?time_of_day=afternoon", 45)]
+
+
+@pytest.mark.asyncio
+async def test_backend_client_turns_backend_down_into_controlled_error():
+    settings = SimpleNamespace(
+        backend_base_url="http://backend:8000",
+        api_auth_key="test-api-auth-key-value",
+        request_retries=0,
+    )
+    client = BackendClient(settings)
+
+    async def handler(request):
+        raise httpx.ConnectError("All connection attempts failed", request=request)
+
+    await client.client.aclose()
+    client.client = httpx.AsyncClient(
+        base_url=settings.backend_base_url,
+        transport=httpx.MockTransport(handler),
+    )
+
+    try:
+        with pytest.raises(BackendRequestError) as exc_info:
+            await client.post_json("/api/economic-indicators/refresh", timeout_seconds=10)
+
+        assert exc_info.value.path == "/api/economic-indicators/refresh"
+        assert exc_info.value.attempts == 1
+        assert isinstance(exc_info.value.last_error, httpx.ConnectError)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_run_safely_logs_controlled_backend_failure_without_traceback(caplog):
+    runner = RefreshJobRunner.__new__(RefreshJobRunner)
+    error = BackendRequestError(
+        "/trigger/summary?time_of_day=manual&refresh=true",
+        3,
+        httpx.ConnectError("All connection attempts failed"),
+    )
+
+    async def failing_job():
+        raise error
+
+    with caplog.at_level("ERROR", logger="news_summarizer_cron"):
+        ok = await runner._run_safely("summary_refresh", failing_job())
+
+    assert ok is False
+    assert "job failed name=summary_refresh" in caplog.text
+    assert "Traceback" not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)
 
 
 def test_cron_delivery_time_accepts_blank_to_disable_window(monkeypatch):

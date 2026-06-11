@@ -12,6 +12,19 @@ from news_cron.utils import utc_now
 LOGGER = logging.getLogger("news_summarizer_cron")
 
 
+class BackendRequestError(RuntimeError):
+    """Raised when the backend request fails after configured retries."""
+
+    def __init__(self, path: str, attempts: int, last_error: Exception | None):
+        self.path = path
+        self.attempts = attempts
+        self.last_error = last_error
+        detail = str(last_error) if last_error else "unknown error"
+        super().__init__(
+            f"backend request failed after {attempts} attempts path={path} error={detail}"
+        )
+
+
 class BackendClient:
     def __init__(self, settings: CronSettings):
         self.settings = settings
@@ -57,4 +70,4 @@ class BackendClient:
                 if attempt < attempts:
                     await asyncio.sleep(min(2**attempt, 30))
 
-        raise RuntimeError(f"request failed after {attempts} attempts: {path}") from last_error
+        raise BackendRequestError(path, attempts, last_error) from last_error

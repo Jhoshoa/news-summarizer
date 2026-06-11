@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from news_cron.clients import BackendClient
+from news_cron.clients.backend import BackendRequestError
 from news_cron.config import CronSettings
 from news_cron.utils import utc_now
 
@@ -152,6 +153,9 @@ class RefreshJobRunner:
         try:
             await task
             return True
+        except BackendRequestError as exc:
+            LOGGER.error("job failed name=%s error=%s", name, exc)
+            return False
         except Exception:
-            LOGGER.exception("job failed name=%s", name)
+            LOGGER.exception("job failed unexpectedly name=%s", name)
             return False

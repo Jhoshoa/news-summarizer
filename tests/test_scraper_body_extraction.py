@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 import pytest
@@ -196,6 +196,69 @@ def test_extract_body_content_uses_readable_text_fallback_after_title():
     assert "newsletter" not in content
 
 
+@pytest.mark.asyncio
+async def test_unitel_listing_date_skips_non_today_detail_fetch():
+    scraper = NewsScraper(sources=[])
+    today = datetime.now()
+    yesterday = today - timedelta(days=1)
+    source = NewsSource(
+        name="Unitel",
+        url="https://unitel.bo/",
+        selector="article",
+        title_selector="h2 a",
+        url_selector="h2 a",
+        date_selector=".vu-td-fdp, .fecha, .date, time",
+        body_selector="main article p",
+    )
+    requested_urls = []
+
+    listing_html = f"""
+        <html>
+          <body>
+            <article>
+              <span class="vu-td-fdp">Publicacion: {today:%d/%m/%Y %H:%M}</span>
+              <h2><a href="/noticias/hoy">Noticia actual de Unitel con fecha de hoy</a></h2>
+            </article>
+            <article>
+              <span class="vu-td-fdp">Publicacion: {yesterday:%d/%m/%Y %H:%M}</span>
+              <h2><a href="/noticias/ayer">Noticia antigua de Unitel con fecha de ayer</a></h2>
+            </article>
+          </body>
+        </html>
+    """
+    detail_html = f"""
+        <html>
+          <body>
+            <span class="vu-td-fdp">Publicacion: {today:%d/%m/%Y %H:%M}</span>
+            <main>
+              <article>
+                <p>Contenido suficiente para una noticia real de Unitel recolectada hoy.</p>
+                <p>Segundo parrafo con contexto adicional para superar validaciones del scraper.</p>
+              </article>
+            </main>
+          </body>
+        </html>
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        if str(request.url) == "https://unitel.bo/":
+            return httpx.Response(200, text=listing_html)
+        return httpx.Response(200, text=detail_html)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        follow_redirects=True,
+    ) as client:
+        articles = await scraper._scrape_source(client, source)
+
+    assert [article["title"] for article in articles] == [
+        "Noticia actual de Unitel con fecha de hoy"
+    ]
+    assert "https://unitel.bo/noticias/hoy" in requested_urls
+    assert "https://unitel.bo/noticias/ayer" not in requested_urls
+
+
 def test_reduno_fallback_skips_related_blocks_but_keeps_later_body():
     scraper = NewsScraper(sources=[])
     source = NewsSource(
@@ -350,6 +413,339 @@ def test_reduno_listing_extracts_current_article_card_markup():
         "https://www.reduno.com.bo/noticias/magisterio-ratifica-paro-2026510124459"
     )
     assert article["image"] == "https://www.reduno.com.bo/uploads/reduno.jpg"
+    assert article["published_at"] == datetime(2026, 5, 10, 12, 44)
+
+
+def test_reduno_date_parser_uses_bolivian_day_first_format():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._parse_date("09/06/2026 8:57")
+
+    assert parsed == datetime(2026, 6, 9, 8, 57)
+
+
+def test_reduno_date_parser_accepts_millisecond_timestamp():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._parse_date("1781143220992")
+
+    assert parsed == datetime(2026, 6, 10, 22, 0, 20, 992000)
+
+
+def test_spanish_month_date_parser_does_not_shift_month_and_day():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._parse_date("10 de junio de 2026 11:20")
+
+    assert parsed == datetime(2026, 6, 10, 11, 20)
+
+
+def test_redbolivision_date_parser_accepts_meta_date_format():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._parse_date("10 de Junio de 2026 - 23:09")
+
+    assert parsed == datetime(2026, 6, 10, 23, 9)
+
+
+def test_lostiempos_date_parser_accepts_date_publish_format():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._parse_date("Publicado el 10/06/2026 a las 23h46")
+
+    assert parsed == datetime(2026, 6, 10, 23, 46)
+
+
+def test_eldeber_date_parser_accepts_article_date_format():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._parse_date("Miércoles, 10 de junio de 2026 a las 12:57")
+
+    assert parsed == datetime(2026, 6, 10, 12, 57)
+
+
+def test_spanish_month_first_date_parser_does_not_shift_month_and_day():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._parse_date("junio 10, 2026 11:20")
+
+    assert parsed == datetime(2026, 6, 10, 11, 20)
+
+
+def test_filter_usable_articles_drops_future_publish_dates():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(name="RadioFides", url="https://www.radiofides.com/")
+    articles = [
+        {
+            "title": "Noticia con fecha futura",
+            "content": "Contenido suficiente para que el articulo sea usable dentro del pipeline.",
+            "published_at": datetime.now() + timedelta(days=10),
+        },
+        {
+            "title": "Noticia valida",
+            "content": "Contenido suficiente para que el articulo sea usable dentro del pipeline.",
+            "published_at": datetime.now(),
+        },
+    ]
+
+    filtered = scraper._filter_usable_articles(articles, source)
+
+    assert [article["title"] for article in filtered] == ["Noticia valida"]
+
+
+@pytest.mark.asyncio
+async def test_reduno_detail_date_replaces_fallback_listing_date():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedUno",
+        url="https://www.reduno.com.bo/noticias/nacionales",
+        date_selector="input.nota_fecha_input, .autor-fecha .fecha, .autor .fecha, .fecha",
+        date_attr="data-fecha-a",
+    )
+
+    class FakeClient:
+        async def get(self, url):
+            class Response:
+                text = """
+                <html>
+                  <head>
+                    <meta property="og:description" content="Descripcion de prueba." />
+                  </head>
+                  <body>
+                    <div class="autor-fecha">
+                      <div class="autor">Red Uno Digital</div>
+                      <p class="fecha">09/06/2026 8:57</p>
+                    </div>
+                    <main><article><p>Contenido suficientemente largo para una noticia real de prueba.</p></article></main>
+                  </body>
+                </html>
+                """
+
+                def raise_for_status(self):
+                    return None
+
+            return Response()
+
+    article = {
+        "title": "Persisten los puntos de bloqueo que afectan el abastecimiento",
+        "url": "https://www.reduno.com.bo/noticias/mapa-de-transitabilidad",
+        "published_at": datetime(2026, 6, 11, 0, 26),
+    }
+
+    enriched = await scraper._enrich_article(FakeClient(), article, source)
+
+    assert enriched["published_at"] == datetime(2026, 6, 9, 8, 57)
+
+
+@pytest.mark.asyncio
+async def test_unitel_detail_date_replaces_fallback_listing_date():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Unitel",
+        url="https://unitel.bo/",
+        date_selector=".fecha, .date, time",
+    )
+
+    class FakeClient:
+        async def get(self, url):
+            class Response:
+                text = """
+                <html>
+                  <head>
+                    <meta property="og:description" content="Descripcion de Unitel." />
+                  </head>
+                  <body>
+                    <time datetime="2026-06-10T14:36:46">10/06/2026 14:36</time>
+                    <main><article><p>Contenido suficientemente largo para una noticia real de prueba.</p></article></main>
+                  </body>
+                </html>
+                """
+
+                def raise_for_status(self):
+                    return None
+
+            return Response()
+
+    article = {
+        "title": "Policia de Cochabamba aclara operativo",
+        "url": "https://unitel.bo/noticias/seguridad/example",
+        "published_at": datetime(2026, 6, 11, 0, 26),
+    }
+
+    enriched = await scraper._enrich_article(FakeClient(), article, source)
+
+    assert enriched["published_at"] == datetime(2026, 6, 10, 14, 36)
+
+
+def test_detail_date_extracts_generic_article_published_time_meta():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(name="Generic", url="https://example.com/")
+    soup = BeautifulSoup(
+        """
+        <html>
+          <head>
+            <meta property="article:published_time" content="2026-06-08T09:15:00" />
+          </head>
+        </html>
+        """,
+        "lxml",
+    )
+
+    assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 8, 9, 15)
+
+
+def test_redbolivision_detail_date_extracts_single_layout_meta_date():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedBolivision",
+        url="https://www.redbolivision.tv.bo/",
+        date_selector=".single-layout__meta-date, .fecha, time",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <body>
+            <span class="single-layout__meta-date">10 de Junio de 2026 - 23:09</span>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 10, 23, 9)
+
+
+def test_lostiempos_extracts_listing_date_from_url():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._extract_date_from_url(
+        "https://www.lostiempos.com/actualidad/pais/20260610/denuncian-presiones"
+    )
+
+    assert parsed == datetime(2026, 6, 10)
+
+
+def test_eldeber_extracts_listing_date_from_compact_url_suffix():
+    scraper = NewsScraper(sources=[])
+
+    parsed = scraper._extract_date_from_url(
+        "https://eldeber.com.bo/bbc/hallazgo-en-el-indico-2026610214845"
+    )
+
+    assert parsed == datetime(2026, 6, 10, 21, 48, 45)
+
+
+def test_lostiempos_detail_date_extracts_date_publish_text():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="LosTiempos",
+        url="https://www.lostiempos.com/actualidad",
+        date_selector=".date-publish, time",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <body>
+            <div class="date-publish">Publicado el 10/06/2026 a las 23h46</div>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 10, 23, 46)
+
+
+def test_eldeber_detail_date_extracts_articulo_fecha_text():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="ElDeber",
+        url="https://eldeber.com.bo/ultimas-noticias",
+        date_selector=".articulo__fecha, time",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <body>
+            <div class="articulo__fecha">Miércoles, 10 de junio de 2026 a las 12:57</div>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 10, 12, 57)
+
+
+@pytest.mark.asyncio
+async def test_lostiempos_url_date_skips_non_today_detail_fetch():
+    scraper = NewsScraper(sources=[])
+    today = datetime.now()
+    yesterday = today - timedelta(days=1)
+    source = NewsSource(
+        name="LosTiempos",
+        url="https://www.lostiempos.com/actualidad",
+        selector=".views-row",
+        title_selector=".views-field-title a",
+        url_selector=".views-field-title a",
+        date_selector=".date-publish, time",
+        body_selector="article p",
+    )
+    requested_urls = []
+
+    listing_html = f"""
+        <html>
+          <body>
+            <div class="views-row">
+              <div class="views-field-title">
+                <a href="/actualidad/pais/{today:%Y%m%d}/noticia-hoy">
+                  Noticia actual de Los Tiempos con fecha de hoy
+                </a>
+              </div>
+            </div>
+            <div class="views-row">
+              <div class="views-field-title">
+                <a href="/actualidad/pais/{yesterday:%Y%m%d}/noticia-ayer">
+                  Noticia antigua de Los Tiempos con fecha de ayer
+                </a>
+              </div>
+            </div>
+          </body>
+        </html>
+    """
+    detail_html = f"""
+        <html>
+          <body>
+            <div class="date-publish">Publicado el {today:%d/%m/%Y} a las 23h46</div>
+            <article>
+              <p>Contenido suficiente para una noticia real de Los Tiempos recolectada hoy.</p>
+              <p>Segundo parrafo con contexto adicional para superar validaciones del scraper.</p>
+            </article>
+          </body>
+        </html>
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested_urls.append(str(request.url))
+        if str(request.url) == "https://www.lostiempos.com/actualidad":
+            return httpx.Response(200, text=listing_html)
+        return httpx.Response(200, text=detail_html)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        follow_redirects=True,
+    ) as client:
+        articles = await scraper._scrape_source(client, source)
+
+    assert [article["title"] for article in articles] == [
+        "Noticia actual de Los Tiempos con fecha de hoy"
+    ]
+    assert f"https://www.lostiempos.com/actualidad/pais/{today:%Y%m%d}/noticia-hoy" in (
+        requested_urls
+    )
+    assert f"https://www.lostiempos.com/actualidad/pais/{yesterday:%Y%m%d}/noticia-ayer" not in (
+        requested_urls
+    )
 
 
 def test_reduno_link_fallback_accepts_articles_below_category_path():

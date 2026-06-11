@@ -3,7 +3,7 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from html import unescape
 from urllib.parse import urljoin, urlparse
@@ -209,6 +209,7 @@ class NewsScraper:
                 articles = self._extract_links_fallback(soup, source)
 
             articles = self._deduplicate(articles)
+            articles = self._filter_articles_for_detail_fetch(articles, source)
             enriched = await self._enrich_articles(client, articles, source)
             return self._filter_usable_articles(enriched, source)
         except Exception as e:
@@ -230,7 +231,10 @@ class NewsScraper:
             if not url:
                 return None
 
-            published_at = self._extract_date(article_soup, source)
+            listing_date = self._extract_optional_date(article_soup, source)
+            if listing_date is None:
+                listing_date = self._extract_date_from_url(url)
+            published_at = listing_date or datetime.now()
             image = self._extract_image(article_soup, source)
             category = self._extract_category(article_soup, source)
 
@@ -243,6 +247,7 @@ class NewsScraper:
                 "category": category,
                 "country": source.country,
                 "published_at": published_at,
+                "published_at_from_listing": listing_date is not None,
                 "image": image,
                 "hash": hashlib.md5(url.encode()).hexdigest() if url else None,
             }
@@ -274,6 +279,7 @@ class NewsScraper:
                     "category": source.category,
                     "country": source.country,
                     "published_at": datetime.now(),
+                    "published_at_from_listing": False,
                     "image": None,
                     "hash": hashlib.md5(url.encode()).hexdigest(),
                 }
@@ -300,10 +306,14 @@ class NewsScraper:
         return enriched
 
     def _filter_usable_articles(self, articles: list[dict], source: NewsSource) -> list[dict]:
-        usable = [article for article in articles if self._has_usable_text(article)]
+        usable = [
+            article
+            for article in articles
+            if self._has_usable_text(article) and not self._has_future_publish_date(article)
+        ]
         dropped = len(articles) - len(usable)
         if dropped:
-            logger.info(f"Dropped {dropped} title-only articles from {source.name}")
+            logger.info(f"Dropped {dropped} unusable articles from {source.name}")
         return usable
 
     def _has_usable_text(self, article: dict) -> bool:
@@ -318,6 +328,13 @@ class NewsScraper:
             return False
 
         return self._count_words(text) >= 8 or len(text) >= 50
+
+    def _has_future_publish_date(self, article: dict) -> bool:
+        published_at = article.get("published_at")
+        if not isinstance(published_at, datetime):
+            return False
+
+        return published_at > datetime.now() + timedelta(days=1)
 
     async def _enrich_article(
         self,
@@ -337,6 +354,13 @@ class NewsScraper:
             return article
 
         soup = BeautifulSoup(response.text, "lxml")
+        detail_date = self._extract_detail_date(soup, source)
+        if detail_date:
+            article["published_at"] = detail_date
+            if self._has_non_today_publish_date(detail_date):
+                article["skipped_detail_reason"] = "non_today_detail_date"
+                return article
+
         content = self._extract_body_content(soup, source, article.get("title"))
         word_count = self._count_words(content)
         meta_description = self._extract_meta_description(soup)
@@ -351,7 +375,6 @@ class NewsScraper:
         article["excerpt"] = self._build_excerpt(content) if content else None
         article["content_word_count"] = word_count
         article["content_collected_at"] = datetime.now()
-
         if meta_description and not article.get("description"):
             article["description"] = meta_description
         elif content and not article.get("description"):
@@ -362,6 +385,62 @@ class NewsScraper:
             article["image"] = detail_image
 
         return article
+
+    def _filter_articles_for_detail_fetch(
+        self,
+        articles: list[dict],
+        source: NewsSource,
+    ) -> list[dict]:
+        filtered = [
+            article
+            for article in articles
+            if not self._has_non_today_listing_publish_date(article)
+        ]
+        dropped = len(articles) - len(filtered)
+        if dropped:
+            logger.info(
+                f"Skipped {dropped} non-today listing articles before detail fetch "
+                f"from {source.name}"
+            )
+        return filtered
+
+    def _has_non_today_listing_publish_date(self, article: dict) -> bool:
+        if not article.get("published_at_from_listing"):
+            return False
+
+        published_at = article.get("published_at")
+        if not isinstance(published_at, datetime):
+            return False
+
+        return self._has_non_today_publish_date(published_at)
+
+    def _has_non_today_publish_date(self, published_at: datetime) -> bool:
+        return published_at.date() != datetime.now().date()
+
+    def _extract_detail_date(self, soup: BeautifulSoup, source: NewsSource) -> datetime | None:
+        date_candidates = []
+
+        if source.date_selector:
+            for element in soup.select(source.date_selector):
+                date_candidates.append(self._extract_date_text(element, source))
+
+        for selector, attr in (
+            ("meta[property='article:published_time']", "content"),
+            ("meta[name='article:published_time']", "content"),
+            ("meta[property='og:published_time']", "content"),
+            ("time[datetime]", "datetime"),
+        ):
+            element = soup.select_one(selector)
+            if element:
+                date_candidates.append(element.get(attr, ""))
+
+        date_candidates.extend(self._extract_json_ld_dates(soup))
+
+        for candidate in date_candidates:
+            parsed = self._parse_date(candidate, fallback_to_now=False)
+            if parsed:
+                return parsed
+        return None
 
     def _extract_body_content(
         self,
@@ -769,18 +848,60 @@ class NewsScraper:
         return url
 
     def _extract_date(self, article_soup, source: NewsSource) -> datetime:
+        return self._extract_optional_date(article_soup, source) or datetime.now()
+
+    def _extract_optional_date(self, article_soup, source: NewsSource) -> datetime | None:
         if not source.date_selector:
-            return datetime.now()
+            return None
         date_elem = article_soup.select_one(source.date_selector)
         if not date_elem:
-            return datetime.now()
-        if source.date_attr:
-            date_text = date_elem.get(source.date_attr, "")
+            return None
+        date_text = self._extract_date_text(date_elem, source)
+        return self._parse_date(date_text, fallback_to_now=False)
+
+    def _extract_date_text(self, date_elem, source: NewsSource) -> str:
+        if source.date_attr and date_elem.has_attr(source.date_attr):
+            return date_elem.get(source.date_attr, "")
         elif date_elem.name in ("input", "textarea", "select"):
-            date_text = date_elem.get("value", "")
-        else:
-            date_text = date_elem.get_text(strip=True)
-        return self._parse_date(date_text)
+            return date_elem.get("value", "")
+        return date_elem.get_text(strip=True)
+
+    def _extract_date_from_url(self, url: str) -> datetime | None:
+        match = re.search(r"/(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})(?:/|$)", url)
+        if match:
+            try:
+                return datetime(
+                    int(match.group("year")),
+                    int(match.group("month")),
+                    int(match.group("day")),
+                )
+            except ValueError:
+                return None
+
+        stamp_match = re.search(r"(?P<stamp>20\d{10,11})(?:\D|$)", url)
+        if not stamp_match:
+            return None
+
+        stamp = stamp_match.group("stamp")
+        for month_digits in (2, 1):
+            try:
+                year = int(stamp[:4])
+                month_start = 4
+                day_start = month_start + month_digits
+                hour_start = day_start + 2
+                minute_start = hour_start + 2
+                second_start = minute_start + 2
+                return datetime(
+                    year,
+                    int(stamp[month_start:day_start]),
+                    int(stamp[day_start:hour_start]),
+                    int(stamp[hour_start:minute_start]),
+                    int(stamp[minute_start:second_start]),
+                    int(stamp[second_start:second_start + 2] or 0),
+                )
+            except ValueError:
+                continue
+        return None
 
     def _extract_image(self, article_soup, source: NewsSource) -> str | None:
         if not source.image_selector:
@@ -818,9 +939,9 @@ class NewsScraper:
                 return self._clean_text(cat_elem.get_text(" ", strip=True))
         return source.category
 
-    def _parse_date(self, date_text: str) -> datetime:
+    def _parse_date(self, date_text: str, *, fallback_to_now: bool = True) -> datetime | None:
         if not date_text:
-            return datetime.now()
+            return datetime.now() if fallback_to_now else None
 
         from dateutil import parser
 
@@ -828,11 +949,97 @@ class NewsScraper:
         date_text = re.sub(r"hace \d+ horas?", "", date_text)
         date_text = re.sub(r"ayer", "1 day ago", date_text)
         date_text = re.sub(r"hoy", "", date_text)
+        date_text = self._normalize_spanish_date_text(date_text)
+        timestamp_date = self._parse_numeric_timestamp(date_text)
+        if timestamp_date:
+            return timestamp_date
 
         try:
-            return parser.parse(date_text, fuzzy=True)
+            return parser.parse(
+                date_text,
+                fuzzy=True,
+                dayfirst=self._should_parse_dayfirst(date_text),
+            )
         except Exception:
-            return datetime.now()
+            return datetime.now() if fallback_to_now else None
+
+    def _should_parse_dayfirst(self, date_text: str) -> bool:
+        return bool(re.search(r"\b\d{1,2}/\d{1,2}/\d{4}\b", date_text))
+
+    def _parse_numeric_timestamp(self, date_text: str) -> datetime | None:
+        if not re.fullmatch(r"\d{10}|\d{13}", date_text.strip()):
+            return None
+
+        timestamp = int(date_text)
+        if len(date_text.strip()) == 13:
+            timestamp = timestamp / 1000
+
+        try:
+            return datetime.fromtimestamp(timestamp)
+        except (OSError, OverflowError, ValueError):
+            return None
+
+    def _normalize_spanish_date_text(self, date_text: str) -> str:
+        month_numbers = {
+            "enero": "01",
+            "febrero": "02",
+            "marzo": "03",
+            "abril": "04",
+            "mayo": "05",
+            "junio": "06",
+            "julio": "07",
+            "agosto": "08",
+            "septiembre": "09",
+            "setiembre": "09",
+            "octubre": "10",
+            "noviembre": "11",
+            "diciembre": "12",
+        }
+        month_pattern = "|".join(month_numbers)
+
+        def replace_day_first(match):
+            day = match.group("day")
+            month = month_numbers[match.group("month")]
+            year = match.group("year")
+            time_text = match.group("time") or ""
+            return f"{day}/{month}/{year}{time_text}"
+
+        normalized = re.sub(
+            rf"(?P<day>\d{{1,2}})\s*(?:de\s+)?(?P<month>{month_pattern})\s*(?:de\s+)?(?P<year>\d{{4}})(?P<time>\s+\d{{1,2}}:\d{{2}})?",
+            replace_day_first,
+            date_text,
+        )
+
+        def replace_month_first(match):
+            day = match.group("day")
+            month = month_numbers[match.group("month")]
+            year = match.group("year")
+            time_text = match.group("time") or ""
+            return f"{day}/{month}/{year}{time_text}"
+
+        return re.sub(
+            rf"(?P<month>{month_pattern})\s+(?P<day>\d{{1,2}}),?\s*(?:de\s+)?(?P<year>\d{{4}})(?P<time>\s+\d{{1,2}}:\d{{2}})?",
+            replace_month_first,
+            normalized,
+        )
+
+    def _extract_json_ld_dates(self, soup: BeautifulSoup) -> list[str]:
+        dates = []
+        for script in soup.select("script[type='application/ld+json']"):
+            raw_json = script.string or script.get_text(strip=True)
+            if not raw_json:
+                continue
+            try:
+                data = json.loads(raw_json)
+            except json.JSONDecodeError:
+                continue
+
+            for node in self._iter_json_ld_nodes(data):
+                for field in ("datePublished", "dateCreated", "dateModified"):
+                    value = node.get(field)
+                    if value:
+                        dates.append(str(value))
+        return dates
 
     def _deduplicate(self, news: list[dict]) -> list[dict]:
         seen = set()

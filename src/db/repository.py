@@ -507,7 +507,10 @@ class Database:
                 unique_articles,
             )
             unique_from_run = self._safe_int(latest_run.deduplicated_count) or unique_articles
-            summaries_from_run = self._safe_int(latest_run.summaries_count) or summaries
+            summaries_from_run = self._impact_summary_count(
+                stored_summaries=summaries,
+                run_summaries=latest_run.summaries_count,
+            )
             return {
                 "data_source": "pipeline_run",
                 "collected_articles": collected_articles,
@@ -563,6 +566,9 @@ class Database:
         ) or bool(getattr(run, "used_cached_articles", False)) or bool(
             getattr(run, "used_cached_summaries", False)
         )
+
+    def _impact_summary_count(self, *, stored_summaries: int, run_summaries: Any) -> int:
+        return max(self._safe_int(stored_summaries), self._safe_int(run_summaries))
 
     def _safe_int(self, value: Any) -> int:
         try:
