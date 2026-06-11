@@ -16,7 +16,6 @@ export const WeatherPanel = ({ weather }: WeatherPanelProps) => {
   const city = weather?.location.name ?? "La Paz";
   const temp = Number(weather?.current.temperature_2m);
   const uv = weather?.radiation.uv_index ?? weather?.today.uv_index_max;
-  const precipitation = weather?.today.precipitation_sum;
 
   return (
     <section className="weather-card" id="clima" aria-label="Clima local">
@@ -27,13 +26,6 @@ export const WeatherPanel = ({ weather }: WeatherPanelProps) => {
           <span>Radiacion UV {formatWeatherValue(uv)}</span>
         </div>
         <b>{formatWeatherValue(temp, "C")}</b>
-      </div>
-      <div className="weather-row muted-row">
-        <div>
-          <strong>Hoy</strong>
-          <span>Lluvia {formatWeatherValue(precipitation, " mm")}</span>
-        </div>
-        <b>{formatWeatherValue(weather?.today.temperature_max, "C")}</b>
       </div>
     </section>
   );

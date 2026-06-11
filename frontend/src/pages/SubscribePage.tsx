@@ -197,11 +197,6 @@ export const SubscribePage = () => {
             Puedes cambiar preferencias o darte de baja cuando quieras.
           </p>
         </div>
-        <div className="data-status-card">
-          <span>Canal recomendado</span>
-          <strong>Email</strong>
-          <small>WhatsApp queda disponible para demo y Telegram cuando el bot este configurado.</small>
-        </div>
       </header>
 
       {optionsError && (
@@ -400,68 +395,72 @@ export const SubscribePage = () => {
           </div>
         </section>
 
-        <aside className="data-panel subscribe-preview-panel">
-          <span className="panel-title">Asi se veria tu brief</span>
-          <div className="chips">
-            {selectedCategories.map((category) => (
-              <span key={category.slug}>{category.label}</span>
-            ))}
-          </div>
-          <div className="preview-list">
-            {previewState.data?.items.length ? (
-              previewState.data.items.map((item) => (
-                <article className="preview-item" key={`${item.category}-${item.title}`}>
-                  <span>{item.category}</span>
-                  <h3>{item.title}</h3>
-                  <p>{item.summary}</p>
-                </article>
-              ))
-            ) : (
-              <p className="impact-section-copy">
-                Usa "Ver preview" para cargar briefs recientes segun tus categorias. No se llama a
-                IA para esta vista previa.
-              </p>
-            )}
-          </div>
-          {previewState.data && <small>{previewState.data.message}</small>}
+        <aside className="data-context-sidebar subscribe-side-panel">
+          <section className="subscribe-preview-panel">
+            <div className="panel-heading">
+              <span className="panel-title">Vista previa</span>
+              <p>Una muestra rapida segun tus categorias.</p>
+            </div>
+            <div className="chips">
+              {selectedCategories.map((category) => (
+                <span key={category.slug}>{category.label}</span>
+              ))}
+            </div>
+            <div className="preview-list">
+              {previewState.data?.items.length ? (
+                previewState.data.items.map((item) => (
+                  <article className="preview-item" key={`${item.category}-${item.title}`}>
+                    <span>{item.category}</span>
+                    <h3>{item.title}</h3>
+                    <p>{item.summary}</p>
+                  </article>
+                ))
+              ) : (
+                <p className="impact-section-copy">
+                  Usa "Ver preview" para cargar briefs recientes segun tus categorias.
+                </p>
+              )}
+            </div>
+            {previewState.data && <small>{previewState.data.message}</small>}
+          </section>
+
+          <section className="unsubscribe-panel">
+            <div className="panel-heading">
+              <span className="panel-title">Cancelar suscripcion</span>
+              <p>Usa el mismo canal con el que te registraste.</p>
+            </div>
+            <div className="unsubscribe-row">
+              <input
+                placeholder={
+                  form.channel === "whatsapp"
+                    ? "+59170000000"
+                    : form.channel === "email"
+                      ? "tu-correo@gmail.com"
+                      : "Telegram ID"
+                }
+                type="text"
+                value={unsubscribeIdentifier}
+                onChange={(event) =>
+                  setUnsubscribeIdentifier(
+                    form.channel === "whatsapp"
+                      ? sanitizePhoneInput(event.target.value)
+                      : event.target.value,
+                  )
+                }
+              />
+              <button
+                className="secondary-button"
+                disabled={unsubscribeState.isLoading}
+                type="button"
+                onClick={handleUnsubscribe}
+              >
+                {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
+              </button>
+            </div>
+            {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
+          </section>
         </aside>
       </div>
-
-      <section className="data-panel unsubscribe-panel">
-        <div className="panel-heading">
-          <span className="panel-title">Cancelar suscripcion</span>
-          <p>Tambien puedes darte de baja desde WhatsApp o Telegram enviando cancelar.</p>
-        </div>
-        <div className="unsubscribe-row">
-          <input
-            placeholder={
-              form.channel === "whatsapp"
-                ? "+59170000000"
-                : form.channel === "email"
-                  ? "tu-correo@gmail.com"
-                  : "Telegram ID"
-            }
-            type="text"
-            value={unsubscribeIdentifier}
-            onChange={(event) =>
-              setUnsubscribeIdentifier(
-                form.channel === "whatsapp"
-                  ? sanitizePhoneInput(event.target.value)
-                  : event.target.value,
-              )
-            }
-          />
-          <button
-            className="secondary-button"
-            disabled={unsubscribeState.isLoading}
-            type="button"
-            onClick={handleUnsubscribe}
-          >
-            {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
-          </button>
-        </div>
-        {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
-      </section>
 
       {isConfirmingSubscribe && (
         <div className="modal-backdrop" role="presentation">

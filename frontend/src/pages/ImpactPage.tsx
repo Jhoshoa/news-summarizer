@@ -1,32 +1,18 @@
 import { useMemo } from "react";
 
-import { useGetImpactMetricsQuery } from "../services/api";
-import type { ImpactMetricsResponse } from "../services/types";
+import { SummaryCard } from "../components/news/SummaryCard";
+import { SummaryCardSkeleton } from "../components/ui/Skeleton";
+import { useGetImpactMetricsQuery, useGetSummariesQuery } from "../services/api";
 import { formatPublishedDate } from "../utils/date";
-import {
-  getImpactDataSourceLabel,
-  getImpactDataSourceTone,
-  getImpactFormulaRows,
-  getImpactPipelineRows,
-} from "../utils/impact";
+import { getImpactFormulaRows, getImpactPipelineRows } from "../utils/impact";
 
 const numberFormatter = new Intl.NumberFormat("es-BO", {
   maximumFractionDigits: 1,
 });
 
-const percentFormatter = new Intl.NumberFormat("es-BO", {
-  maximumFractionDigits: 0,
-  style: "percent",
-});
-
 const formatNumber = (value: unknown) => {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberFormatter.format(numberValue) : "0";
-};
-
-const formatPercent = (value: unknown) => {
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? percentFormatter.format(numberValue) : "0%";
 };
 
 const formatImpactDate = (value?: string | null) => {
@@ -53,6 +39,35 @@ const ImpactMetricCard = ({
   </section>
 );
 
+const SkeletonLine = ({ className = "" }: { className?: string }) => (
+  <span className={`skeleton-block ${className}`} aria-hidden="true" />
+);
+
+const ImpactMetricSkeleton = () => (
+  <section className="data-panel impact-stat-card skeleton-panel" aria-hidden="true">
+    <SkeletonLine className="skeleton-line skeleton-line-sm" />
+    <SkeletonLine className="skeleton-line skeleton-line-lg" />
+    <SkeletonLine className="skeleton-line skeleton-line-md" />
+  </section>
+);
+
+const ImpactPanelSkeleton = ({ rows = 3 }: { rows?: number }) => (
+  <section className="data-panel impact-flow-panel skeleton-panel" aria-hidden="true">
+    <div className="panel-heading">
+      <SkeletonLine className="skeleton-line skeleton-line-sm" />
+      <SkeletonLine className="skeleton-line skeleton-line-md" />
+    </div>
+    <div className="impact-skeleton-list">
+      {Array.from({ length: rows }, (_, index) => (
+        <div className="impact-skeleton-row" key={index}>
+          <SkeletonLine className="skeleton-line skeleton-line-xs" />
+          <SkeletonLine className="skeleton-line" />
+        </div>
+      ))}
+    </div>
+  </section>
+);
+
 const ImpactLoading = () => (
   <section className="impact-page" aria-label="Cargando impacto digital">
     <header className="data-hero impact-hero">
@@ -61,11 +76,26 @@ const ImpactLoading = () => (
         <h1>Calculando eficiencia informativa</h1>
         <p>EcoBrief esta consultando las metricas del pipeline.</p>
       </div>
-      <div className="data-status-card">
-        <span className="skeleton-block skeleton-line skeleton-line-md" aria-hidden="true" />
-        <span className="skeleton-block skeleton-line skeleton-line-lg" aria-hidden="true" />
-      </div>
     </header>
+    <section className="data-context-layout">
+      <div className="data-context-main">
+        <section className="impact-stat-grid essential" aria-label="Cargando resumen de impacto">
+          {Array.from({ length: 4 }, (_, index) => (
+            <ImpactMetricSkeleton key={index} />
+          ))}
+        </section>
+        <ImpactPanelSkeleton />
+        <ImpactPanelSkeleton rows={4} />
+        <ImpactPanelSkeleton />
+      </div>
+      <aside className="data-context-sidebar" aria-label="Cargando noticias resumidas">
+        <div className="data-briefs-list">
+          {Array.from({ length: 3 }, (_, index) => (
+            <SummaryCardSkeleton key={index} />
+          ))}
+        </div>
+      </aside>
+    </section>
   </section>
 );
 
@@ -81,42 +111,35 @@ const ImpactEmptyState = ({ isError = false }: { isError?: boolean }) => (
             : "Actualiza la portada para recolectar noticias y calcular el impacto informativo."}
         </p>
       </div>
-      <div className="data-status-card">
-        <span>Fuente de datos</span>
-        <strong>{isError ? "Error de consulta" : "Sin datos"}</strong>
-        <small>No se muestran estimaciones ambientales exactas.</small>
-      </div>
     </header>
   </section>
 );
 
-const ImpactSummary = ({ metrics }: { metrics: ImpactMetricsResponse }) => {
-  const dataSourceTone = getImpactDataSourceTone(metrics.data_source);
-  const dataSourceLabel = getImpactDataSourceLabel(metrics.data_source);
-
-  return (
-    <header className="data-hero impact-hero">
-      <div>
-        <span className="eyebrow">Impacto digital</span>
-        <h1>Como EcoBrief reduce navegacion repetida</h1>
-        <p>
-          La pagina muestra el flujo informativo del dia, las estimaciones usadas y los limites de
-          la metodologia Green Tech del proyecto.
-        </p>
-      </div>
-      <div className={`data-status-card impact-source-card ${dataSourceTone}`}>
-        <span>Fecha analizada</span>
-        <strong>{formatImpactDate(metrics.date)}</strong>
-        <small>{dataSourceLabel}</small>
-      </div>
-    </header>
-  );
-};
+const ImpactSummary = () => (
+  <header className="data-hero impact-hero">
+    <div>
+      <span className="eyebrow">Impacto digital</span>
+      <h1>Menos paginas abiertas, mas lectura util</h1>
+      <p>
+        EcoBrief recolecta, filtra y resume noticias para que el lector revise contexto local sin
+        navegar repetidamente por decenas de paginas.
+      </p>
+    </div>
+  </header>
+);
 
 export const ImpactPage = () => {
   const { data: metrics, isError, isFetching } = useGetImpactMetricsQuery({ fallback_to_latest: true });
+  const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
+    fallback_to_latest: true,
+    page_size: 3,
+  });
   const formulaRows = useMemo(() => getImpactFormulaRows(metrics), [metrics]);
-  const pipelineRows = useMemo(() => getImpactPipelineRows(metrics), [metrics]);
+  const pipelineRows = useMemo(() => {
+    const rows = getImpactPipelineRows(metrics);
+    return rows.filter((row) => ["Recolectadas", "Utiles", "Unicas", "Briefs"].includes(row.label));
+  }, [metrics]);
+  const summaries = summariesData?.items ?? [];
 
   if (isFetching && !metrics) {
     return <ImpactLoading />;
@@ -132,7 +155,7 @@ export const ImpactPage = () => {
 
   return (
     <section className="impact-page">
-      <ImpactSummary metrics={metrics} />
+      <ImpactSummary />
 
       {metrics.is_fallback && (
         <p className="form-notice">
@@ -141,124 +164,94 @@ export const ImpactPage = () => {
         </p>
       )}
 
-      <section className="impact-stat-grid" aria-label="Resumen de impacto">
-        <ImpactMetricCard
-          helper="Articulos que entraron al flujo de EcoBrief."
-          label="Procesadas"
-          value={formatNumber(metrics.collected_articles)}
-        />
-        <ImpactMetricCard
-          helper="Sintesis finales generadas para lectura rapida."
-          label="Briefs"
-          value={formatNumber(metrics.summaries)}
-        />
-        <ImpactMetricCard
-          helper="Paginas que el usuario no necesita revisar una por una."
-          label="Paginas evitadas"
-          value={formatNumber(metrics.estimated_pages_avoided)}
-        />
-        <ImpactMetricCard
-          helper="Tiempo orientativo con 0.5 min por pagina evitada."
-          label="Minutos estimados"
-          value={formatNumber(metrics.estimated_minutes_saved)}
-        />
-        <ImpactMetricCard
-          helper="Transferencia evitada estimada con 0.8 MB por pagina."
-          label="Datos estimados"
-          value={`${formatNumber(metrics.estimated_data_saved_mb)} MB`}
-        />
-        <ImpactMetricCard
-          helper="Relacion entre briefs finales y articulos recolectados."
-          label="Reduccion"
-          value={formatPercent(metrics.reduction_rate)}
-        />
-      </section>
+      <section className="data-context-layout">
+        <div className="data-context-main">
+          <section className="impact-stat-grid essential" aria-label="Resumen de impacto">
+            <ImpactMetricCard
+              helper="Noticias tomadas como entrada para el flujo editorial."
+              label="Procesadas"
+              value={formatNumber(metrics.collected_articles)}
+            />
+            <ImpactMetricCard
+              helper="Sintesis finales para lectura rapida."
+              label="Briefs"
+              value={formatNumber(metrics.summaries)}
+            />
+            <ImpactMetricCard
+              helper="Paginas que el lector no necesita abrir una por una."
+              label="Paginas evitadas"
+              value={formatNumber(metrics.estimated_pages_avoided)}
+            />
+            <ImpactMetricCard
+              helper="Estimacion orientativa de tiempo ahorrado."
+              label="Minutos estimados"
+              value={formatNumber(metrics.estimated_minutes_saved)}
+            />
+          </section>
 
-      <section className="data-panel wide-panel impact-flow-panel">
-        <div className="panel-heading">
-          <span className="panel-title">Flujo del pipeline</span>
-          <p>EcoBrief filtra, deduplica y prioriza antes de resumir con IA.</p>
-        </div>
-        <div className="impact-flow" aria-label="Flujo de articulos procesados">
-          {pipelineRows.map((item, index) => (
-            <div className="impact-flow-step" key={item.label}>
-              {index > 0 && <span className="impact-flow-arrow">-&gt;</span>}
+          <section className="data-panel impact-flow-panel">
+            <div className="panel-heading">
+              <span className="panel-title">Como ayuda EcoBrief</span>
+              <p>El impacto real es reducir ruido: menos busqueda manual y mas contexto comparable.</p>
+            </div>
+            <div className="impact-narrative-list">
               <div>
-                <strong>{formatNumber(item.value)}</strong>
-                <span>{item.label}</span>
+                <strong>Filtra volumen</strong>
+                <p>Recolecta muchas notas, descarta lo redundante y conserva lo que aporta contexto.</p>
+              </div>
+              <div>
+                <strong>Evita repeticion</strong>
+                <p>Agrupa duplicados y notas similares para que el lector no lea lo mismo varias veces.</p>
+              </div>
+              <div>
+                <strong>Prioriza lectura</strong>
+                <p>Convierte el flujo en briefs con fuente visible para decidir que abrir y contrastar.</p>
               </div>
             </div>
-          ))}
-        </div>
-        <div className="metric-list">
-          <div>
-            <span>Descartadas por calidad</span>
-            <strong>{formatNumber(metrics.quality_dropped_articles ?? 0)}</strong>
-          </div>
-          <div>
-            <span>Duplicadas evitadas</span>
-            <strong>{formatNumber(metrics.duplicate_articles ?? metrics.duplicate_articles_estimated)}</strong>
-          </div>
-          <div>
-            <span>Rankeadas</span>
-            <strong>{formatNumber(metrics.ranked_articles ?? metrics.unique_articles)}</strong>
-          </div>
-          <div>
-            <span>Llamadas IA evitadas estimadas</span>
-            <strong>{formatNumber(metrics.ai_calls_avoided_estimated)}</strong>
-          </div>
-          <div>
-            <span>Cache reutilizado</span>
-            <strong>{metrics.cache_reused ? "Si" : "No"}</strong>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      <section className="data-grid">
-        <section className="data-panel wide-panel">
-          <div className="panel-heading">
-            <span className="panel-title">Metodologia</span>
-            <p>Los calculos son indicadores de eficiencia informativa, no mediciones energeticas.</p>
-          </div>
-          <div className="impact-formula-list">
-            {formulaRows.map((row) => (
-              <div className="impact-formula-row" key={row.label}>
-                <span>{row.label}</span>
-                <code>{row.formula}</code>
-                <strong>{row.value}</strong>
-              </div>
-            ))}
-          </div>
-          <p className="impact-disclaimer">
-            {metrics.methodology.note} No se reportan CO2, kWh ni impacto ambiental certificado
-            porque no hay medicion directa.
-          </p>
-        </section>
-      </section>
+          <section className="data-panel impact-flow-panel">
+            <div className="panel-heading">
+              <span className="panel-title">Flujo simplificado</span>
+              <p>De muchas notas a pocos briefs utiles para revisar.</p>
+            </div>
+            <div className="impact-flow" aria-label="Flujo de articulos procesados">
+              {pipelineRows.map((item, index) => (
+                <div className="impact-flow-step" key={item.label}>
+                  {index > 0 && <span className="impact-flow-arrow">-&gt;</span>}
+                  <div>
+                    <strong>{formatNumber(item.value)}</strong>
+                    <span>{item.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
 
-      <section className="data-grid" id="fuentes">
-        <section className="data-panel">
-          <span className="panel-title">Fuentes monitoreadas</span>
-          <p className="impact-section-copy">
-            EcoBrief conserva fuentes visibles y enlaces originales en cada noticia o brief. Un
-            estado tecnico por fuente debe salir de datos reales o de un endpoint dedicado.
-          </p>
-        </section>
-        <section className="data-panel">
-          <span className="panel-title">Uso responsable de IA</span>
-          <p className="impact-section-copy">
-            El sistema filtra calidad, deduplica, rankea y selecciona candidatas antes de resumir.
-            Asi evita procesar contenido redundante cuando el pipeline tiene datos suficientes.
-          </p>
-        </section>
-        <section className="data-panel" id="politica-editorial">
-          <span className="panel-title">Politica editorial</span>
-          <p className="impact-section-copy">
-            EcoBrief no reemplaza a los medios ni produce reporterias propias. Resume y organiza
-            noticias existentes, mantiene la fuente visible y reconoce que los resumenes automaticos
-            deben contrastarse con el enlace original.
-          </p>
-        </section>
+          <section className="data-panel">
+            <div className="panel-heading">
+              <span className="panel-title">Como se estima</span>
+              <p>Indicadores de eficiencia informativa, no mediciones energeticas certificadas.</p>
+            </div>
+            <div className="impact-formula-list compact">
+              {formulaRows.slice(0, 3).map((row) => (
+                <div className="impact-formula-row" key={row.label}>
+                  <span>{row.label}</span>
+                  <strong>{row.value}</strong>
+                  <code>{row.formula}</code>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <aside className="data-context-sidebar" aria-label="Noticias resumidas">
+          <div className="data-briefs-list">
+            {isFetchingSummaries
+              ? Array.from({ length: 3 }, (_, index) => <SummaryCardSkeleton key={index} />)
+              : summaries.map((summary) => <SummaryCard key={summary.id ?? summary.title} summary={summary} />)}
+          </div>
+        </aside>
       </section>
     </section>
   );

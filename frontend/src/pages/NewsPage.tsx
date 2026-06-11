@@ -87,8 +87,7 @@ export const NewsPage = () => {
     <>
       <section className="news-browser">
         <div className="browser-heading">
-          <span className="eyebrow">EcoBrief Bolivia</span>
-          <h1>{view === "resumenes" ? "Briefs priorizados" : "Noticias recolectadas"}</h1>
+          <h1>{view === "resumenes" ? "Noticias resumidas por IA" : "Noticias recolectadas"}</h1>
           <p>
             {view === "resumenes"
               ? "Lee noticias priorizadas y sintetizadas para reducir ruido informativo."
@@ -96,39 +95,41 @@ export const NewsPage = () => {
           </p>
         </div>
 
-        <div className="news-toolbar">
-          <label className="date-filter">
-            <span>Fecha</span>
-            <input
-              aria-label="Fecha de noticias"
-              max={today}
-              type="date"
-              value={selectedDate}
-              onChange={(event) => navigate(navigateToDate(event.target.value || today, category, view))}
-            />
-          </label>
-          <span className="news-count">
-            {showNewsSkeleton
-              ? "Cargando"
-              : `${activeData?.total ?? 0} ${view === "resumenes" ? "briefs" : "noticias"} para ${selectedDate}`}
-          </span>
-        </div>
-
         {validationMessage && <p className="form-notice">{validationMessage}</p>}
 
-        <div className="view-tabs" aria-label="Tipo de contenido">
-          <Link
-            className={view === "resumenes" ? "active" : ""}
-            href={buildNewsHref(1, selectedDate, category, "resumenes")}
-          >
-            Briefs EcoBrief
-          </Link>
-          <Link
-            className={view === "recolectadas" ? "active" : ""}
-            href={buildNewsHref(1, selectedDate, category, "recolectadas")}
-          >
-            Noticias recolectadas
-          </Link>
+        <div className="news-view-toolbar">
+          <div className="view-tabs" aria-label="Tipo de contenido">
+            <Link
+              className={view === "resumenes" ? "active" : ""}
+              href={buildNewsHref(1, selectedDate, category, "resumenes")}
+            >
+              Noticias resumidas por IA
+            </Link>
+            <Link
+              className={view === "recolectadas" ? "active" : ""}
+              href={buildNewsHref(1, selectedDate, category, "recolectadas")}
+            >
+              Noticias recolectadas
+            </Link>
+          </div>
+
+          <div className="news-toolbar">
+            <label className="date-filter">
+              <span>Fecha</span>
+              <input
+                aria-label="Fecha de noticias"
+                max={today}
+                type="date"
+                value={selectedDate}
+                onChange={(event) => navigate(navigateToDate(event.target.value || today, category, view))}
+              />
+            </label>
+            <span className="news-count">
+              {showNewsSkeleton
+                ? "Cargando"
+                : `${activeData?.total ?? 0} ${view === "resumenes" ? "briefs" : "noticias"} para ${selectedDate}`}
+            </span>
+          </div>
         </div>
 
         <div className="category-tabs" aria-label="Categorias">

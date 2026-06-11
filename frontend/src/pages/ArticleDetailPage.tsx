@@ -10,6 +10,7 @@ import {
   formatNumber,
 } from "../components/indicators/indicatorUtils";
 import { ArticleImage } from "../components/news/ArticleImage";
+import { SummaryCard } from "../components/news/SummaryCard";
 import { ArticleDetailSkeleton, PanelSkeleton } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
 import {
@@ -59,6 +60,10 @@ export const ArticleDetailPage = () => {
     articleId ? { article_id: articleId, page_size: 1 } : undefined,
     { skip: articleId === null },
   );
+  const { data: latestSummariesData, isFetching: isFetchingLatestSummaries } = useGetSummariesQuery({
+    fallback_to_latest: true,
+    page_size: 6,
+  });
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery();
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
@@ -66,6 +71,13 @@ export const ArticleDetailPage = () => {
   const indicators = indicatorsData?.items ?? [];
   const article = articleData;
   const relatedSummary = summaryData?.items[0];
+  const relatedBriefs = useMemo(
+    () =>
+      (latestSummariesData?.items ?? [])
+        .filter((summary) => summary.article_id !== articleId)
+        .slice(0, 3),
+    [articleId, latestSummariesData?.items],
+  );
   const officialBuy = findByExactCode(indicators, "bcb_tipo_de_cambio_compra")?.value;
   const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
   const referenceBuy = findByExactCode(
@@ -124,6 +136,17 @@ export const ArticleDetailPage = () => {
   return (
     <>
       <section className="detail-layout">
+        <aside className="related-briefs-sidebar" aria-label="Briefs EcoBrief relacionados">
+          <div className="section-label">Briefs EcoBrief</div>
+          <div className="related-briefs-list">
+            {isFetchingLatestSummaries
+              ? Array.from({ length: 3 }, (_, index) => <PanelSkeleton key={index} />)
+              : relatedBriefs.map((summary) => (
+                  <SummaryCard key={summary.id ?? summary.title} summary={summary} />
+                ))}
+          </div>
+        </aside>
+
         <article className="detail-article">
           <span className="eyebrow">Detalle - {article.category}</span>
           <time className="published-date detail-date" dateTime={article.published_at}>

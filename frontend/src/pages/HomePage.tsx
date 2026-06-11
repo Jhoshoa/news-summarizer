@@ -1,12 +1,12 @@
 import { useCallback, useMemo } from "react";
 
+import { Link } from "../app/router";
 import { usePageRefreshControl } from "../app/refreshControl";
 import { ImpactMetricsPanel } from "../components/impact/ImpactMetricsPanel";
 import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
-import { findByExactCode, formatNumber } from "../components/indicators/indicatorUtils";
 import { SecondaryIndicators } from "../components/indicators/SecondaryIndicators";
+import { ArticleImage } from "../components/news/ArticleImage";
 import { NewsCard } from "../components/news/NewsCard";
-import { PhoneBrief } from "../components/news/PhoneBrief";
 import { SummaryCard } from "../components/news/SummaryCard";
 import {
   MarketSkeletons,
@@ -25,6 +25,9 @@ import {
   useRefreshEconomicIndicatorsMutation,
   useTriggerSummaryMutation,
 } from "../services/api";
+import type { Article, Summary } from "../services/types";
+import { formatPublishedDate } from "../utils/date";
+import { buildContextualSummary, cleanGeneratedText } from "../utils/summaryText";
 
 const departments = [
   "La Paz",
@@ -55,6 +58,53 @@ const formatContentDate = (value?: string | null) => {
   }).format(date);
 };
 
+const hasImage = (item: Pick<Article | Summary, "image">) => Boolean(item.image?.trim());
+
+const prioritizeImages = <T extends Pick<Article | Summary, "image">>(items: T[]) => [
+  ...items.filter(hasImage),
+  ...items.filter((item) => !hasImage(item)),
+];
+
+const FeaturedSummary = ({ summary }: { summary: Summary }) => {
+  const href = summary.article_id ? `/article/${summary.article_id}` : summary.url || "#";
+  const title = cleanGeneratedText(summary.title);
+  const summaryText = buildContextualSummary(summary.summary, summary.article_description);
+  const fact = summary.fact ? cleanGeneratedText(summary.fact) : "";
+  const content = (
+    <>
+      <ArticleImage image={summary.image} alt={title} />
+      <div className="featured-summary-copy">
+        <div className="card-meta-row">
+          <span className="eyebrow">
+            {summary.source ?? "EcoBrief Bolivia"} - {summary.category}
+          </span>
+          <span className="status-badge summarized">Resumido IA</span>
+        </div>
+        <time className="published-date" dateTime={summary.published_at ?? summary.created_at ?? undefined}>
+          {formatPublishedDate(summary.published_at ?? summary.created_at)}
+        </time>
+        <h2>{title}</h2>
+        <p>{summaryText}</p>
+        {fact && <small>{fact}</small>}
+      </div>
+    </>
+  );
+
+  if (summary.article_id) {
+    return (
+      <Link className="featured-summary card-link" href={href}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <a className="featured-summary card-link" href={href}>
+      {content}
+    </a>
+  );
+};
+
 export const HomePage = () => {
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery();
@@ -64,12 +114,12 @@ export const HomePage = () => {
     isFetching: isFetchingImpactMetrics,
   } = useGetImpactMetricsQuery({ fallback_to_latest: true });
   const { data: articlesData, isFetching: isFetchingArticles } = useGetArticlesQuery({
-    limit: 8,
+    limit: 20,
     fallback_to_latest: true,
-    exclude_summarized: true,
   });
   const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
     fallback_to_latest: true,
+    page_size: 20,
   });
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
   const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
@@ -77,23 +127,22 @@ export const HomePage = () => {
   const indicators = indicatorsData?.items ?? [];
   const articles = useMemo(() => articlesData?.items ?? [], [articlesData?.items]);
   const summaries = useMemo(() => summariesData?.items ?? [], [summariesData?.items]);
-  const headline = summaries[0]?.title ?? "Menos ruido informativo, mas claridad local";
   const fallbackDate = summariesData?.is_fallback
     ? summariesData.date
     : articlesData?.is_fallback
       ? articlesData.date
       : null;
   const fallbackDateLabel = formatContentDate(fallbackDate);
-  const p2pBuy = formatNumber(findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value);
-  const p2pSell = formatNumber(findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value);
   const showIndicatorSkeleton = isFetchingIndicators;
   const showArticleSkeleton = isFetchingArticles;
   const showSummarySkeleton = isFetchingSummaries;
   const showWeatherSkeleton = isFetchingWeather;
-  const showPhoneSkeleton = showArticleSkeleton || showSummarySkeleton || showIndicatorSkeleton || showWeatherSkeleton;
 
-  const featuredArticles = useMemo(() => articles.slice(0, 3), [articles]);
-  const featuredSummaries = useMemo(() => summaries.slice(0, 3), [summaries]);
+  const prioritizedArticles = useMemo(() => prioritizeImages(articles), [articles]);
+  const prioritizedSummaries = useMemo(() => prioritizeImages(summaries), [summaries]);
+  const collectedArticles = useMemo(() => prioritizedArticles.slice(0, 4), [prioritizedArticles]);
+  const primarySummary = prioritizedSummaries[0];
+  const secondarySummaries = prioritizedSummaries.slice(1, 5);
 
   const handleRefresh = useCallback(() => {
     void Promise.all([
@@ -116,37 +165,7 @@ export const HomePage = () => {
   return (
     <>
       <section className="home-layout">
-        {showPhoneSkeleton ? (
-          <aside className="phone-brief" aria-label="Cargando portada movil">
-            <div className="phone-screen skeleton-phone" aria-hidden="true">
-              <span className="skeleton-block skeleton-line skeleton-line-sm" />
-              <span className="skeleton-block skeleton-title" />
-              <span className="skeleton-block skeleton-line" />
-              <span className="skeleton-block skeleton-line skeleton-line-md" />
-              {Array.from({ length: 4 }, (_, index) => (
-                <span className="skeleton-block skeleton-phone-row" key={index} />
-              ))}
-            </div>
-          </aside>
-        ) : (
-          <PhoneBrief
-            headline={headline}
-            articles={featuredArticles}
-            p2pBuy={p2pBuy}
-            p2pSell={p2pSell}
-            weather={weather}
-          />
-        )}
-
         <section className="content-column">
-          <section className="hero-panel" id="ultimo">
-            <div className="hero-art">
-              <span>EcoBrief Bolivia</span>
-              <h1>Menos ruido informativo. Mas claridad local.</h1>
-              <p>Briefs de noticias bolivianas con fuentes visibles e impacto digital estimado.</p>
-            </div>
-          </section>
-
           <ImpactMetricsPanel
             data={impactMetrics}
             isError={Boolean(impactMetricsError)}
@@ -154,36 +173,53 @@ export const HomePage = () => {
           />
 
           <section className="lower-grid">
-            <div className="news-list">
+            <div className="home-main-column">
               {fallbackDateLabel && (
                 <p className="form-notice">
                   No hay noticias de hoy todavia. Mostrando ultimas disponibles del {fallbackDateLabel}.
                 </p>
               )}
-              <div className="section-label">Briefs EcoBrief</div>
-              {showSummarySkeleton
-                ? Array.from({ length: 3 }, (_, index) => <SummaryCardSkeleton key={index} />)
-                : featuredSummaries.map((summary) => (
-                    <SummaryCard key={summary.id ?? summary.title} summary={summary} />
-                  ))}
-              {!showSummarySkeleton && featuredSummaries.length === 0 && (
-                <section className="empty-state compact">
-                  <span className="panel-title">Sin briefs disponibles</span>
-                  <p>Actualiza la portada para sintetizar las noticias recolectadas.</p>
+              {showSummarySkeleton ? (
+                <SummaryCardSkeleton />
+              ) : primarySummary ? (
+                <FeaturedSummary summary={primarySummary} />
+              ) : null}
+
+              <div className="home-news-board">
+                <section className="briefs-board">
+                  <div className="section-label">Briefs EcoBrief</div>
+                  <div className="briefs-grid">
+                    {showSummarySkeleton
+                      ? Array.from({ length: 4 }, (_, index) => <SummaryCardSkeleton key={index} />)
+                      : secondarySummaries.map((summary) => (
+                          <SummaryCard key={summary.id ?? summary.title} summary={summary} />
+                        ))}
+                  </div>
+                  {!showSummarySkeleton && secondarySummaries.length === 0 && (
+                    <section className="empty-state compact">
+                      <span className="panel-title">Sin briefs disponibles</span>
+                      <p>Actualiza la portada para sintetizar noticias recolectadas.</p>
+                    </section>
+                  )}
                 </section>
-              )}
-              <div className="section-label">Noticias sin resumir</div>
-              {showArticleSkeleton
-                ? Array.from({ length: 2 }, (_, index) => <NewsCardSkeleton key={index} />)
-                : featuredArticles.slice(0, 2).map((article) => (
-                    <NewsCard key={article.id} article={article} />
-                  ))}
-              {!showArticleSkeleton && featuredArticles.length === 0 && (
-                <section className="empty-state compact">
-                  <span className="panel-title">Sin noticias recolectadas</span>
-                  <p>Presiona actualizar para recolectar noticias desde las fuentes configuradas.</p>
+
+                <section className="collected-board">
+                  <div className="section-label">Noticias recolectadas</div>
+                  <div className="collected-list">
+                    {showArticleSkeleton
+                      ? Array.from({ length: 4 }, (_, index) => <NewsCardSkeleton key={index} />)
+                      : collectedArticles.map((article) => (
+                          <NewsCard key={article.id} article={article} />
+                        ))}
+                  </div>
+                  {!showArticleSkeleton && collectedArticles.length === 0 && (
+                    <section className="empty-state compact">
+                      <span className="panel-title">Sin noticias recolectadas</span>
+                      <p>Presiona actualizar para recolectar noticias desde las fuentes configuradas.</p>
+                    </section>
+                  )}
                 </section>
-              )}
+              </div>
             </div>
 
             <aside className="side-stack">

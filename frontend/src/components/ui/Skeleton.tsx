@@ -93,6 +93,22 @@ export const TableSkeleton = () => (
 
 export const ArticleDetailSkeleton = () => (
   <section className="detail-layout" aria-label="Cargando articulo">
+    <aside className="related-briefs-sidebar skeleton-related-briefs" aria-hidden="true">
+      <SkeletonBlock className="skeleton-line skeleton-line-sm" />
+      <div className="related-briefs-list">
+        {Array.from({ length: 3 }, (_, index) => (
+          <article className="summary-card skeleton-card" key={index}>
+            <SkeletonBlock className="skeleton-media" />
+            <div className="skeleton-stack">
+              <SkeletonBlock className="skeleton-line skeleton-line-xs" />
+              <SkeletonBlock className="skeleton-line skeleton-line-lg" />
+              <SkeletonBlock className="skeleton-line" />
+              <SkeletonBlock className="skeleton-line skeleton-line-md" />
+            </div>
+          </article>
+        ))}
+      </div>
+    </aside>
     <article className="detail-article skeleton-detail" aria-hidden="true">
       <SkeletonBlock className="skeleton-line skeleton-line-xs" />
       <SkeletonBlock className="skeleton-line skeleton-line-sm" />
