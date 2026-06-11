@@ -22,6 +22,13 @@ Componentes:
 - **Distributors:** preparacion para WhatsApp y Telegram.
 - **Scheduler:** ejecucion automatizada.
 
+Alcance de confianza informativa:
+
+- EcoBrief conserva enlace a la fuente original.
+- Prioriza articulos con cuerpo, fecha y fuente identificada.
+- Reduce dependencia de informacion obtenida por scroll en redes sociales.
+- No reemplaza fact-checking periodistico, pero ayuda a evitar contenido no trazable.
+
 **Diagrama:** `diagrams/technical-architecture.puml`.
 
 ---
@@ -243,6 +250,7 @@ Metricas estimadas:
 - MB evitados.
 - Tasa de reduccion.
 - Llamadas IA evitadas.
+- Sesiones de busqueda o scroll evitadas.
 
 Nota metodologica:
 
@@ -391,10 +399,11 @@ ruff check src tests
 |---|---|
 | Cambios de HTML en fuentes | Tests por fuente y selectores configurables |
 | Falsos positivos en dedupe | Umbral conservador y marcado sin borrado |
-| Falsos negativos | Roadmap con embeddings |
+| Falsos negativos | Ajuste de reglas, entidades y comparacion multi-fuente |
 | Costos IA | Dedupe, cache, ranking y limites |
 | Mensajeria productiva | Activacion gradual |
 | Metricas ambientales estimadas | Transparencia metodologica |
+| Informacion falsa o descontextualizada | Trazabilidad a fuente original y priorizacion de contenido verificable |
 
 ---
 
@@ -406,6 +415,7 @@ ruff check src tests
 - Exponer metricas historicas de duplicados.
 - Mostrar fuentes relacionadas en UI.
 - Alertas de errores de scraping.
+- Medir reduccion estimada de busquedas repetitivas en redes sociales.
 
 ### Mediano plazo
 
@@ -413,13 +423,14 @@ ruff check src tests
 - Dashboard historico.
 - WhatsApp/Telegram productivo.
 - Monitoreo de costos IA.
+- Integracion de boletines y comunicados de instituciones del Estado.
 
 ### Largo plazo
 
-- Embeddings para clustering semantico.
 - Deteccion por entidades.
 - Evaluacion de precision de dedupe.
-- Estimacion de CO2 con metodologia externa.
+- Planes de suscripcion para usuarios avanzados, organizaciones y analistas.
+- Panel institucional para monitoreo de noticias, comunicados y alertas publicas.
 
 ---
 

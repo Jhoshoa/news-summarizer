@@ -14,10 +14,11 @@ EcoBrief Bolivia es una plataforma que usa IA de forma responsable para reducir 
 
 La propuesta no busca crear mas contenido. Busca reducir ruido digital.
 
-EcoBrief transforma un flujo disperso de noticias en informacion breve, priorizada y medible:
+EcoBrief transforma un flujo disperso de noticias, redes sociales y fuentes digitales en informacion breve, priorizada y medible:
 
 - De muchas paginas a pocos briefs.
 - De noticias repetidas a historias unicas.
+- De scroll social a informacion trazable.
 - De IA aplicada sin filtro a IA aplicada despues de deduplicar.
 - De navegacion manual a informacion personalizada.
 - De impacto ambiguo a metricas visibles.
@@ -32,7 +33,7 @@ Mensaje central:
 
 ## 2. Problema Green Tech
 
-Informarse sobre la actualidad boliviana suele implicar revisar varios medios, abrir muchas paginas, comparar titulares y descartar noticias repetidas. Este proceso genera desperdicio digital.
+Informarse sobre la actualidad boliviana suele implicar revisar varios medios, abrir muchas paginas, comparar titulares, buscar contexto en redes sociales y descartar noticias repetidas. Este proceso genera desperdicio digital.
 
 El desperdicio ocurre en cuatro niveles:
 
@@ -42,8 +43,9 @@ El desperdicio ocurre en cuatro niveles:
 | Datos | Carga innecesaria de paginas, imagenes, scripts y publicidad |
 | IA | Procesamiento redundante si se resumen articulos duplicados |
 | Ecosistema digital | Mayor navegacion, mas requests y mas consumo de recursos |
+| Confianza | Exposicion a contenido viral, fragmentado o sin fuente trazable |
 
-Una misma noticia puede aparecer en varios medios, con titulos distintos o URLs diferentes. Sin una capa de deduplicacion y priorizacion, el usuario y el sistema terminan procesando informacion redundante.
+Una misma noticia puede aparecer en varios medios, con titulos distintos o URLs diferentes. Tambien puede circular como video corto, captura o post sin contexto en redes sociales como TikTok o Facebook. Sin una capa de deduplicacion, priorizacion y trazabilidad, el usuario y el sistema terminan procesando informacion redundante o dificil de verificar.
 
 ---
 
@@ -62,7 +64,8 @@ El sistema:
 7. Resume con IA solo los articulos seleccionados.
 8. Presenta una experiencia web clara.
 9. Prepara distribucion personalizada por preferencias.
-10. Mide impacto digital estimado.
+10. Mantiene trazabilidad hacia fuentes originales.
+11. Mide impacto digital estimado.
 
 **Diagrama recomendado:** ver `diagrams/executive-flow.puml`.
 
@@ -74,6 +77,8 @@ El sistema:
 |---|---|
 | Abrir varios sitios de noticias | Ver un brief centralizado |
 | Leer titulares repetidos | Ver historias deduplicadas |
+| Hacer scroll en redes para informarse | Consumir informacion sintetizada y trazable |
+| Ver contenido viral sin contexto | Acceder a fuentes identificadas y enlaces originales |
 | Consumir paginas completas | Consumir resumenes compactos |
 | Procesar todo con IA | Usar IA solo despues de filtrar y priorizar |
 | No saber cuanto se reduce | Ver metricas de impacto |
@@ -107,6 +112,14 @@ El usuario puede leer briefs compactos en lugar de cargar paginas completas con 
 
 Las preferencias por categoria y frecuencia reducen informacion no solicitada y evitan spam informativo.
 
+### 5.6 Reduce dependencia del scroll social
+
+EcoBrief ofrece una alternativa al consumo informativo en redes sociales. En lugar de depender de TikTok, Facebook u otros feeds con videos, comentarios y contenido no siempre trazable, el usuario recibe briefs compactos, priorizados y enlazados a fuentes identificadas.
+
+### 5.7 Ayuda a mitigar informacion falsa o descontextualizada
+
+EcoBrief no reemplaza la verificacion periodistica ni afirma eliminar noticias falsas. Su aporte es reducir la exposicion a informacion no trazable al priorizar contenido con fuente, fecha, cuerpo de noticia y enlace original. Esto ayuda a que el usuario compare hechos desde fuentes identificadas en lugar de depender solo de clips o publicaciones virales.
+
 ---
 
 ## 6. Impacto medible
@@ -136,6 +149,7 @@ Con base en el flujo anterior, se estiman:
 - MB no descargados.
 - Llamadas IA evitadas.
 - Tasa de reduccion del flujo.
+- Sesiones de busqueda o scroll evitadas.
 
 Formulas:
 
@@ -324,8 +338,8 @@ El prototipo tiene limitaciones claras:
 - Los scrapers dependen de cambios en HTML de los medios.
 - WhatsApp en produccion requiere credenciales y costos externos.
 - No todos los articulos historicos tienen backfill de huellas.
-- La agrupacion semantica avanzada con embeddings esta en roadmap.
-- La estimacion de CO2 requiere una metodologia mas rigurosa.
+- La verificacion automatica de informacion falsa no forma parte del MVP.
+- La integracion de boletines institucionales esta planteada como futura implementacion.
 
 Estas limitaciones estan identificadas y no afectan la demostracion del MVP.
 
@@ -339,19 +353,20 @@ Estas limitaciones estan identificadas y no afectan la demostracion del MVP.
 - Mostrar en UI cuantas coberturas fueron agrupadas.
 - Exponer duplicados historicos en pagina de impacto.
 - Mejorar historial de metricas.
+- Medir reduccion estimada de busquedas repetitivas en redes sociales.
 
 ### Mediano plazo
 
 - Medir datos reales descargados/evitados.
-- Agregar estimacion de energia y CO2 con metodologia documentada.
 - Activar WhatsApp/Telegram en produccion.
 - Crear dashboard por usuario.
+- Integrar boletines y comunicados de instituciones del Estado como fuentes verificables.
 
 ### Largo plazo
 
-- Clustering semantico con embeddings.
 - Deteccion por entidades, personas y lugares.
-- Panel para organizaciones, periodistas o analistas.
+- Planes de suscripcion para usuarios avanzados, organizaciones, periodistas o analistas.
+- Panel institucional para monitoreo de noticias, comunicados y alertas publicas.
 - Monitoreo automatico de cambios en fuentes.
 
 ---
@@ -362,7 +377,7 @@ EcoBrief Bolivia convierte un problema cotidiano en una solucion Green Tech conc
 
 El proyecto tiene tres fortalezas para el concurso:
 
-1. **Alineacion clara:** reduce navegacion, duplicacion, datos y procesamiento IA innecesario.
+1. **Alineacion clara:** reduce navegacion, scroll social, duplicacion, datos y procesamiento IA innecesario.
 2. **Prototipo funcional:** no es solo una idea; ya existe una app con backend, frontend, BD y metricas.
 3. **Impacto medible:** el sistema muestra reduccion del flujo informativo y permite estimar ahorro de tiempo, paginas y datos.
 
