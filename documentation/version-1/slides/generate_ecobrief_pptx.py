@@ -11,6 +11,11 @@ OUT = Path(__file__).with_name("ecobrief-green-tech-pitch.pptx")
 SLIDE_W = 13_333_333
 SLIDE_H = 7_500_000
 
+TITLE_Y = 760_000
+TITLE_H = 1_260_000
+SUBTITLE_Y = 2_140_000
+CONTENT_Y = 3_030_000
+
 COLORS = {
     "forest": "12372A",
     "green": "1B7F5C",
@@ -255,8 +260,8 @@ def add_header(slide: dict) -> str:
         rect(0, 0, SLIDE_W, 7_500_000, COLORS["cream"], radius="rect")
         + rect(0, 0, 245_000, SLIDE_H, COLORS["green"], radius="rect")
         + text_box(620_000, 410_000, 3_600_000, 260_000, slide["kicker"], 1350, COLORS["green"], True)
-        + text_box(620_000, 775_000, 7_700_000, 980_000, slide["title"], 4050, COLORS["forest"], True)
-        + text_box(630_000, 1_710_000, 7_850_000, 570_000, slide.get("subtitle", ""), 1950, COLORS["muted"])
+        + text_box(620_000, TITLE_Y, 8_250_000, TITLE_H, slide["title"], 3450, COLORS["forest"], True)
+        + text_box(630_000, SUBTITLE_Y, 8_350_000, 620_000, slide.get("subtitle", ""), 1850, COLORS["muted"])
     )
 
 
@@ -277,7 +282,7 @@ def render_slide(slide: dict, idx: int) -> str:
     else:
         shapes.append(add_header(slide))
         if "bullets" in slide:
-            shapes.append(bullet_list(770_000, 2_650_000, 6_850_000, slide["bullets"]))
+            shapes.append(bullet_list(770_000, CONTENT_Y, 6_850_000, slide["bullets"]))
         if "columns" in slide:
             col_count = len(slide["columns"])
             col_w = 3_780_000 if col_count == 3 else 4_950_000
@@ -285,12 +290,12 @@ def render_slide(slide: dict, idx: int) -> str:
             gap = 340_000
             for i, (heading, items) in enumerate(slide["columns"]):
                 x = start_x + i * (col_w + gap)
-                shapes.append(rect(x, 2_680_000, col_w, 3_520_000, COLORS["white"], COLORS["mint"]))
-                shapes.append(text_box(x + 260_000, 2_930_000, col_w - 520_000, 360_000, heading, 2300, COLORS["green"], True))
-                shapes.append(bullet_list(x + 300_000, 3_460_000, col_w - 580_000, items, COLORS["ink"]))
+                shapes.append(rect(x, CONTENT_Y, col_w, 3_220_000, COLORS["white"], COLORS["mint"]))
+                shapes.append(text_box(x + 260_000, CONTENT_Y + 230_000, col_w - 520_000, 340_000, heading, 2200, COLORS["green"], True))
+                shapes.append(bullet_list(x + 300_000, CONTENT_Y + 720_000, col_w - 580_000, items, COLORS["ink"]))
         if "steps" in slide:
             x = 720_000
-            y = 3_020_000
+            y = CONTENT_Y + 260_000
             for i, step in enumerate(slide["steps"]):
                 shapes.append(rect(x, y, 1_350_000, 760_000, COLORS["white"], COLORS["mint"]))
                 shapes.append(text_box(x + 80_000, y + 135_000, 1_190_000, 180_000, f"{i + 1}", 1650, COLORS["green"], True, align="c"))
@@ -299,7 +304,7 @@ def render_slide(slide: dict, idx: int) -> str:
                     shapes.append(text_box(x + 1_380_000, y + 250_000, 250_000, 250_000, ">", 2400, COLORS["green"], True, align="c"))
                 x += 1_570_000
         if "table" in slide:
-            y = 2_620_000
+            y = CONTENT_Y
             for label, value in slide["table"]:
                 fill = COLORS["white"] if (y // 440_000) % 2 else COLORS["mint"]
                 shapes.append(rect(830_000, y, 7_350_000, 340_000, fill, radius="rect"))
@@ -307,11 +312,11 @@ def render_slide(slide: dict, idx: int) -> str:
                 shapes.append(text_box(6_000_000, y + 70_000, 1_900_000, 170_000, value, 1700, COLORS["forest"], True, align="r"))
                 y += 445_000
         if "placeholder" in slide:
-            shapes.append(rect(8_250_000, 2_600_000, 3_950_000, 2_650_000, COLORS["white"], COLORS["green"]))
-            shapes.append(text_box(8_600_000, 3_470_000, 3_250_000, 620_000, slide["placeholder"], 2100, COLORS["muted"], True, align="c"))
+            shapes.append(rect(8_250_000, CONTENT_Y, 3_950_000, 2_650_000, COLORS["white"], COLORS["green"]))
+            shapes.append(text_box(8_600_000, CONTENT_Y + 870_000, 3_250_000, 620_000, slide["placeholder"], 2100, COLORS["muted"], True, align="c"))
         if "callout" in slide:
-            shapes.append(rect(8_500_000, 4_920_000, 3_900_000, 1_150_000, COLORS["forest"]))
-            shapes.append(text_box(8_790_000, 5_180_000, 3_320_000, 540_000, slide["callout"], 2050, COLORS["white"], True, align="c"))
+            shapes.append(rect(8_500_000, 5_140_000, 3_900_000, 1_150_000, COLORS["forest"]))
+            shapes.append(text_box(8_790_000, 5_400_000, 3_320_000, 540_000, slide["callout"], 1950, COLORS["white"], True, align="c"))
         shapes.append(text_box(11_940_000, 6_930_000, 720_000, 220_000, f"{idx:02d}", 1300, COLORS["green"], True, align="r"))
     return slide_xml("".join(shapes))
 
