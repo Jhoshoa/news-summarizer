@@ -11,7 +11,7 @@ sources:
     title_selector: "h2 a, h3 a"
     url_selector: "a.post-link, a"
     date_selector: ".post-date, .date, time"
-    image_selector: "img"
+    image_selector: "div[frame='imagenPrincipalNota_B'] img, meta[property='og:image'], img"
     body_selector: "article .entry-content p, article .post-content p, .entry-content p, .post-content p, article p"
     enabled: true
     
@@ -23,7 +23,7 @@ sources:
     selector: "article, .noticia-item, .news-item"
     title_selector: "h2 a, h3 a, .title a"
     url_selector: "a"
-    date_selector: ".vu-td-fdp, .fecha, .date, time"
+    date_selector: ".UNITEL_DETALLE_FECHA_PUBLICACION, .vu-td-fdp, .fecha, .date, time"
     image_selector: "img"
     body_selector: "main article p, main section p, .article-body p, .nota-contenido p, .news-detail p"
     enabled: true

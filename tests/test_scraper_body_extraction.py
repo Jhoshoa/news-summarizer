@@ -594,6 +594,84 @@ def test_detail_date_extracts_generic_article_published_time_meta():
     assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 8, 9, 15)
 
 
+def test_unitel_detail_date_extracts_specific_publication_class():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Unitel",
+        url="https://unitel.bo/",
+        date_selector=".UNITEL_DETALLE_FECHA_PUBLICACION, .fecha, .date, time",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <body>
+            <span class="UNITEL_DETALLE_FECHA_PUBLICACION">
+              Publicado el: 10/06/2026 08:42
+            </span>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 10, 8, 42)
+
+
+def test_filter_usable_articles_drops_non_today_detail_date_even_with_description():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(name="Unitel", url="https://unitel.bo/")
+
+    articles = scraper._filter_usable_articles(
+        [
+            {
+                "title": "Noticia antigua con descripcion suficiente",
+                "description": "Descripcion suficientemente larga para pasar la validacion de texto util.",
+                "published_at": datetime.now() - timedelta(days=1),
+                "skipped_detail_reason": "non_today_detail_date",
+            },
+            {
+                "title": "Noticia actual con descripcion suficiente",
+                "description": "Descripcion suficientemente larga para pasar la validacion de texto util.",
+                "published_at": datetime.now(),
+            },
+        ],
+        source,
+    )
+
+    assert [article["title"] for article in articles] == [
+        "Noticia actual con descripcion suficiente"
+    ]
+
+
+def test_unitel_extracts_public_main_image_from_data_srcset():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Unitel",
+        url="https://unitel.bo/",
+        image_selector="div[frame='imagenPrincipalNota_B'] img, meta[property='og:image'], img",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <body>
+            <div frame="imagenPrincipalNota_B">
+              <img
+                src="//estaticos.unitel.bo/placeholder/svg/viewbox/1024x512"
+                data-srcset="//estaticos.unitel.bo/binrepository/1024x545/0c17/1024d512/none/246276540/HAKB/unitel-noticias_101-15749089_20260611012545.jpg 1024w,//estaticos.unitel.bo/binrepository/512x273/0c9/512d256/none/246276540/XUJI/unitel-noticias_101-15749089_20260611012545.jpg 512w"
+              />
+            </div>
+          </body>
+        </html>
+        """,
+        "lxml",
+    )
+
+    assert scraper._extract_image(soup, source) == (
+        "https://estaticos.unitel.bo/binrepository/1024x545/0c17/1024d512/none/"
+        "246276540/HAKB/unitel-noticias_101-15749089_20260611012545.jpg"
+    )
+
+
 def test_redbolivision_detail_date_extracts_single_layout_meta_date():
     scraper = NewsScraper(sources=[])
     source = NewsSource(

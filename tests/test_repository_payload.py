@@ -134,6 +134,34 @@ def test_day_bounds_cover_exact_selected_date():
     assert end_at == datetime(2026, 5, 29, 0, 0, 0)
 
 
+def test_existing_scraper_article_keeps_original_published_at_when_new_date_is_fallback():
+    db = object.__new__(Database)
+    existing_published_at = datetime(2026, 6, 10, 8, 42)
+
+    assert (
+        db._should_update_article_published_at(
+            {
+                "source_type": "scraper",
+                "published_at": datetime(2026, 6, 11, 9, 15),
+                "published_at_from_listing": False,
+            },
+            existing_published_at,
+        )
+        is False
+    )
+    assert (
+        db._should_update_article_published_at(
+            {
+                "source_type": "scraper",
+                "published_at": datetime(2026, 6, 10, 8, 42),
+                "published_at_from_detail": True,
+            },
+            existing_published_at,
+        )
+        is True
+    )
+
+
 def test_article_filters_can_exclude_summarized_articles_for_selected_date():
     db = object.__new__(Database)
 
@@ -147,6 +175,18 @@ def test_article_filters_can_exclude_summarized_articles_for_selected_date():
     assert "news_summaries" in compiled_filter
     assert "news_summaries.article_id = news_articles.id" in compiled_filter
     assert "news_summaries.summary_date = '2026-06-03'" in compiled_filter
+
+
+def test_summary_filters_keep_summary_date_aligned_with_article_publish_date():
+    db = object.__new__(Database)
+
+    filters = db._summary_filters(summary_date=date(2026, 6, 11))
+    compiled_filters = "\n".join(
+        str(item.compile(compile_kwargs={"literal_binds": True})) for item in filters
+    )
+
+    assert "news_summaries.summary_date = '2026-06-11'" in compiled_filters
+    assert "date(news_articles.published_at) = '2026-06-11'" in compiled_filters
 
 
 def test_paginated_response_includes_fallback_metadata():

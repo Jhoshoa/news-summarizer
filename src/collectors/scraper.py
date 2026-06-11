@@ -97,7 +97,8 @@ class NewsScraper:
             selector="article, .noticia-item, .news-item",
             title_selector="h2 a, h3 a, .title a",
             url_selector="a",
-            date_selector=".fecha, .date, time",
+            date_selector=".UNITEL_DETALLE_FECHA_PUBLICACION, .fecha, .date, time",
+            image_selector="div[frame='imagenPrincipalNota_B'] img, meta[property='og:image'], img",
             body_selector=(
                 "main article p, main section p, "
                 ".article-body p, .nota-contenido p, .news-detail p"
@@ -309,7 +310,9 @@ class NewsScraper:
         usable = [
             article
             for article in articles
-            if self._has_usable_text(article) and not self._has_future_publish_date(article)
+            if self._has_usable_text(article)
+            and not self._has_future_publish_date(article)
+            and not self._has_non_today_detail_skip(article)
         ]
         dropped = len(articles) - len(usable)
         if dropped:
@@ -336,6 +339,9 @@ class NewsScraper:
 
         return published_at > datetime.now() + timedelta(days=1)
 
+    def _has_non_today_detail_skip(self, article: dict) -> bool:
+        return article.get("skipped_detail_reason") == "non_today_detail_date"
+
     async def _enrich_article(
         self,
         client: httpx.AsyncClient,
@@ -357,6 +363,7 @@ class NewsScraper:
         detail_date = self._extract_detail_date(soup, source)
         if detail_date:
             article["published_at"] = detail_date
+            article["published_at_from_detail"] = True
             if self._has_non_today_publish_date(detail_date):
                 article["skipped_detail_reason"] = "non_today_detail_date"
                 return article
@@ -909,17 +916,27 @@ class NewsScraper:
         image_elem = article_soup.select_one(source.image_selector)
         if not image_elem:
             return None
-        image_url = (
-            image_elem.get("src")
-            or image_elem.get("data-src")
-            or image_elem.get("data-lazy-src")
-            or (image_elem.get("srcset", "").split()[0] if image_elem.get("srcset") else None)
-        )
+        image_url = self._extract_image_url_from_element(image_elem)
         if not image_url:
             return None
 
         image_url = urljoin(source.url, image_url)
         return None if self._is_non_article_image(image_url) else image_url
+
+    def _extract_image_url_from_element(self, image_elem) -> str | None:
+        if image_elem.name == "meta":
+            return image_elem.get("content")
+
+        for attr in ("data-srcset", "srcset"):
+            srcset = image_elem.get(attr)
+            if srcset:
+                return srcset.split(",")[0].strip().split()[0]
+
+        return (
+            image_elem.get("data-src")
+            or image_elem.get("data-lazy-src")
+            or image_elem.get("src")
+        )
 
     def _is_non_article_image(self, image_url: str) -> bool:
         normalized = image_url.lower()

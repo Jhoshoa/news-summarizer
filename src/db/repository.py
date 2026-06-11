@@ -748,6 +748,10 @@ class Database:
 
                 if existing:
                     article["id"] = existing.id
+                    should_update_published_at = self._should_update_article_published_at(
+                        article,
+                        existing.published_at,
+                    )
                     existing.title = title
                     existing.url = url
                     existing.description = article.get("description")
@@ -760,9 +764,12 @@ class Database:
                     existing.content_fingerprint = content_fingerprint
                     existing.story_cluster_id = existing.story_cluster_id or content_fingerprint
                     existing.country = article.get("country")
-                    existing.published_at = published_at
-                    existing.collected_at = datetime.utcnow()
-                    existing.score = score
+                    if should_update_published_at:
+                        existing.published_at = published_at
+                        existing.score = score
+                    else:
+                        article["published_at"] = existing.published_at
+                        article["score"] = existing.score
                     existing.is_active = True
                     self._copy_story_metadata_to_payload(article, existing)
                     existing.raw_payload = self._normalize_payload(article)
@@ -1331,7 +1338,13 @@ class Database:
         summary_date: date,
         article_id: int | None = None,
     ) -> list[Any]:
-        filters = [NewsSummary.summary_date == summary_date]
+        filters = [
+            NewsSummary.summary_date == summary_date,
+            or_(
+                NewsSummary.article_id.is_(None),
+                func.date(NewsArticle.published_at) == summary_date,
+            ),
+        ]
         if category:
             filters.append(NewsCategory.name == category.strip().lower())
         if article_id is not None:
@@ -1523,6 +1536,19 @@ class Database:
         if isinstance(value, datetime):
             return value.replace(tzinfo=None) if value.tzinfo else value
         return datetime.now()
+
+    def _should_update_article_published_at(
+        self,
+        article: dict[str, Any],
+        existing_published_at: datetime | None,
+    ) -> bool:
+        if existing_published_at is None:
+            return True
+        return bool(
+            article.get("published_at_from_detail")
+            or article.get("published_at_from_listing")
+            or article.get("source_type") != "scraper"
+        )
 
     def _coerce_score(self, value: Any) -> float:
         try:

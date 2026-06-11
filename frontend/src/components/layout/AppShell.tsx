@@ -25,13 +25,15 @@ export const AppShell = ({
   onRefresh,
 }: AppShellProps) => (
   <div className="app-frame">
-    <Header
-      activePath={activePath}
-      compact={compactHeader}
-      isRefreshing={isRefreshing}
-      onRefresh={onRefresh}
-    />
-    <NavigationTrail backFallback={backFallback} breadcrumbs={breadcrumbs} />
+    <div className="sticky-shell-header">
+      <Header
+        activePath={activePath}
+        compact={compactHeader}
+        isRefreshing={isRefreshing}
+        onRefresh={onRefresh}
+      />
+      <NavigationTrail backFallback={backFallback} breadcrumbs={breadcrumbs} />
+    </div>
     <main className="page">{children}</main>
     <Footer />
   </div>
