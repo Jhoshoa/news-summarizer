@@ -1130,10 +1130,11 @@ class Database:
         *,
         llm_provider: str | None = None,
         llm_model: str | None = None,
+        summary_date: date | None = None,
     ) -> dict[str, int]:
         inserted = 0
         updated = 0
-        summary_date = date.today()
+        summary_date = summary_date or date.today()
 
         async with self.session_maker() as session:
             category_cache: dict[str, NewsCategory] = {}
@@ -1206,6 +1207,9 @@ class Database:
                     NewsArticle.url,
                     NewsArticle.title,
                     NewsSource.name,
+                    NewsArticle.published_at,
+                    NewsArticle.image_url,
+                    NewsArticle.description,
                 )
                 .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
                 .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
@@ -1213,6 +1217,8 @@ class Database:
                 .where(
                     NewsCategory.name.in_(categories),
                     NewsSummary.summary_date == summary_date,
+                    NewsArticle.published_at.is_not(None),
+                    func.date(NewsArticle.published_at) == summary_date,
                 )
                 .order_by(NewsSummary.created_at.desc())
             )

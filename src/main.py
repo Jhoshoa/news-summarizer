@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import sys
 import traceback
 from contextlib import asynccontextmanager
@@ -24,7 +25,7 @@ from src.api.security import require_cron_key
 from src.collectors import NewsAPICollector, NewsScraper
 from src.config import Settings, get_settings
 from src.db import Database
-from src.distributors import TelegramHandler, WhatsAppHandler
+from src.distributors import EmailHandler, TelegramHandler, WhatsAppHandler
 from src.llm import LLMProvider
 from src.processors import Deduplicator, NewsClassifier, NewsRanker, NewsRewriter, NewsSummarizer
 from src.scheduler import NewsScheduler
@@ -39,6 +40,7 @@ class NewsSummarizerApp:
         self.llm: LLMProvider | None = None
         self.whatsapp: WhatsAppHandler | None = None
         self.telegram: TelegramHandler | None = None
+        self.email: EmailHandler | None = None
         self.scheduler: NewsScheduler | None = None
 
     async def startup(self):
@@ -93,6 +95,7 @@ class NewsSummarizerApp:
 
         self.whatsapp = WhatsAppHandler(self.db, self.settings)
         self.telegram = TelegramHandler(self.db, self.settings)
+        self.email = EmailHandler(self.db, self.settings)
 
         logger.info("Aplicacion iniciada")
 
@@ -107,13 +110,21 @@ class NewsSummarizerApp:
 
         logger.info("Aplicacion cerrada")
 
-    async def send_summaries(self, time_of_day: str = "morning", refresh: bool = False):
-        """Generates and sends summaries to active subscribers."""
+    async def send_summaries(
+        self,
+        time_of_day: str = "morning",
+        refresh: bool = False,
+        *,
+        deliver: bool = True,
+    ):
+        """Generates summaries and optionally delivers them to active subscribers."""
 
-        logger.info(f"Generating summaries ({time_of_day}) refresh={refresh}")
+        logger.info(f"Generating summaries ({time_of_day}) refresh={refresh} deliver={deliver}")
 
         categories = self.settings.categories_list
+        brief_date = self._brief_date()
         sent_count = 0
+        delivery_stats = self._empty_delivery_stats()
         news: list[dict] = []
         summaries: list[dict] = []
         used_cached_articles = False
@@ -137,7 +148,10 @@ class NewsSummarizerApp:
 
         if self.db:
             try:
-                summaries = await self.db.get_recent_summaries(categories)
+                summaries = await self.db.get_recent_summaries(
+                    categories,
+                    summary_date=brief_date,
+                )
                 if summaries and not refresh:
                     used_cached_summaries = True
                     pipeline_metrics["used_cached_summaries"] = True
@@ -190,6 +204,7 @@ class NewsSummarizerApp:
                     "used_cached_articles": used_cached_articles,
                     "used_cached_summaries": used_cached_summaries,
                     "collection_stats": collection_stats,
+                    "delivery_stats": delivery_stats,
                 }
 
             before_quality_filter = len(news)
@@ -223,6 +238,7 @@ class NewsSummarizerApp:
                     "used_cached_articles": used_cached_articles,
                     "used_cached_summaries": used_cached_summaries,
                     "collection_stats": collection_stats,
+                    "delivery_stats": delivery_stats,
                 }
 
             deduplicator = Deduplicator()
@@ -282,6 +298,7 @@ class NewsSummarizerApp:
                     "used_cached_articles": used_cached_articles,
                     "used_cached_summaries": used_cached_summaries,
                     "collection_stats": collection_stats,
+                    "delivery_stats": delivery_stats,
                 }
 
             summary_candidates = self._select_summary_candidates(news, categories)
@@ -303,6 +320,7 @@ class NewsSummarizerApp:
                         summaries,
                         llm_provider=self.llm.provider,
                         llm_model=self.llm.models.get("quality"),
+                        summary_date=brief_date,
                     )
                 except Exception as e:
                     logger.error(f"Error guardando summaries: {e}")
@@ -327,21 +345,85 @@ class NewsSummarizerApp:
                 "used_cached_articles": used_cached_articles,
                 "used_cached_summaries": used_cached_summaries,
                 "collection_stats": collection_stats,
+                "delivery_stats": delivery_stats,
             }
+
+        if deliver:
+            sent_count, delivery_stats = await self._deliver_summaries(
+                summaries=summaries,
+                categories=categories,
+                time_of_day=time_of_day,
+            )
+        else:
+            logger.info("Delivery skipped for summary refresh")
+
+        logger.info(f"Resumenes procesados: {len(summaries)}")
+        if summaries:
+            logger.info(f"Sample summary: {summaries[0]}")
+
+        return {
+            "collected": len(news),
+            "summaries": len(summaries),
+            "sent": sent_count,
+            "used_cached_articles": used_cached_articles,
+            "used_cached_summaries": used_cached_summaries,
+            "collection_stats": collection_stats,
+            "delivery_stats": delivery_stats,
+        }
+
+    async def deliver_cached_summaries(self, time_of_day: str = "manual"):
+        """Entrega summaries ya guardados sin recolectar, deduplicar ni llamar al LLM."""
+
+        categories = self.settings.categories_list
+        brief_date = self._brief_date()
+        if not self.db:
+            logger.warning("DB no disponible, no se entregan summaries cacheados")
+            return {
+                "collected": 0,
+                "summaries": 0,
+                "sent": 0,
+                "used_cached_articles": False,
+                "used_cached_summaries": False,
+                "collection_stats": {"scraper": 0, "newsapi": 0, "inserted": 0, "updated": 0},
+                "delivery_stats": self._empty_delivery_stats(),
+            }
+
+        summaries = await self.db.get_recent_summaries(categories, summary_date=brief_date)
+        sent_count, delivery_stats = await self._deliver_summaries(
+            summaries=summaries,
+            categories=categories,
+            time_of_day=time_of_day,
+        )
+        return {
+            "collected": 0,
+            "summaries": len(summaries),
+            "sent": sent_count,
+            "used_cached_articles": False,
+            "used_cached_summaries": bool(summaries),
+            "collection_stats": {"scraper": 0, "newsapi": 0, "inserted": 0, "updated": 0},
+            "delivery_stats": delivery_stats,
+        }
+
+    async def _deliver_summaries(
+        self,
+        *,
+        summaries: list[dict],
+        categories: list[str],
+        time_of_day: str,
+    ) -> tuple[int, dict[str, dict[str, int]]]:
+        if not self.db:
+            logger.warning("DB no disponible, no se envia nada")
+            return 0, self._empty_delivery_stats()
+
+        sent_count = 0
+        delivery_stats = self._empty_delivery_stats()
 
         logger.info(f"Checking subscribers... DB: {self.db}")
         try:
             subscribers = await self.db.get_active_subscribers()
         except Exception as e:
             logger.error(f"Error obtaining subscribers: {e}")
-            return {
-                "collected": len(news),
-                "summaries": len(summaries),
-                "sent": 0,
-                "used_cached_articles": used_cached_articles,
-                "used_cached_summaries": used_cached_summaries,
-                "collection_stats": collection_stats,
-            }
+            return 0, delivery_stats
 
         logger.info(f"Active subscribers: {len(subscribers)}")
 
@@ -363,28 +445,51 @@ class NewsSummarizerApp:
                 if not user_news:
                     continue
 
-                message = self._format_summary(user_news[:10])
+                user_news = user_news[:10]
 
                 if sub.channel == "whatsapp" and sub.phone:
-                    self.whatsapp.send_message(sub.phone, message)
-                    sent_count += 1
+                    message = self._format_summary(user_news)
+                    delivered = bool(self.whatsapp and self.whatsapp.send_message(sub.phone, message))
+                    if delivered:
+                        sent_count += 1
+                        delivery_stats["sent_by_channel"]["whatsapp"] += 1
+                    else:
+                        delivery_stats["failed_by_channel"]["whatsapp"] += 1
                 elif sub.channel == "telegram" and sub.telegram_id:
-                    await self.telegram.send_message(sub.telegram_id, message)
-                    sent_count += 1
+                    message = self._format_summary(user_news)
+                    delivered = bool(
+                        self.telegram and await self.telegram.send_message(sub.telegram_id, message)
+                    )
+                    if delivered:
+                        sent_count += 1
+                        delivery_stats["sent_by_channel"]["telegram"] += 1
+                    else:
+                        delivery_stats["failed_by_channel"]["telegram"] += 1
+                elif sub.channel == "email" and getattr(sub, "email", None):
+                    subject, body, html_body = self._format_email_summary(user_news)
+                    delivered = bool(
+                        self.email
+                        and await self.email.send_message(
+                            sub.email,
+                            subject,
+                            body,
+                            html_body,
+                        )
+                    )
+                    if delivered:
+                        sent_count += 1
+                        delivery_stats["sent_by_channel"]["email"] += 1
+                    else:
+                        delivery_stats["failed_by_channel"]["email"] += 1
             except Exception as e:
                 logger.error(f"Error enviando a {sub}: {e}")
 
-        logger.info(f"Resumenes procesados: {len(summaries)}")
-        if summaries:
-            logger.info(f"Sample summary: {summaries[0]}")
+        return sent_count, delivery_stats
 
+    def _empty_delivery_stats(self) -> dict[str, dict[str, int]]:
         return {
-            "collected": len(news),
-            "summaries": len(summaries),
-            "sent": sent_count,
-            "used_cached_articles": used_cached_articles,
-            "used_cached_summaries": used_cached_summaries,
-            "collection_stats": collection_stats,
+            "sent_by_channel": {"email": 0, "telegram": 0, "whatsapp": 0},
+            "failed_by_channel": {"email": 0, "telegram": 0, "whatsapp": 0},
         }
 
     def _filter_usable_articles(self, news: list[dict]) -> list[dict]:
@@ -603,9 +708,127 @@ class NewsSummarizerApp:
         preferred_time = str(getattr(subscriber, "preferred_time", "manana") or "manana").lower()
         if time_of_day == "morning":
             return preferred_time == "manana"
+        if time_of_day == "afternoon":
+            return preferred_time == "tarde"
+        if time_of_day == "night":
+            return preferred_time == "noche"
         if time_of_day == "evening":
             return preferred_time in {"tarde", "noche"}
         return True
+
+    def _format_email_summary(self, news: list[dict]) -> tuple[str, str, str]:
+        subject = "EcoBrief Bolivia - Brief del dia"
+        body = "EcoBrief Bolivia - Brief del dia\n\n"
+        body += "Noticias locales resumidas con menos ruido.\n\n"
+        items_html = []
+
+        for index, article in enumerate(news, 1):
+            title = str(article.get("title", ""))[:120]
+            summary = str(article.get("summary", ""))[:500]
+            fact = str(article.get("fact") or "").strip()
+            source = str(article.get("source") or "").strip()
+            url = str(article.get("url") or "").strip()
+
+            body += f"{index}. {title}\n"
+            body += f"   {summary}\n"
+
+            if fact:
+                body += f"   Dato: {fact}\n"
+            if source:
+                body += f"   Fuente: {source}\n"
+            if url:
+                body += f"   Link: {url}\n"
+            body += "\n"
+
+            meta_parts = []
+            if fact:
+                meta_parts.append(f"<strong>Dato:</strong> {html.escape(fact)}")
+            if source:
+                meta_parts.append(f"<strong>Fuente:</strong> {html.escape(source)}")
+            if url:
+                safe_url = html.escape(url, quote=True)
+                meta_parts.append(
+                    '<a href="'
+                    f'{safe_url}" '
+                    'style="color:#0f6b63;text-decoration:none;font-weight:700;">Link</a>'
+                )
+            meta_html = " · ".join(meta_parts)
+
+            items_html.append(
+                f"""
+                <tr>
+                  <td style="padding:16px 0;border-top:1px solid rgba(58,43,31,0.12);">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td valign="top" width="34" style="padding-right:10px;">
+                          <div style="width:28px;height:28px;border-radius:8px;background:#e6f1ec;color:#0f6b63;font:700 13px Inter,Segoe UI,Arial,sans-serif;text-align:center;line-height:28px;">
+                            {index}
+                          </div>
+                        </td>
+                        <td>
+                          <h2 style="margin:0 0 8px;color:#211914;font:700 18px/1.32 Inter,Segoe UI,Arial,sans-serif;">
+                            {html.escape(title)}
+                          </h2>
+                          <p style="margin:0 0 10px;color:#504238;font:400 14px/1.62 Inter,Segoe UI,Arial,sans-serif;">
+                            {html.escape(summary)}
+                          </p>
+                          <p style="margin:0;color:#736354;font:400 12px/1.55 Inter,Segoe UI,Arial,sans-serif;">
+                            {meta_html}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                """
+            )
+
+        body += "---\n"
+        body += "Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.\n"
+        html_body = self._format_email_html("".join(items_html))
+        return subject, body, html_body
+
+    def _format_email_html(self, items_html: str) -> str:
+        return f"""<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4eadc;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4eadc;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fffdf8;border:1px solid rgba(58,43,31,0.12);border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="background:#0f6b63;padding:22px 24px;">
+                <p style="margin:0 0 6px;color:#e6f1ec;font:700 12px/1.2 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;">
+                  EcoBrief Bolivia
+                </p>
+                <h1 style="margin:0;color:#ffffff;font:700 26px/1.22 Inter,Segoe UI,Arial,sans-serif;">
+                  Brief del dia
+                </h1>
+                <p style="margin:10px 0 0;color:rgba(255,255,255,.84);font:400 14px/1.5 Inter,Segoe UI,Arial,sans-serif;">
+                  Noticias locales resumidas con menos ruido.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 24px 4px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  {items_html}
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 24px 22px;background:#fbf5eb;border-top:1px solid rgba(58,43,31,0.12);">
+                <p style="margin:0;color:#736354;font:400 12px/1.6 Inter,Segoe UI,Arial,sans-serif;">
+                  Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>"""
 
     def _matches_frequency(self, subscriber: Any) -> bool:
         frequency = str(getattr(subscriber, "frequency", "diario") or "diario").lower()
@@ -632,6 +855,16 @@ class NewsSummarizerApp:
             return datetime.now(ZoneInfo(timezone_name))
         except ZoneInfoNotFoundError:
             return datetime.now(ZoneInfo("America/La_Paz"))
+
+    def _brief_date(self):
+        timezone_name = str(
+            getattr(self.settings, "schedule_timezone", None)
+            or "America/La_Paz"
+        )
+        try:
+            return datetime.now(ZoneInfo(timezone_name)).date()
+        except ZoneInfoNotFoundError:
+            return datetime.now(ZoneInfo("America/La_Paz")).date()
 
     def _deduplicate_summaries_for_delivery(self, summaries: list[dict]) -> list[dict]:
         unique: list[dict] = []
@@ -747,14 +980,18 @@ async def trigger_summary(
         description="Clave privada para endpoints internos.",
     ),
 ):
-    """Endpoint to trigger the summary manually."""
+    """Genera o actualiza summaries. No entrega a suscriptores por defecto."""
 
     if not app_instance:
         raise HTTPException(status_code=500, detail="App no inicializada")
     await require_cron_key(app_instance, x_api_key)
 
     try:
-        result = await app_instance.send_summaries(time_of_day, refresh=refresh)
+        result = await app_instance.send_summaries(
+            time_of_day,
+            refresh=refresh,
+            deliver=False,
+        )
         logger.info(
             "Manual summary refresh completed: "
             f"collected={result.get('collected')} processed={result.get('processed')} "
@@ -767,6 +1004,37 @@ async def trigger_summary(
         }
     except Exception as e:
         logger.error(f"Error-trigger: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/trigger/delivery")
+async def trigger_delivery(
+    time_of_day: str = "manual",
+    x_api_key: str | None = Header(
+        default=None,
+        alias="X-API-Key",
+        description="Clave privada para endpoints internos.",
+    ),
+):
+    """Entrega summaries existentes sin recolectar ni generar nuevos briefs."""
+
+    if not app_instance:
+        raise HTTPException(status_code=500, detail="App no inicializada")
+    await require_cron_key(app_instance, x_api_key)
+
+    try:
+        result = await app_instance.deliver_cached_summaries(time_of_day)
+        logger.info(
+            "Cached summary delivery completed: "
+            f"summaries={result.get('summaries')} sent={result.get('sent')}"
+        )
+        return {
+            "status": "success",
+            "message": f"Entrega {time_of_day} procesada",
+            "result": result,
+        }
+    except Exception as e:
+        logger.error(f"Error-delivery-trigger: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

@@ -12,7 +12,7 @@ class FakeDatabase:
         self.saved_summaries = []
         self.finished_runs = []
 
-    async def get_recent_summaries(self, categories):
+    async def get_recent_summaries(self, categories, summary_date=None):
         return []
 
     async def get_recent_articles(self, categories, since, limit=None):
@@ -30,8 +30,16 @@ class FakeDatabase:
     async def finish_collection_run(self, run_id, **kwargs):
         self.finished_runs.append({"run_id": run_id, **kwargs})
 
-    async def save_summaries(self, summaries, *, llm_provider=None, llm_model=None):
+    async def save_summaries(
+        self,
+        summaries,
+        *,
+        llm_provider=None,
+        llm_model=None,
+        summary_date=None,
+    ):
         self.saved_summaries = summaries
+        self.saved_summary_date = summary_date
         return {"inserted": len(summaries), "updated": 0}
 
     async def get_active_subscribers(self):
@@ -39,7 +47,7 @@ class FakeDatabase:
 
 
 class CacheFailingDatabase(FakeDatabase):
-    async def get_recent_summaries(self, categories):
+    async def get_recent_summaries(self, categories, summary_date=None):
         raise RuntimeError("schema cache read failed")
 
 
@@ -70,7 +78,8 @@ class CachedSummaryDatabase(FakeDatabase):
         self.summaries = summaries
         self.subscribers = subscribers
 
-    async def get_recent_summaries(self, categories):
+    async def get_recent_summaries(self, categories, summary_date=None):
+        self.requested_summary_date = summary_date
         return self.summaries
 
     async def get_active_subscribers(self):
@@ -92,6 +101,15 @@ class FakeTelegram:
 
     async def send_message(self, telegram_id, message):
         self.sent.append((telegram_id, message))
+        return True
+
+
+class FakeEmail:
+    def __init__(self):
+        self.sent = []
+
+    async def send_message(self, email, subject, body, html_body=None):
+        self.sent.append((email, subject, body, html_body))
         return True
 
 
@@ -437,6 +455,7 @@ async def test_morning_delivery_respects_preferred_time():
     app.db = CachedSummaryDatabase(summaries, subscribers)
     app.whatsapp = FakeWhatsApp()
     app.telegram = FakeTelegram()
+    app.email = FakeEmail()
 
     result = await app.send_summaries("morning")
 
@@ -478,6 +497,7 @@ async def test_weekly_frequency_only_sends_on_monday():
     )
     app.whatsapp = FakeWhatsApp()
     app.telegram = FakeTelegram()
+    app.email = FakeEmail()
     app._subscriber_local_now = lambda _subscriber: datetime(2026, 6, 9, 8, 0)
 
     result = await app.send_summaries("morning")
@@ -516,9 +536,186 @@ async def test_manual_delivery_ignores_frequency_and_preferred_time_for_demo():
     )
     app.whatsapp = FakeWhatsApp()
     app.telegram = FakeTelegram()
+    app.email = FakeEmail()
     app._subscriber_local_now = lambda _subscriber: datetime(2026, 6, 9, 8, 0)
 
     result = await app.send_summaries("manual")
 
     assert result["sent"] == 1
     assert len(app.whatsapp.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_email_delivery_sends_plain_text_brief():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+    )
+    subscriber = SimpleNamespace(
+        channel="email",
+        phone=None,
+        telegram_id=None,
+        email="reader@example.com",
+        categories=["politica"],
+        frequency="diario",
+        preferred_time="manana",
+        timezone="America/La_Paz",
+    )
+    summaries = [
+        {
+            "title": "Titulo",
+            "summary": "Resumen politico.",
+            "fact": "Dato clave",
+            "source": "Unitel",
+            "url": "https://example.com/noticia",
+            "category": "politica",
+        }
+    ]
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(summaries, [subscriber])
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+    app.email = FakeEmail()
+
+    result = await app.send_summaries("morning")
+
+    assert result["sent"] == 1
+    assert result["delivery_stats"]["sent_by_channel"]["email"] == 1
+    email, subject, body, html_body = app.email.sent[0]
+    assert email == "reader@example.com"
+    assert subject == "EcoBrief Bolivia - Brief del dia"
+    assert body == (
+        "EcoBrief Bolivia - Brief del dia\n\n"
+        "Noticias locales resumidas con menos ruido.\n\n"
+        "1. Titulo\n"
+        "   Resumen politico.\n"
+        "   Dato: Dato clave\n"
+        "   Fuente: Unitel\n"
+        "   Link: https://example.com/noticia\n\n"
+        "---\n"
+        "Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.\n"
+    )
+    assert 'href="https://example.com/noticia"' in html_body
+    assert ">Link</a>" in html_body
+    assert "background:#0f6b63" in html_body
+
+
+@pytest.mark.asyncio
+async def test_cached_delivery_does_not_collect_or_generate_news():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+    )
+    subscriber = SimpleNamespace(
+        channel="email",
+        phone=None,
+        telegram_id=None,
+        email="reader@example.com",
+        categories=["politica"],
+        frequency="diario",
+        preferred_time="manana",
+        timezone="America/La_Paz",
+    )
+    summaries = [{"title": "Titulo", "summary": "Resumen politico.", "category": "politica"}]
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(summaries, [subscriber])
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+    app.email = FakeEmail()
+
+    async def collect_news(categories):
+        raise AssertionError("deliver_cached_summaries must not collect news")
+
+    app._collect_news = collect_news
+
+    result = await app.deliver_cached_summaries("morning")
+
+    assert result["collected"] == 0
+    assert result["summaries"] == 1
+    assert result["sent"] == 1
+    assert result["used_cached_summaries"] is True
+    assert app.email.sent[0][0] == "reader@example.com"
+
+
+@pytest.mark.asyncio
+async def test_summary_refresh_can_skip_delivery():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+    )
+    subscriber = SimpleNamespace(
+        channel="email",
+        phone=None,
+        telegram_id=None,
+        email="reader@example.com",
+        categories=["politica"],
+        frequency="diario",
+        preferred_time="manana",
+        timezone="America/La_Paz",
+    )
+    summaries = [{"title": "Titulo", "summary": "Resumen politico.", "category": "politica"}]
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(summaries, [subscriber])
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+    app.email = FakeEmail()
+
+    result = await app.send_summaries("morning", deliver=False)
+
+    assert result["summaries"] == 1
+    assert result["sent"] == 0
+    assert result["delivery_stats"]["sent_by_channel"]["email"] == 0
+    assert app.email.sent == []
+
+
+@pytest.mark.asyncio
+async def test_afternoon_and_night_windows_match_exact_preferred_time():
+    settings = SimpleNamespace(
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+    )
+    summaries = [{"title": "Titulo", "summary": "Resumen.", "category": "politica"}]
+    afternoon_subscriber = SimpleNamespace(
+        channel="email",
+        phone=None,
+        telegram_id=None,
+        email="afternoon@example.com",
+        categories=["politica"],
+        frequency="diario",
+        preferred_time="tarde",
+        timezone="America/La_Paz",
+    )
+    night_subscriber = SimpleNamespace(
+        channel="email",
+        phone=None,
+        telegram_id=None,
+        email="night@example.com",
+        categories=["politica"],
+        frequency="diario",
+        preferred_time="noche",
+        timezone="America/La_Paz",
+    )
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(summaries, [afternoon_subscriber, night_subscriber])
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+    app.email = FakeEmail()
+
+    afternoon_result = await app.send_summaries("afternoon")
+
+    assert afternoon_result["sent"] == 1
+    assert app.email.sent[0][0] == "afternoon@example.com"
+
+    app.email = FakeEmail()
+    night_result = await app.send_summaries("night")
+
+    assert night_result["sent"] == 1
+    assert app.email.sent[0][0] == "night@example.com"

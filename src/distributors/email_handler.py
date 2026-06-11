@@ -31,14 +31,20 @@ class EmailHandler:
         )
         return all(required)
 
-    async def send_message(self, to_email: str, subject: str, body: str) -> bool:
-        """Envia un correo en texto plano."""
+    async def send_message(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        html_body: str | None = None,
+    ) -> bool:
+        """Envia un correo multipart con texto plano y HTML opcional."""
 
         if not self.is_configured:
             logger.warning(f"SMTP no configurado. Mensaje no enviado a {to_email}: {subject}")
             return False
 
-        message = self._build_message(to_email, subject, body)
+        message = self._build_message(to_email, subject, body, html_body=html_body)
         try:
             await asyncio.to_thread(self._send_sync, message)
             logger.info(f"Email enviado a {to_email}")
@@ -47,7 +53,14 @@ class EmailHandler:
             logger.error(f"Error enviando email a {to_email}: {exc}")
             return False
 
-    def _build_message(self, to_email: str, subject: str, body: str) -> EmailMessage:
+    def _build_message(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        *,
+        html_body: str | None = None,
+    ) -> EmailMessage:
         from_email = self.settings.smtp_from_email
         from_name = self.settings.smtp_from_name
 
@@ -56,6 +69,8 @@ class EmailHandler:
         message["From"] = formataddr((from_name, from_email))
         message["To"] = to_email
         message.set_content(body)
+        if html_body:
+            message.add_alternative(html_body, subtype="html")
         return message
 
     def _send_sync(self, message: EmailMessage) -> None:

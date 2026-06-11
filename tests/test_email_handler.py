@@ -42,6 +42,22 @@ def test_email_handler_builds_plain_text_message():
     assert message.get_content().strip() == "Contenido"
 
 
+def test_email_handler_builds_multipart_html_message():
+    handler = EmailHandler(settings=_settings())
+
+    message = handler._build_message(
+        "reader@example.com",
+        "EcoBrief Bolivia - Brief del dia",
+        "Contenido",
+        html_body="<p>Contenido <a href=\"https://example.com\">Link</a></p>",
+    )
+
+    assert message.is_multipart()
+    assert message.get_body(preferencelist=("plain",)).get_content().strip() == "Contenido"
+    html_part = message.get_body(preferencelist=("html",)).get_content()
+    assert '<a href="https://example.com">Link</a>' in html_part
+
+
 @pytest.mark.asyncio
 async def test_email_handler_sends_with_configured_smtp(monkeypatch):
     sent_messages = []

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 from news_cron.clients import BackendClient
 from news_cron.config import CronSettings
@@ -31,6 +32,13 @@ class RefreshJobRunner:
             self.settings.backend_base_url,
             self.settings.run_once,
         )
+        delivery_next = {
+            window: self._next_delivery_run(scheduled_at)
+            for window, scheduled_at in self.settings.delivery_windows().items()
+        }
+        for window, scheduled_at in delivery_next.items():
+            LOGGER.info("delivery window scheduled window=%s next_run=%s", window, scheduled_at)
+
         economic_ok = await self._run_safely("economic_refresh", self.run_economic_refresh())
         summary_ok = await self._run_safely("summary_refresh", self.run_summary_refresh())
 
@@ -59,12 +67,31 @@ class RefreshJobRunner:
                 summary_next = utc_now() + timedelta(
                     seconds=self.settings.summary_refresh_interval_seconds
                 )
+            for window, due_at in list(delivery_next.items()):
+                if now >= due_at:
+                    await self._run_safely(
+                        f"delivery_{window}",
+                        self.run_delivery_window(window),
+                    )
+                    delivery_next[window] = self._next_delivery_run(
+                        self.settings.delivery_windows()[window]
+                    )
+                    LOGGER.info(
+                        "delivery window rescheduled window=%s next_run=%s",
+                        window,
+                        delivery_next[window],
+                    )
 
-            sleep_for = min(
+            next_waits = [
                 max((economic_next - utc_now()).total_seconds(), 1),
                 max((summary_next - utc_now()).total_seconds(), 1),
                 60,
+            ]
+            next_waits.extend(
+                max((due_at - utc_now()).total_seconds(), 1)
+                for due_at in delivery_next.values()
             )
+            sleep_for = min(next_waits)
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=sleep_for)
             except TimeoutError:
@@ -84,9 +111,9 @@ class RefreshJobRunner:
         )
 
     async def run_summary_refresh(self) -> None:
-        query = urlencode({"refresh": "true", "time_of_day": self.settings.summary_time_of_day})
+        query = urlencode({"time_of_day": self.settings.summary_time_of_day, "refresh": "true"})
         payload = await self.backend.post_json(
-            f"/trigger/summary?{query}",
+            f"{self.settings.summary_trigger_path}?{query}",
             timeout_seconds=self.settings.summary_request_timeout_seconds,
         )
         result = payload.get("result") or {}
@@ -97,6 +124,29 @@ class RefreshJobRunner:
             result.get("summaries"),
             result.get("sent"),
         )
+
+    async def run_delivery_window(self, time_of_day: str) -> None:
+        query = urlencode({"time_of_day": time_of_day})
+        payload = await self.backend.post_json(
+            f"{self.settings.delivery_trigger_path}?{query}",
+            timeout_seconds=self.settings.delivery_request_timeout_seconds,
+        )
+        result = payload.get("result") or {}
+        LOGGER.info(
+            "summary delivery ok window=%s summaries=%s sent=%s",
+            time_of_day,
+            result.get("summaries"),
+            result.get("sent"),
+        )
+
+    def _next_delivery_run(self, scheduled_at: str, *, after: datetime | None = None) -> datetime:
+        zone = ZoneInfo(self.settings.schedule_timezone)
+        now = (after or utc_now()).astimezone(zone)
+        hour, minute = (int(part) for part in scheduled_at.split(":", maxsplit=1))
+        candidate = datetime.combine(now.date(), time(hour, minute), tzinfo=zone)
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        return candidate.astimezone(UTC)
 
     async def _run_safely(self, name: str, task: Any) -> bool:
         try:

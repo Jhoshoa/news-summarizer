@@ -69,8 +69,10 @@ class Settings(BaseSettings):
     )
 
     schedule_timezone: str = Field(default="America/La_Paz", alias="SCHEDULE_TIMEZONE")
-    schedule_summary_morning: str = Field(default="08:00", alias="SCHEDULE_SUMMARY_MORNING")
-    schedule_summary_evening: str = Field(default="18:00", alias="SCHEDULE_SUMMARY_EVENING")
+    schedule_summary_morning: str = Field(default="09:00", alias="SCHEDULE_SUMMARY_MORNING")
+    schedule_summary_afternoon: str = Field(default="16:00", alias="SCHEDULE_SUMMARY_AFTERNOON")
+    schedule_summary_night: str = Field(default="20:00", alias="SCHEDULE_SUMMARY_NIGHT")
+    schedule_summary_evening: str | None = Field(default=None, alias="SCHEDULE_SUMMARY_EVENING")
     api_auth_key: str | None = Field(default=None, alias="API_AUTH_KEY")
 
     default_categories: str = Field(
