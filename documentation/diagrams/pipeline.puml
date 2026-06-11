@@ -1,0 +1,27 @@
+@startuml
+title EcoBrief Bolivia - Pipeline de procesamiento
+
+skinparam shadowing false
+skinparam activity {
+  BackgroundColor #F8FAF7
+  BorderColor #2F6B4F
+  FontColor #1F2933
+}
+
+start
+:Recolectar noticias locales;
+:Extraer titulo, URL, imagen, descripcion y cuerpo;
+:Filtrar articulos sin contenido util;
+:Deduplicar por URL y titulo;
+:Clasificar por categoria;
+:Rankear por relevancia;
+:Persistir articulos y fingerprints;
+:Detectar duplicados historicos;
+:Seleccionar candidatos unicos por historia;
+:Generar resumen IA;
+:Deduplicar summaries;
+:Guardar briefs y metricas;
+:Mostrar en web / enviar segun preferencias;
+stop
+
+@enduml

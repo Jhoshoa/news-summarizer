@@ -1,0 +1,37 @@
+@startuml
+title EcoBrief Bolivia - Arquitectura general
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+actor Usuario
+
+package "Frontend" {
+  [React / Vite\nHome, Noticias, Detalle,\nImpacto, Preferencias] as FE
+}
+
+package "Backend FastAPI" {
+  [API Routes] as API
+  [Pipeline\nsend_summaries] as PIPE
+  [Collectors\nScraping / NewsAPI] as COL
+  [Processors\nDedupe, Clasificacion,\nRanking, Resumen] as PROC
+  [Distributors\nWhatsApp / Telegram] as DIST
+}
+
+database "PostgreSQL" as DB
+cloud "Proveedor IA\nGroq/OpenAI" as LLM
+cloud "Fuentes locales\nMedios bolivianos" as SOURCES
+
+Usuario --> FE
+FE --> API
+API --> DB
+API --> PIPE
+PIPE --> COL
+COL --> SOURCES
+PIPE --> PROC
+PROC --> LLM
+PIPE --> DB
+PIPE --> DIST
+DIST --> Usuario
+
+@enduml

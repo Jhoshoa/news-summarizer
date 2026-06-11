@@ -1,0 +1,25 @@
+@startuml
+title EcoBrief Bolivia - De ruido digital a brief util
+
+skinparam shadowing false
+skinparam rectangle {
+  BackgroundColor #F8FAF7
+  BorderColor #2F6B4F
+}
+
+rectangle "Fuentes locales\n(medios bolivianos)" as A
+rectangle "Noticias repetidas\ny dispersas" as B
+rectangle "EcoBrief\nlimpia + deduplica + prioriza" as C
+rectangle "IA responsable\nsolo sobre candidatos utiles" as D
+rectangle "Briefs personalizados\ncon impacto medible" as E
+
+A --> B
+B --> C
+C --> D
+D --> E
+
+note bottom of C
+Reduce ruido antes de usar IA
+end note
+
+@enduml

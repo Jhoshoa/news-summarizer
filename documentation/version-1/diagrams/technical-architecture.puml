@@ -1,0 +1,48 @@
+@startuml
+title EcoBrief Bolivia - Arquitectura tecnica
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+actor Usuario
+cloud "Medios locales" as Sources
+cloud "Proveedor IA" as LLM
+database "PostgreSQL" as DB
+
+package "Frontend React/Vite" {
+  [Home]
+  [Noticias]
+  [Detalle]
+  [Impacto]
+  [Suscripcion]
+}
+
+package "Backend FastAPI" {
+  [API]
+  [Collectors]
+  [Processors]
+  [Scheduler]
+  [Distributors]
+}
+
+Usuario --> [Home]
+Usuario --> [Noticias]
+Usuario --> [Detalle]
+Usuario --> [Impacto]
+Usuario --> [Suscripcion]
+
+[Home] --> [API]
+[Noticias] --> [API]
+[Detalle] --> [API]
+[Impacto] --> [API]
+[Suscripcion] --> [API]
+
+[API] --> DB
+[Scheduler] --> [Collectors]
+[Collectors] --> Sources
+[Collectors] --> [Processors]
+[Processors] --> LLM
+[Processors] --> DB
+[Distributors] --> Usuario
+
+@enduml

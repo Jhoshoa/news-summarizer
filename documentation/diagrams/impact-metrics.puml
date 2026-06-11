@@ -1,0 +1,28 @@
+@startuml
+title EcoBrief Bolivia - Reduccion de desperdicio digital
+
+skinparam shadowing false
+
+rectangle "Articulos recolectados" as A
+rectangle "Filtro de calidad\n(descarta contenido vacio)" as B
+rectangle "Deduplicacion\n(URL, titulo, historia)" as C
+rectangle "Ranking\n(prioriza relevancia)" as D
+rectangle "Candidatos a IA" as E
+rectangle "Briefs finales" as F
+
+A --> B : reduce basura informativa
+B --> C : reduce repeticion
+C --> D : reduce volumen
+D --> E : reduce llamadas IA
+E --> F : reduce lectura final
+
+note right of F
+Metricas:
+- paginas evitadas
+- minutos ahorrados
+- MB estimados evitados
+- llamadas IA evitadas
+- tasa de reduccion
+end note
+
+@enduml

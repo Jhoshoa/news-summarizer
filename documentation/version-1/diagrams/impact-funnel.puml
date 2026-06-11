@@ -1,0 +1,25 @@
+@startuml
+title EcoBrief Bolivia - Funnel de impacto digital
+
+skinparam shadowing false
+
+rectangle "Recolectadas" as A
+rectangle "Utiles" as B
+rectangle "Unicas" as C
+rectangle "Candidatas IA" as D
+rectangle "Briefs" as E
+
+A --> B : filtro calidad
+B --> C : deduplicacion
+C --> D : ranking
+D --> E : resumen IA
+
+note right of E
+Impacto estimado:
+- paginas evitadas
+- minutos ahorrados
+- MB evitados
+- llamadas IA evitadas
+end note
+
+@enduml

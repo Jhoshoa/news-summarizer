@@ -1,0 +1,25 @@
+@startuml
+title EcoBrief Bolivia - Pipeline tecnico
+
+start
+:Trigger manual o scheduler;
+if (Hay summaries cacheados?) then (si)
+  :Reutilizar summaries;
+else (no)
+  :Scraping / fuentes;
+  :Filtro de contenido util;
+  :Deduplicacion por URL y titulo;
+  :Clasificacion;
+  :Ranking;
+  :Persistencia;
+  :Fingerprint historico;
+  :Marcado de duplicados;
+  :Seleccion de candidatos;
+  :Resumen IA;
+  :Dedupe de summaries;
+  :Guardar metricas;
+endif
+:Mostrar en web / preparar envio;
+stop
+
+@enduml
