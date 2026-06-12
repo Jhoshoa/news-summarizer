@@ -728,6 +728,7 @@ class NewsSummarizerApp:
             fact = str(article.get("fact") or "").strip()
             source = str(article.get("source") or "").strip()
             url = str(article.get("url") or "").strip()
+            category = str(article.get("category") or "general").strip()
 
             body += f"{index}. {title}\n"
             body += f"   {summary}\n"
@@ -750,29 +751,39 @@ class NewsSummarizerApp:
                 meta_parts.append(
                     '<a href="'
                     f'{safe_url}" '
-                    'style="color:#0f6b63;text-decoration:none;font-weight:700;">Link</a>'
+                    'style="color:#385fa8;text-decoration:none;font-weight:700;">Link</a>'
                 )
             meta_html = " · ".join(meta_parts)
+
+            meta_html = " &middot; ".join(meta_parts)
+            source_label = html.escape(source or "EcoBrief Bolivia")
+            category_label = html.escape(category)
 
             items_html.append(
                 f"""
                 <tr>
-                  <td style="padding:16px 0;border-top:1px solid rgba(58,43,31,0.12);">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <td style="padding:8px 0;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid rgba(34,34,34,0.12);border-top:4px solid #fece31;border-radius:8px;">
                       <tr>
-                        <td valign="top" width="34" style="padding-right:10px;">
-                          <div style="width:28px;height:28px;border-radius:8px;background:#e6f1ec;color:#0f6b63;font:700 13px Inter,Segoe UI,Arial,sans-serif;text-align:center;line-height:28px;">
+                        <td valign="top" width="42" style="padding:14px 0 14px 14px;">
+                          <div style="width:28px;height:28px;border-radius:8px;background:#fff5cb;color:#5f4700;font:700 13px Inter,Segoe UI,Arial,sans-serif;text-align:center;line-height:28px;">
                             {index}
                           </div>
                         </td>
-                        <td>
-                          <h2 style="margin:0 0 8px;color:#211914;font:700 18px/1.32 Inter,Segoe UI,Arial,sans-serif;">
+                        <td style="padding:14px;">
+                          <p style="margin:0 0 6px;color:#666666;font:700 11px/1.3 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em;">
+                            {source_label} - {category_label}
+                            <span style="display:inline-block;margin-left:8px;border:1px solid rgba(254,206,49,.72);border-radius:999px;padding:3px 7px;background:#fff5cb;color:#5f4700;font:700 10px/1 Inter,Segoe UI,Arial,sans-serif;text-transform:none;letter-spacing:0;">
+                              Resumido IA
+                            </span>
+                          </p>
+                          <h2 style="margin:0 0 8px;color:#222222;font:700 19px/1.22 Georgia,'Times New Roman',serif;">
                             {html.escape(title)}
                           </h2>
-                          <p style="margin:0 0 10px;color:#504238;font:400 14px/1.62 Inter,Segoe UI,Arial,sans-serif;">
+                          <p style="margin:0 0 10px;color:#3f424c;font:400 14px/1.55 Inter,Segoe UI,Arial,sans-serif;">
                             {html.escape(summary)}
                           </p>
-                          <p style="margin:0;color:#736354;font:400 12px/1.55 Inter,Segoe UI,Arial,sans-serif;">
+                          <p style="margin:0;color:#666666;font:400 12px/1.55 Inter,Segoe UI,Arial,sans-serif;">
                             {meta_html}
                           </p>
                         </td>
@@ -791,34 +802,34 @@ class NewsSummarizerApp:
     def _format_email_html(self, items_html: str) -> str:
         return f"""<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#f4eadc;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4eadc;padding:24px 12px;">
+  <body style="margin:0;padding:0;background:#fafafa;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fafafa;padding:24px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fffdf8;border:1px solid rgba(58,43,31,0.12);border-radius:8px;overflow:hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:720px;background:#ffffff;border:1px solid rgba(34,34,34,0.12);border-radius:8px;overflow:hidden;">
             <tr>
-              <td style="background:#0f6b63;padding:22px 24px;">
-                <p style="margin:0 0 6px;color:#e6f1ec;font:700 12px/1.2 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;">
+              <td style="background:#ffffff;border-top:6px solid #fece31;padding:22px 24px 18px;">
+                <p style="margin:0 0 6px;color:#666666;font:700 12px/1.2 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;">
                   EcoBrief Bolivia
                 </p>
-                <h1 style="margin:0;color:#ffffff;font:700 26px/1.22 Inter,Segoe UI,Arial,sans-serif;">
+                <h1 style="margin:0;color:#222222;font:700 30px/1.12 Georgia,'Times New Roman',serif;">
                   Brief del dia
                 </h1>
-                <p style="margin:10px 0 0;color:rgba(255,255,255,.84);font:400 14px/1.5 Inter,Segoe UI,Arial,sans-serif;">
+                <p style="margin:10px 0 0;color:#3f424c;font:400 14px/1.5 Inter,Segoe UI,Arial,sans-serif;">
                   Noticias locales resumidas con menos ruido.
                 </p>
               </td>
             </tr>
             <tr>
-              <td style="padding:8px 24px 4px;">
+              <td style="padding:8px 24px 12px;background:#fafafa;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   {items_html}
                 </table>
               </td>
             </tr>
             <tr>
-              <td style="padding:18px 24px 22px;background:#fbf5eb;border-top:1px solid rgba(58,43,31,0.12);">
-                <p style="margin:0;color:#736354;font:400 12px/1.6 Inter,Segoe UI,Arial,sans-serif;">
+              <td style="padding:18px 24px 22px;background:#ffffff;border-top:1px solid rgba(34,34,34,0.12);">
+                <p style="margin:0;color:#666666;font:400 12px/1.6 Inter,Segoe UI,Arial,sans-serif;">
                   Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.
                 </p>
               </td>

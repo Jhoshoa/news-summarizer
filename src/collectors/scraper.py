@@ -444,10 +444,27 @@ class NewsScraper:
         date_candidates.extend(self._extract_json_ld_dates(soup))
 
         for candidate in date_candidates:
-            parsed = self._parse_date(candidate, fallback_to_now=False)
+            parsed = self._parse_detail_date_candidate(candidate, source)
             if parsed:
                 return parsed
         return None
+
+    def _parse_detail_date_candidate(self, date_text: str, source: NewsSource) -> datetime | None:
+        parsed = self._parse_date(date_text, fallback_to_now=False)
+        if not parsed:
+            return None
+
+        if self._is_unitel_utc_json_ld_date(date_text, source):
+            return parsed - timedelta(hours=4)
+
+        return parsed
+
+    def _is_unitel_utc_json_ld_date(self, date_text: str, source: NewsSource) -> bool:
+        if source.name.lower() != "unitel":
+            return False
+
+        normalized = date_text.strip()
+        return bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}t\d{2}:\d{2}:\d{2}", normalized.lower()))
 
     def _extract_body_content(
         self,

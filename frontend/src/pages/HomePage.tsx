@@ -116,6 +116,7 @@ export const HomePage = () => {
   const { data: articlesData, isFetching: isFetchingArticles } = useGetArticlesQuery({
     limit: 20,
     fallback_to_latest: true,
+    exclude_summarized: true,
   });
   const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
     fallback_to_latest: true,
@@ -140,7 +141,14 @@ export const HomePage = () => {
 
   const prioritizedArticles = useMemo(() => prioritizeImages(articles), [articles]);
   const prioritizedSummaries = useMemo(() => prioritizeImages(summaries), [summaries]);
-  const collectedArticles = useMemo(() => prioritizedArticles.slice(0, 4), [prioritizedArticles]);
+  const summarizedArticleIds = useMemo(
+    () => new Set(summaries.map((summary) => summary.article_id).filter((id): id is number => id != null)),
+    [summaries],
+  );
+  const collectedArticles = useMemo(
+    () => prioritizedArticles.filter((article) => !summarizedArticleIds.has(article.id)).slice(0, 4),
+    [prioritizedArticles, summarizedArticleIds],
+  );
   const primarySummary = prioritizedSummaries[0];
   const secondarySummaries = prioritizedSummaries.slice(1, 5);
 

@@ -617,6 +617,32 @@ def test_unitel_detail_date_extracts_specific_publication_class():
     assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 10, 8, 42)
 
 
+def test_unitel_json_ld_detail_date_is_converted_from_utc_to_local_time():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="Unitel",
+        url="https://unitel.bo/",
+        date_selector=".UNITEL_DETALLE_FECHA_PUBLICACION, .fecha, .date, time",
+    )
+    soup = BeautifulSoup(
+        """
+        <html>
+          <head>
+            <script type="application/ld+json">
+              {
+                "@type": "NewsArticle",
+                "datePublished": "2026-06-11T19:33:00"
+              }
+            </script>
+          </head>
+        </html>
+        """,
+        "lxml",
+    )
+
+    assert scraper._extract_detail_date(soup, source) == datetime(2026, 6, 11, 15, 33)
+
+
 def test_filter_usable_articles_drops_non_today_detail_date_even_with_description():
     scraper = NewsScraper(sources=[])
     source = NewsSource(name="Unitel", url="https://unitel.bo/")
