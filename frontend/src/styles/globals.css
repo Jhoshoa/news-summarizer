@@ -11,13 +11,13 @@
   --color-primary: #222222;
   --color-primary-dark: #000000;
   --color-primary-soft: #f1f2f5;
-  --color-highlight: #1b36d9;
-  --color-highlight-dark: #1428a8;
-  --color-highlight-soft: #eef1ff;
-  --color-brief: #fece31;
-  --color-brief-soft: #fff5cb;
-  --color-collected: #385fa8;
-  --color-collected-soft: #edf3ff;
+  --color-highlight: #006d77;
+  --color-highlight-dark: #004d54;
+  --color-highlight-soft: #d4e6e8;
+  --color-brief: #16a34a;
+  --color-brief-soft: #bbf7d0;
+  --color-collected: #00606a;
+  --color-collected-soft: #cce2e5;
   --color-accent: #a94138;
   --color-accent-soft: #faece7;
   --color-gold: #222222;
@@ -640,9 +640,9 @@ p {
 }
 
 .status-badge.summarized {
-  border-color: rgba(254, 206, 49, 0.72);
+  border-color: rgba(22, 163, 74, 0.72);
   background: var(--color-brief-soft);
-  color: #5f4700;
+  color: #14532d;
 }
 
 .news-card p,
@@ -811,7 +811,7 @@ p {
 .impact-panel {
   display: grid;
   gap: 8px;
-  border: 1px solid rgba(27, 54, 217, 0.18);
+  border: 1px solid rgba(0, 109, 119, 0.18);
   border-radius: 8px;
   padding: 10px 12px;
   background: var(--color-highlight-soft);
@@ -2103,11 +2103,11 @@ p {
 }
 
 .ai-summary {
-  background: var(--color-primary-soft);
+  background: var(--color-brief-soft);
 }
 
 .pending-summary {
-  background: var(--color-surface-muted);
+  background: var(--color-collected-soft);
 }
 
 .ai-summary p {

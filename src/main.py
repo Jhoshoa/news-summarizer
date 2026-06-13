@@ -751,7 +751,7 @@ class NewsSummarizerApp:
                 meta_parts.append(
                     '<a href="'
                     f'{safe_url}" '
-                    'style="color:#385fa8;text-decoration:none;font-weight:700;">Link</a>'
+                    'style="color:#00606a;text-decoration:none;font-weight:700;">Link</a>'
                 )
             meta_html = " · ".join(meta_parts)
 
@@ -763,17 +763,17 @@ class NewsSummarizerApp:
                 f"""
                 <tr>
                   <td style="padding:8px 0;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid rgba(34,34,34,0.12);border-top:4px solid #fece31;border-radius:8px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid rgba(34,34,34,0.12);border-top:4px solid #16a34a;border-radius:8px;">
                       <tr>
                         <td valign="top" width="42" style="padding:14px 0 14px 14px;">
-                          <div style="width:28px;height:28px;border-radius:8px;background:#fff5cb;color:#5f4700;font:700 13px Inter,Segoe UI,Arial,sans-serif;text-align:center;line-height:28px;">
+                          <div style="width:28px;height:28px;border-radius:8px;background:#bbf7d0;color:#14532d;font:700 13px Inter,Segoe UI,Arial,sans-serif;text-align:center;line-height:28px;">
                             {index}
                           </div>
                         </td>
                         <td style="padding:14px;">
                           <p style="margin:0 0 6px;color:#666666;font:700 11px/1.3 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em;">
                             {source_label} - {category_label}
-                            <span style="display:inline-block;margin-left:8px;border:1px solid rgba(254,206,49,.72);border-radius:999px;padding:3px 7px;background:#fff5cb;color:#5f4700;font:700 10px/1 Inter,Segoe UI,Arial,sans-serif;text-transform:none;letter-spacing:0;">
+                            <span style="display:inline-block;margin-left:8px;border:1px solid rgba(22,163,74,.72);border-radius:999px;padding:3px 7px;background:#bbf7d0;color:#14532d;font:700 10px/1 Inter,Segoe UI,Arial,sans-serif;text-transform:none;letter-spacing:0;">
                               Resumido IA
                             </span>
                           </p>
@@ -808,7 +808,7 @@ class NewsSummarizerApp:
         <td align="center">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:720px;background:#ffffff;border:1px solid rgba(34,34,34,0.12);border-radius:8px;overflow:hidden;">
             <tr>
-              <td style="background:#ffffff;border-top:6px solid #fece31;padding:22px 24px 18px;">
+              <td style="background:#ffffff;border-top:6px solid #16a34a;padding:22px 24px 18px;">
                 <p style="margin:0 0 6px;color:#666666;font:700 12px/1.2 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;">
                   EcoBrief Bolivia
                 </p>

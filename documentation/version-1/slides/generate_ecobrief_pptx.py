@@ -26,7 +26,7 @@ COLORS = {
     "muted": "56635C",
     "white": "FFFFFF",
     "amber": "F2C14E",
-    "blue": "2D6CDF",
+    "blue": "006D77",
 }
 
 
@@ -424,9 +424,9 @@ def theme() -> str:
       <a:dk1><a:srgbClr val="17211B"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
       <a:dk2><a:srgbClr val="12372A"/></a:dk2><a:lt2><a:srgbClr val="F7F4EA"/></a:lt2>
       <a:accent1><a:srgbClr val="1B7F5C"/></a:accent1><a:accent2><a:srgbClr val="B6E388"/></a:accent2>
-      <a:accent3><a:srgbClr val="F2C14E"/></a:accent3><a:accent4><a:srgbClr val="2D6CDF"/></a:accent4>
+      <a:accent3><a:srgbClr val="F2C14E"/></a:accent3><a:accent4><a:srgbClr val="006D77"/></a:accent4>
       <a:accent5><a:srgbClr val="DDF6E8"/></a:accent5><a:accent6><a:srgbClr val="56635C"/></a:accent6>
-      <a:hlink><a:srgbClr val="2D6CDF"/></a:hlink><a:folHlink><a:srgbClr val="1B7F5C"/></a:folHlink>
+      <a:hlink><a:srgbClr val="006D77"/></a:hlink><a:folHlink><a:srgbClr val="1B7F5C"/></a:folHlink>
     </a:clrScheme>
     <a:fontScheme name="Aptos"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme>
     <a:fmtScheme name="EcoBrief"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>

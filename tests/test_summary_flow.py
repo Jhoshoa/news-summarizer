@@ -600,7 +600,7 @@ async def test_email_delivery_sends_plain_text_brief():
     assert 'href="https://example.com/noticia"' in html_body
     assert ">Link</a>" in html_body
     assert "background:#fafafa" in html_body
-    assert "border-top:4px solid #fece31" in html_body
+    assert "border-top:4px solid #16a34a" in html_body
     assert "Resumido IA" in html_body
 
 
