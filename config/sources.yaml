@@ -7,11 +7,11 @@ sources:
     url: "https://www.radiofides.com/"
     category: "general"
     country: "bolivia"
-    selector: "article.post, article"
-    title_selector: "h2 a, h3 a"
-    url_selector: "a.post-link, a"
+    selector: "article.post-data, article.post, article"
+    title_selector: ".data-wrapper h2 a, h2 a, h3 a"
+    url_selector: ".data-wrapper h2 a, a"
     date_selector: ".post-date, .date, time"
-    image_selector: "div[frame='imagenPrincipalNota_B'] img, meta[property='og:image'], img"
+    image_selector: "div.media img, img"
     body_selector: "article .entry-content p, article .post-content p, .entry-content p, .post-content p, article p"
     enabled: true
     
@@ -24,7 +24,7 @@ sources:
     title_selector: "h2 a, h3 a, .title a"
     url_selector: "a"
     date_selector: ".UNITEL_DETALLE_FECHA_PUBLICACION, .vu-td-fdp, .fecha, .date, time"
-    image_selector: "img"
+    image_selector: "div[frame='imagenPrincipalNota_B'] img, meta[property='og:image'], img"
     body_selector: "main article p, main section p, .article-body p, .nota-contenido p, .news-detail p"
     enabled: true
     
@@ -79,7 +79,7 @@ sources:
     title_selector: ".nota__titulo-item a, h2 a, h3 a"
     url_selector: ".nota__titulo-item a, a"
     date_selector: ".articulo__fecha, time"
-    image_selector: "img"
+    image_selector: "meta[property='og:image'], amp-img, img"
     body_selector: "article p, main article p, .articulo__contenido p, .article-content p"
     enabled: true
 

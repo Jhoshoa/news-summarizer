@@ -339,20 +339,9 @@ p {
   overflow: hidden;
   min-height: 220px;
   border-radius: 8px;
-  color: #fff;
-  background:
-    linear-gradient(135deg, rgba(34, 34, 34, 0.92) 0%, rgba(63, 66, 76, 0.86) 54%, rgba(34, 34, 34, 0.72) 100%);
-}
-
-.article-image::before {
-  position: absolute;
-  inset: 0;
-  content: "";
-  background-image: repeating-linear-gradient(
-    116deg,
-    rgba(255, 255, 255, 0.17) 0 1px,
-    transparent 1px 22px
-  );
+  background: linear-gradient(90deg, #e7e9f0 0%, #f7f8fb 48%, #e7e9f0 100%);
+  background-size: 220% 100%;
+  animation: skeleton-pulse 1.25s ease-in-out infinite;
 }
 
 .markets {

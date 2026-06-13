@@ -839,6 +839,7 @@ class NewsScraper:
             "/author/",
             "/page/",
             "/programa/",
+            "/programacion/",
             "facebook.com",
             "instagram.com",
             "twitter.com",

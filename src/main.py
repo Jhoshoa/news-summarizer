@@ -893,8 +893,16 @@ class NewsSummarizerApp:
     def _deduplicate_summaries_for_storage(self, summaries: list[dict]) -> list[dict]:
         unique: list[dict] = []
         seen: set[str] = set()
+        seen_article_ids: set[int] = set()
 
         for summary in summaries:
+            article_id = summary.get("article_id")
+            if article_id is not None:
+                article_id = int(article_id)
+                if article_id in seen_article_ids:
+                    continue
+                seen_article_ids.add(article_id)
+
             category = str(summary.get("category") or "general").strip().lower()
             key = f"{category}:{self._summary_delivery_key(summary)}"
             if key in seen:

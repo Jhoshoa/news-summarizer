@@ -174,7 +174,7 @@ def test_article_filters_can_exclude_summarized_articles_for_selected_date():
     assert "NOT" in compiled_filter
     assert "news_summaries" in compiled_filter
     assert "news_summaries.article_id = news_articles.id" in compiled_filter
-    assert "news_summaries.summary_date = '2026-06-03'" in compiled_filter
+    assert "news_summaries.summary_date" not in compiled_filter
 
 
 def test_summary_filters_keep_summary_date_aligned_with_article_publish_date():

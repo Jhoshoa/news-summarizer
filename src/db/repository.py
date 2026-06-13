@@ -1045,10 +1045,8 @@ class Database:
         return filters
 
     def _article_not_summarized_filter(self, article_date: date | None = None) -> Any:
-        summary_date_filter = article_date if article_date is not None else func.date(NewsArticle.published_at)
         summarized_article_exists = exists().where(
             NewsSummary.article_id == NewsArticle.id,
-            NewsSummary.summary_date == summary_date_filter,
         )
         return ~summarized_article_exists
 

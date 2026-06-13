@@ -880,6 +880,27 @@ def test_article_url_filter_rejects_program_pages():
         "https://www.redbolivision.tv.bo/programa/la-cancha-de-bolivision/",
         source,
     )
+    assert not scraper._looks_like_article_url(
+        "https://www.redbolivision.tv.bo/programacion/",
+        source,
+    )
+    assert not scraper._looks_like_article_url(
+        "https://www.redbolivision.tv.bo/programacion/este-viernes/",
+        source,
+    )
+
+
+def test_article_url_filter_accepts_news_pages():
+    scraper = NewsScraper(sources=[])
+    source = NewsSource(
+        name="RedBolivision",
+        url="https://www.redbolivision.tv.bo/",
+    )
+
+    assert scraper._looks_like_article_url(
+        "https://www.redbolivision.tv.bo/noticia-real/",
+        source,
+    )
 
 
 def test_filter_usable_articles_drops_title_only_results():
