@@ -195,7 +195,7 @@ class Database:
     STORY_LOOKBACK_DAYS = 3
     STORY_SIMILARITY_THRESHOLD = 0.85
     IMPACT_METHODOLOGY_NOTE = (
-        "Estimaciones orientativas basadas en articulos evitados, no medicion energetica directa."
+        "Estimaciones orientativas basadas en articulos evitados."
     )
 
     def __init__(self, url: str, pool_size: int = 10, max_overflow: int = 20):

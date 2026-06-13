@@ -38,7 +38,7 @@ class FakeImpactDatabase:
             "methodology": {
                 "minutes_per_article": 0.5,
                 "mb_per_page": 0.8,
-                "note": "Estimaciones orientativas basadas en articulos evitados, no medicion energetica directa.",
+                "note": "Estimaciones orientativas basadas en articulos evitados.",
             },
         }
 

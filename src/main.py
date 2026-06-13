@@ -18,6 +18,7 @@ from src.api import (
     create_economic_indicators_router,
     create_impact_metrics_router,
     create_preferences_router,
+    create_sources_router,
     create_summaries_router,
     create_weather_router,
 )
@@ -962,6 +963,7 @@ app = FastAPI(
 )
 app.include_router(create_economic_indicators_router(lambda: app_instance))
 app.include_router(create_weather_router())
+app.include_router(create_sources_router())
 app.include_router(create_articles_router(lambda: app_instance))
 app.include_router(create_summaries_router(lambda: app_instance))
 app.include_router(create_impact_metrics_router(lambda: app_instance))

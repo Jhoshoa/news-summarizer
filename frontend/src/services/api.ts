@@ -8,6 +8,8 @@ import type {
   PreferenceOptionsResponse,
   PreferencePreviewRequest,
   PreferencePreviewResponse,
+  Source,
+  SourcesResponse,
   Summary,
   SubscribeRequest,
   SubscribeResponse,
@@ -58,7 +60,7 @@ export const newsApi = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: import.meta.env.VITE_API_BASE_URL || "",
   }),
-  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics", "Preferences"],
+  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics", "Preferences", "Sources"],
   endpoints: (builder) => ({
     getEconomicIndicators: builder.query<EconomicIndicatorsResponse, GetIndicatorsArgs | void>({
       query: (args) => ({
@@ -118,6 +120,10 @@ export const newsApi = createApi({
         },
       }),
       providesTags: ["Summaries"],
+    }),
+    getSources: builder.query<SourcesResponse, void>({
+      query: () => "/api/sources",
+      providesTags: ["Sources"],
     }),
     getImpactMetrics: builder.query<ImpactMetricsResponse, GetImpactMetricsArgs | void>({
       query: (args) => ({
@@ -180,6 +186,7 @@ export const {
   useGetSummariesQuery,
   useGetImpactMetricsQuery,
   useGetPreferenceOptionsQuery,
+  useGetSourcesQuery,
   usePreviewPreferencesMutation,
   useTriggerSummaryMutation,
   useSubscribeToBriefMutation,

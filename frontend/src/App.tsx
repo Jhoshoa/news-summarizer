@@ -6,6 +6,7 @@ import { DataPage } from "./pages/DataPage";
 import { HomePage } from "./pages/HomePage";
 import { ImpactPage } from "./pages/ImpactPage";
 import { NewsPage } from "./pages/NewsPage";
+import { FuentesPage } from "./pages/FuentesPage";
 import { SubscribePage } from "./pages/SubscribePage";
 import { getNavigationState } from "./utils/navigation";
 
@@ -18,8 +19,9 @@ const App = () => {
   const isNewsRoute = location.pathname.startsWith("/news");
   const isDataRoute = location.pathname.startsWith("/datos");
   const isImpactRoute = location.pathname.startsWith("/impacto");
+  const isFuentesRoute = location.pathname.startsWith("/fuentes");
   const isSubscribeRoute = location.pathname.startsWith("/suscribirse");
-  const compactHeader = isArticleRoute || isNewsRoute || isDataRoute || isImpactRoute || isSubscribeRoute;
+  const compactHeader = isArticleRoute || isNewsRoute || isDataRoute || isImpactRoute || isFuentesRoute || isSubscribeRoute;
   const navigationState = getNavigationState(location.pathname);
 
   let page = <HomePage />;
@@ -32,6 +34,8 @@ const App = () => {
     page = <DataPage />;
   } else if (isImpactRoute) {
     page = <ImpactPage />;
+  } else if (isFuentesRoute) {
+    page = <FuentesPage />;
   } else if (isSubscribeRoute) {
     page = <SubscribePage />;
   }

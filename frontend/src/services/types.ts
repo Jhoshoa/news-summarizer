@@ -199,6 +199,18 @@ export type Summary = {
   created_at?: string | null;
 };
 
+export type Source = {
+  name: string;
+  url: string;
+  category: string;
+  country: string;
+  enabled: boolean;
+};
+
+export type SourcesResponse = {
+  items: Source[];
+};
+
 export type TriggerSummaryResponse = {
   status: string;
   message: string;
