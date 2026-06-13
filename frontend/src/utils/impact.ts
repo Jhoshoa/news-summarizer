@@ -28,6 +28,8 @@ export const getImpactDataSourceTone = (
   return "empty";
 };
 
+const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
+
 export const getImpactFormulaRows = (metrics?: ImpactMetricsResponse) => {
   const minutesPerArticle = metrics?.methodology.minutes_per_article ?? 0.5;
   const mbPerPage = metrics?.methodology.mb_per_page ?? 0.8;
@@ -46,12 +48,12 @@ export const getImpactFormulaRows = (metrics?: ImpactMetricsResponse) => {
       formula: "1 - briefs / recolectadas",
       value:
         metrics && metrics.has_data && metrics.collected_articles > 0
-          ? `1 - ${metrics.summaries} / ${metrics.collected_articles}`
+          ? `1 - ${metrics.summaries} / ${metrics.collected_articles} = ${pct(metrics.reduction_rate)}`
           : "sin datos",
     },
     {
       label: "Minutos estimados",
-      formula: `paginas evitadas * ${minutesPerArticle}`,
+      formula: `paginas evitadas * ${minutesPerArticle} (${minutesPerArticle * 60}s c/u)`,
       value:
         metrics && metrics.has_data
           ? `${metrics.estimated_pages_avoided} * ${minutesPerArticle} = ${metrics.estimated_minutes_saved}`
