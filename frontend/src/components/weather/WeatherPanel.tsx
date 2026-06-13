@@ -15,7 +15,7 @@ const formatWeatherValue = (value?: number | null, suffix = "") => {
 export const WeatherPanel = ({ weather }: WeatherPanelProps) => {
   const city = weather?.location.name ?? "La Paz";
   const temp = Number(weather?.current.temperature_2m);
-  const uv = weather?.radiation.uv_index ?? weather?.today.uv_index_max;
+  const uv = weather?.today.uv_index_max;
 
   return (
     <section className="weather-card" id="clima" aria-label="Clima local">
