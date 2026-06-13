@@ -1338,10 +1338,6 @@ class Database:
     ) -> list[Any]:
         filters = [
             NewsSummary.summary_date == summary_date,
-            or_(
-                NewsSummary.article_id.is_(None),
-                func.date(NewsArticle.published_at) == summary_date,
-            ),
         ]
         if category:
             filters.append(NewsCategory.name == category.strip().lower())

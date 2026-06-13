@@ -177,7 +177,7 @@ def test_article_filters_can_exclude_summarized_articles_for_selected_date():
     assert "news_summaries.summary_date" not in compiled_filter
 
 
-def test_summary_filters_keep_summary_date_aligned_with_article_publish_date():
+def test_summary_filters_filters_by_summary_date():
     db = object.__new__(Database)
 
     filters = db._summary_filters(summary_date=date(2026, 6, 11))
@@ -186,7 +186,7 @@ def test_summary_filters_keep_summary_date_aligned_with_article_publish_date():
     )
 
     assert "news_summaries.summary_date = '2026-06-11'" in compiled_filters
-    assert "date(news_articles.published_at) = '2026-06-11'" in compiled_filters
+    assert "date(news_articles.published_at)" not in compiled_filters
 
 
 def test_paginated_response_includes_fallback_metadata():

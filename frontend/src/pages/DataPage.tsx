@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
 import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
@@ -62,9 +62,23 @@ const CurrencySpread = ({ indicators }: { indicators: EconomicIndicator[] }) => 
   );
 };
 
+const departments: Array<{ label: string; location: string }> = [
+  { label: "La Paz", location: "La Paz" },
+  { label: "Santa Cruz", location: "Santa Cruz" },
+  { label: "Cochabamba", location: "Cochabamba" },
+  { label: "Oruro", location: "Oruro" },
+  { label: "Potosi", location: "Potosi" },
+  { label: "Tarija", location: "Tarija" },
+  { label: "Chuquisaca", location: "Sucre" },
+  { label: "Beni", location: "Trinidad" },
+  { label: "Pando", location: "Cobija" },
+];
+
 export const DataPage = () => {
+  const [selectedDept, setSelectedDept] = useState("La Paz");
+  const selectedLocation = departments.find((d) => d.label === selectedDept)?.location ?? "La Paz";
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
-  const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery("La Paz");
+  const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery(selectedLocation);
   const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
     fallback_to_latest: true,
     page_size: 3,
@@ -76,7 +90,7 @@ export const DataPage = () => {
   const current = weather?.current ?? {};
   const elevation = getNumber(weather?.raw_payload.elevation);
   const timezone = String(weather?.raw_payload.timezone ?? "America/La_Paz");
-  const city = weather?.location.name ?? "La Paz";
+  const city = weather?.location.name ?? selectedLocation;
   const showEconomySkeleton = isFetchingIndicators;
   const showWeatherSkeleton = isFetchingWeather;
 
@@ -120,6 +134,22 @@ export const DataPage = () => {
               <div className="panel-heading">
                 <span className="panel-title">Clima local</span>
               </div>
+              <div className="category-tabs" aria-label="Departamentos">
+                {departments.map((dept) => (
+                  <a
+                    key={dept.label}
+                    href="#"
+                    role="button"
+                    className={dept.label === selectedDept ? "active" : ""}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setSelectedDept(dept.label);
+                    }}
+                  >
+                    {dept.label}
+                  </a>
+                ))}
+              </div>
               {showWeatherSkeleton ? (
                 <PanelSkeleton />
               ) : (
@@ -132,7 +162,7 @@ export const DataPage = () => {
                   <div className="metric-list">
                     <div>
                       <span>Radiacion UV</span>
-                      <strong>{formatMetric(weather?.radiation.uv_index, "", 1)}</strong>
+                      <strong>{formatMetric(weather?.today.uv_index_max, "", 1)}</strong>
                     </div>
                     <div>
                       <span>Humedad</span>

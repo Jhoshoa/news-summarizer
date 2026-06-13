@@ -66,7 +66,7 @@ Mejora la claridad sin cambiar los hechos ni recortar contexto relevante."""
             prompt += f"{i}. [{category}] {title}: {summary}\n"
 
         prompt += "\nFormato de respuesta:"
-        prompt += "\nNÚMERO. Título reescrito | Resumen reescrito en 2 oraciones con contexto"
+        prompt += "\nNÚMERO. Título original | Resumen reescrito en 2 oraciones con contexto"
 
         return prompt
 
@@ -86,10 +86,6 @@ Mejora la claridad sin cambiar los hechos ni recortar contexto relevante."""
                 subparts = parts[1].split("|")
 
                 base = dict(original[original_index]) if original_index < len(original) else {}
-                base["title"] = self._limit_text(
-                    self._clean_generated_text(subparts[0]),
-                    self.TITLE_MAX_CHARS,
-                )
                 base["summary"] = self._limit_text(
                     self._clean_generated_text(subparts[1]),
                     self.SUMMARY_MAX_CHARS,

@@ -21,7 +21,7 @@ def test_parse_response_preserves_original_summary_metadata():
 
     assert rewritten == [
         {
-            "title": "Titulo reescrito",
+            "title": "Titulo original",
             "summary": "Resumen reescrito",
             "fact": "Dato original",
             "category": "politica",
@@ -60,5 +60,5 @@ def test_parse_response_removes_nested_numbering():
         [{"title": "Original", "summary": "Original"}],
     )
 
-    assert rewritten[0]["title"] == "Titulo reescrito"
+    assert rewritten[0]["title"] == "Original"
     assert rewritten[0]["summary"] == "Resumen reescrito"
