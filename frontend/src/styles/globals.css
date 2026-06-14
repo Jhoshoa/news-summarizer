@@ -1590,6 +1590,31 @@ p {
 .impact-flow-panel {
   display: grid;
   gap: 16px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pipeline-formula-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pipeline-formula-expression {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.pipeline-formula-result {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.pipeline-svg-flow {
+  margin-top: 0.75rem;
+  min-width: 0;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .impact-narrative-list {
@@ -2213,6 +2238,15 @@ p {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .panel-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .panel-heading p {
+    text-align: left;
+  }
+
   .data-hero h1 {
     font-size: clamp(1.35rem, 3vw, 1.75rem);
   }
@@ -2232,6 +2266,15 @@ p {
   .impact-narrative-list,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+  .pipeline-formula-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pipeline-formula-result {
+    font-size: 1.2rem;
+    white-space: normal;
   }
 
   .impact-flow {

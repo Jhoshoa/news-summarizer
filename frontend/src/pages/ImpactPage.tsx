@@ -375,43 +375,43 @@ export const ImpactPage = () => {
               <div className="pipeline-formulas" style={{ fontSize: "0.8rem", lineHeight: 1.5, color: "#374151", minWidth: "11rem" }}>
                 <div style={{ marginBottom: "0.9rem" }}>
                   <strong style={{ fontSize: "0.85rem" }}>Paginas evitadas</strong>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <div>
+                  <div className="pipeline-formula-row">
+                    <div className="pipeline-formula-expression">
                       <div>{formatNumber(metrics.collected_articles)} − {formatNumber(metrics.summaries)} = {formatNumber(metrics.estimated_pages_avoided)}</div>
                       <code style={{ fontSize: "0.75rem", color: "#6b7280" }}>recolectadas − briefs</code>
                     </div>
-                    <strong style={{ fontSize: "1.5rem", color: "#006d77", whiteSpace: "nowrap" }}>
+                    <strong className="pipeline-formula-result" style={{ color: "#006d77" }}>
                       {formatNumber(metrics.estimated_pages_avoided)} paginas evitadas
                     </strong>
                   </div>
                 </div>
                 <div style={{ marginBottom: "0.9rem" }}>
                   <strong style={{ fontSize: "0.85rem" }}>Reduccion estimada</strong>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <div>
+                  <div className="pipeline-formula-row">
+                    <div className="pipeline-formula-expression">
                       <div>1 − {formatNumber(metrics.summaries)} / {formatNumber(metrics.collected_articles)} = {formatNumber(metrics.reduction_rate * 100)}%</div>
                       <code style={{ fontSize: "0.75rem", color: "#6b7280" }}>1 − briefs / recolectadas</code>
                     </div>
-                    <strong style={{ fontSize: "1.5rem", color: "#006d77", whiteSpace: "nowrap" }}>
+                    <strong className="pipeline-formula-result" style={{ color: "#006d77" }}>
                       {formatNumber(metrics.reduction_rate * 100)}% paginas descartadas
                     </strong>
                   </div>
                 </div>
                 <div>
                   <strong style={{ fontSize: "0.85rem" }}>Minutos estimados</strong>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <div>
+                  <div className="pipeline-formula-row">
+                    <div className="pipeline-formula-expression">
                       <div>{formatNumber(metrics.estimated_pages_avoided)} × 0.5 <span style={{ color: "#6b7280" }}>(30s c/u)</span> = {formatNumber(metrics.estimated_minutes_saved)}</div>
                       <code style={{ fontSize: "0.75rem", color: "#6b7280" }}>paginas evitadas × 30s</code>
                     </div>
-                    <strong style={{ fontSize: "1.5rem", color: "#006d77", whiteSpace: "nowrap" }}>
+                    <strong className="pipeline-formula-result" style={{ color: "#006d77" }}>
                       {formatNumber(metrics.estimated_minutes_saved)} min de lectura evitada
                     </strong>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="pipeline-svg-flow" style={{ marginTop: "0.75rem" }}>
+            <div className="pipeline-svg-flow">
               <PipelineFlowSVG metrics={metrics} />
             </div>
           </section>
