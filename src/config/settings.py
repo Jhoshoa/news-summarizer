@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     schedule_summary_night: str = Field(default="20:00", alias="SCHEDULE_SUMMARY_NIGHT")
     schedule_summary_evening: str | None = Field(default=None, alias="SCHEDULE_SUMMARY_EVENING")
     api_auth_key: str | None = Field(default=None, alias="API_AUTH_KEY")
+    cors_origins: str = Field(
+        default="http://localhost:5173", alias="CORS_ORIGINS"
+    )
 
     default_categories: str = Field(
         default="economia,politica,deportes", alias="DEFAULT_CATEGORIES"

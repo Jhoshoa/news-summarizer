@@ -11,6 +11,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from src.api import (
@@ -961,6 +962,14 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origins.split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(create_economic_indicators_router(lambda: app_instance))
 app.include_router(create_weather_router())
 app.include_router(create_sources_router())
