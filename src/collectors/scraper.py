@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from html import unescape
 from urllib.parse import urljoin, urlparse
+from zoneinfo import ZoneInfo
 
 import httpx
 import yaml
@@ -135,12 +136,15 @@ class NewsScraper:
         user_agent: str = None,
         timeout: int = 30,
         config_path: str = None,
+        timezone: str = "America/La_Paz",
     ):
         self.user_agent = (
             user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
         self.timeout = timeout
         self._config_path = config_path
+        self._scraper_timezone = timezone
+        self._tz = ZoneInfo(timezone)
 
         if sources:
             self.sources = [NewsSource.from_dict(s) if isinstance(s, dict) else s for s in sources]
@@ -150,7 +154,7 @@ class NewsScraper:
         if config_path:
             self._load_sources_from_config(config_path)
 
-        logger.info(f"NewsScraper inicializado con {len(self.sources)} fuentes")
+        logger.info(f"NewsScraper inicializado con {len(self.sources)} fuentes en timezone={timezone}")
 
     def reload_config(self):
         if self._config_path:
@@ -337,7 +341,7 @@ class NewsScraper:
         if not isinstance(published_at, datetime):
             return False
 
-        return published_at > datetime.now() + timedelta(days=1)
+        return published_at > self._now() + timedelta(days=1)
 
     def _has_non_today_detail_skip(self, article: dict) -> bool:
         return article.get("skipped_detail_reason") == "non_today_detail_date"
@@ -421,8 +425,11 @@ class NewsScraper:
 
         return self._has_non_today_publish_date(published_at)
 
+    def _now(self) -> datetime:
+        return datetime.now(self._tz)
+
     def _has_non_today_publish_date(self, published_at: datetime) -> bool:
-        return published_at.date() != datetime.now().date()
+        return published_at.date() != self._now().date()
 
     def _extract_detail_date(self, soup: BeautifulSoup, source: NewsSource) -> datetime | None:
         date_candidates = []
@@ -837,12 +844,16 @@ class NewsScraper:
             "/category/",
             "/categoria/",
             "/author/",
+            "/el-toque-de-la-abuela",
             "/page/",
             "/programa/",
             "/programacion/",
             "/politicas-privacidad",
             "/politicas-de-privacidad",
             "/politica-de-privacidad",
+            "/santa-cruz",
+            "/terminos-condiciones",
+            "/terminos-y-condiciones",
             "facebook.com",
             "instagram.com",
             "twitter.com",

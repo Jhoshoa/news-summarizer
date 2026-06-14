@@ -84,9 +84,18 @@ class NewsSummarizerApp:
 
         if self.settings.llm_api_key:
             try:
+                override_models = {}
+                if self.settings.llm_model_classify:
+                    override_models["fast"] = self.settings.llm_model_classify
+                if self.settings.llm_model_summarize:
+                    override_models["quality"] = self.settings.llm_model_summarize
+                if self.settings.llm_model_rewrite and "fast" not in override_models:
+                    override_models["fast"] = self.settings.llm_model_rewrite
                 self.llm = LLMProvider(
                     provider=self.settings.llm_provider,
                     api_key=self.settings.llm_api_key,
+                    models=override_models or None,
+                    base_url=self.settings.llm_base_url,
                 )
                 logger.info(f"LLM Provider: {self.llm}")
             except Exception as e:
@@ -533,6 +542,7 @@ class NewsSummarizerApp:
                         user_agent=self.settings.scraper_user_agent,
                         timeout=self.settings.scraper_timeout,
                         config_path=self.settings.scraper_config_path,
+                        timezone=self.settings.schedule_timezone,
                     )
                     scraped = await scraper.fetch_all(categories=categories)
                     news.extend(scraped)

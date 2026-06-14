@@ -24,9 +24,23 @@ class LLMProvider:
                 "quality": "gpt-4o",
             },
         },
+        "github": {
+            "base_url": "https://models.inference.ai.azure.com/openai/v1",
+            "models": {
+                "fast": "Phi-4-reasoning",
+                "balanced": "Phi-4-reasoning",
+                "quality": "Phi-4-reasoning",
+            },
+        },
     }
 
-    def __init__(self, provider: str = "groq", api_key: str = None):
+    def __init__(
+        self,
+        provider: str = "groq",
+        api_key: str = None,
+        models: dict[str, str] | None = None,
+        base_url: str | None = None,
+    ):
         if provider not in self.PROVIDERS:
             raise ValueError(
                 f"Provider {provider} no soportado. Providers disponibles: {list(self.PROVIDERS.keys())}"
@@ -37,11 +51,16 @@ class LLMProvider:
 
         self.provider = provider
         config = self.PROVIDERS[provider]
+        resolved_base_url = base_url or config["base_url"]
 
-        self._client = AsyncOpenAI(api_key=api_key, base_url=config["base_url"])
-        self.models = config["models"]
+        self._client = AsyncOpenAI(api_key=api_key, base_url=resolved_base_url)
+        self.models = config["models"].copy()
+        if models:
+            self.models.update(models)
         logger.info(
-            f"LLMProvider inicializado con provider={provider}, model={config['models']['quality']}"
+            f"LLMProvider inicializado con provider={provider}, "
+            f"base_url={resolved_base_url}, "
+            f"models={self.models}"
         )
 
     async def chat(

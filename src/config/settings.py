@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    github_api_key: str | None = Field(default=None, alias="GITHUB_API_KEY")
+    llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
     llm_model_summarize: str = Field(default="llama-3.3-70b-versatile", alias="LLM_MODEL_SUMMARIZE")
     llm_model_classify: str = Field(default="llama-3.1-8b-instant", alias="LLM_MODEL_CLASSIFY")
     llm_model_rewrite: str = Field(default="llama-3.1-70b-versatile", alias="LLM_MODEL_REWRITE")
@@ -102,6 +104,8 @@ class Settings(BaseSettings):
     def llm_api_key(self) -> str | None:
         if self.llm_provider == "groq":
             return self.groq_api_key
+        if self.llm_provider == "github":
+            return self.github_api_key
         return self.openai_api_key
 
 
