@@ -33,7 +33,7 @@ services:
       SCHEDULE_SUMMARY_MORNING: 10:00
       SCHEDULE_SUMMARY_AFTERNOON: 16:00
       SCHEDULE_SUMMARY_NIGHT: 20:00
-      CORS_ORIGINS: http://2.25.206.70:5173,https://ecobriefbolivia.online
+      CORS_ORIGINS: http://2.25.206.70:5173,https://ecobriefbolivia.online,https://briefs.ecobriefbolivia.online
     depends_on:
       postgres:
         condition: service_healthy
