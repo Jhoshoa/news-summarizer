@@ -25,11 +25,11 @@ class LLMProvider:
             },
         },
         "github": {
-            "base_url": "https://models.inference.ai.azure.com/openai/v1",
+            "base_url": "https://models.github.ai/inference",
             "models": {
-                "fast": "Phi-4-reasoning",
-                "balanced": "Phi-4-reasoning",
-                "quality": "Phi-4-reasoning",
+                "fast": "microsoft/Phi-4-reasoning",
+                "balanced": "microsoft/Phi-4-reasoning",
+                "quality": "microsoft/Phi-4-reasoning",
             },
         },
     }
