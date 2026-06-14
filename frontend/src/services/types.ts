@@ -89,6 +89,8 @@ export type ImpactMetricsResponse = {
   estimated_data_saved_mb: number;
   cache_reused: boolean;
   ai_calls_avoided_estimated: number;
+  llm_provider?: string | null;
+  llm_model?: string | null;
   pipeline: ImpactPipelineStep[];
   methodology: ImpactMethodology;
 };

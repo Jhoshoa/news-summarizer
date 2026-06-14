@@ -41,9 +41,16 @@ def create_impact_metrics_router(get_app_instance: Callable[[], Any]) -> APIRout
         if requested_date > today:
             raise HTTPException(status_code=422, detail="La fecha no puede ser futura")
 
-        return await app_instance.db.get_impact_metrics(
+        metrics = await app_instance.db.get_impact_metrics(
             requested_date,
             fallback_to_latest=fallback_to_latest,
         )
+        if hasattr(app_instance, "llm") and app_instance.llm:
+            metrics["llm_provider"] = app_instance.llm.provider
+            metrics["llm_model"] = app_instance.llm.models.get("quality")
+        else:
+            metrics["llm_provider"] = None
+            metrics["llm_model"] = None
+        return metrics
 
     return router

@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { SummaryCardSkeleton } from "../components/ui/Skeleton";
 import { useGetImpactMetricsQuery, useGetSummariesQuery } from "../services/api";
+import type { ImpactMetricsResponse } from "../services/types";
 import { formatPublishedDate } from "../utils/date";
 import { getImpactPipelineRows } from "../utils/impact";
 
@@ -28,8 +29,8 @@ const SkeletonLine = ({ className = "" }: { className?: string }) => (
 );
 
 const PipelineDonut = ({ pct }: { pct: number }) => {
-  const size = 176;
-  const sw = 26;
+  const size = 144;
+  const sw = 22;
   const r = (size - sw) / 2;
   const c = 2 * Math.PI * r;
   const briefs = Math.max(pct * c, 0);
@@ -38,25 +39,27 @@ const PipelineDonut = ({ pct }: { pct: number }) => {
   const removedPct = 100 - briefsPct;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.4rem" }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size / 2} cy={size / 2} r={r}
-          fill="none" stroke="#9ca3af" strokeWidth={sw} />
-        <circle cx={size / 2} cy={size / 2} r={r}
-          fill="none" stroke="#16a34a" strokeWidth={sw}
-          strokeDasharray={`${briefs} ${gap}`}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{ transition: "stroke-dasharray 0.6s ease" }} />
+          fill="none" stroke="#e5e7eb" strokeWidth={sw} />
+        {briefs > 0 && (
+          <circle cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke="#16a34a" strokeWidth={sw}
+            strokeDasharray={`${briefs} ${gap}`}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            style={{ transition: "stroke-dasharray 0.6s ease" }} />
+        )}
         <text x={size / 2} y={size / 2 - 4} textAnchor="middle"
-          fontSize="22" fontWeight="700" fill="#111827">
+          fontSize="20" fontWeight="700" fill="#111827">
           {removedPct}%
         </text>
         <text x={size / 2} y={size / 2 + 12} textAnchor="middle"
-          fontSize="11" fill="#6b7280">descartadas</text>
+          fontSize="10" fill="#6b7280">descartadas</text>
       </svg>
-      <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem" }}>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: "#9ca3af", marginRight: 4 }} /> {removedPct}%</span>
+      <div style={{ display: "flex", gap: "1rem", fontSize: "0.75rem" }}>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: "#e5e7eb", marginRight: 4 }} /> {removedPct}%</span>
         <span><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: "#16a34a", marginRight: 4 }} /> {briefsPct}%</span>
       </div>
     </div>
@@ -64,6 +67,177 @@ const PipelineDonut = ({ pct }: { pct: number }) => {
 };
 
 const PIPELINE_COLORS = ["#6b7280", "#d97706", "#006d77", "#16a34a"];
+
+const breakText = (text: string, maxLen: number): string[] => {
+  if (text.length <= maxLen) return [text];
+  const lines: string[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) { lines.push(remaining); break; }
+    let cut = remaining.lastIndexOf(" ", maxLen);
+    if (cut === -1) cut = maxLen;
+    lines.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut).trimStart();
+  }
+  return lines;
+};
+
+type StageDef = { label: string; count: number; color: string; icon: string };
+type DropDef = { fromIdx: number; count: number; label: string };
+
+const DESC = {
+  Recolectadas: "Artículos de scrapers + NewsAPI de 6 fuentes bolivianas (Unitel, RedUno, El Deber, Los Tiempos, Red Bolivisión, Radio Fides)",
+  Útiles: "Filtro de calidad: se descartan artículos sin título, sin imagen o con contenido insuficiente",
+  Únicas: "Deduplicación por URL duplicada, contenido similar y cluster de historia",
+  Rankeadas: "Todas las únicas noticias se puntúan con 7 criterios — actualidad (15%), relevancia local Bolivia (20%), impacto informativo (20%), calidad contenido (17%), fuente (10%), corroboración (10%) y confianza categoría (8%)",
+  Briefs: "",
+};
+
+const PipelineFlowSVG = ({ metrics }: { metrics: ImpactMetricsResponse }) => {
+  const total = metrics.collected_articles;
+  const fmt = (n: number) => formatNumber(n);
+  const pctStr = (n: number) => (total > 0 ? `${((n / total) * 100).toFixed(0)}%` : "—");
+  const modelLabel = metrics.llm_model && metrics.llm_provider
+    ? `Generados con ${metrics.llm_model} vía ${metrics.llm_provider}`
+    : "Resumidos con IA (Groq)";
+
+  const usable = metrics.usable_articles ?? 0;
+  const unicas = metrics.unique_articles;
+  const ranked = metrics.ranked_articles ?? 0;
+  const summaries = metrics.summaries;
+
+  const stages: StageDef[] = [
+    { label: "Recolectadas", count: total, color: "#6b7280", icon: "📥" },
+  ];
+
+  if (usable > 0 && usable !== total) {
+    stages.push({ label: "Útiles", count: usable, color: "#d97706", icon: "🔍" });
+  }
+
+  stages.push({ label: "Únicas", count: unicas, color: "#006d77", icon: "🧹" });
+
+  if (ranked > 0) {
+    stages.push({ label: "Rankeadas", count: ranked, color: "#16a34a", icon: "⭐" });
+  }
+
+  if (summaries > 0 && summaries !== (stages[stages.length - 1]?.count ?? 0)) {
+    stages.push({ label: "Briefs", count: summaries, color: "#16a34a", icon: "✍️" });
+  }
+
+  const prevCount = stages[stages.length - 1]?.count ?? 0;
+  const accumulated = summaries > prevCount && prevCount > 0;
+
+  const drops: DropDef[] = [];
+  for (let i = 0; i < stages.length - 1; i++) {
+    const diff = stages[i].count - stages[i + 1].count;
+    if (diff <= 0) continue;
+    let label = "descartadas";
+    if (i === 0) label = "baja calidad";
+    else if (i === 1 && stages[i].label === "Útiles") label = "duplicados";
+    else if (stages[i].label === "Únicas" && stages[i + 1].label === "Rankeadas") label = "no priorizadas";
+    else if (stages[i + 1].label === "Briefs") label = "no resumidas";
+    drops.push({ fromIdx: i, count: diff, label });
+  }
+
+  const boxW = 260;
+  const boxH = 48;
+  const gap = 32;
+  const dropW = 120;
+  const dropH = 36;
+  const padX = 16;
+  const mainX = padX;
+  const dropX = mainX + boxW + 20;
+  const descX = dropX + dropW + 24;
+  const svgW = 740;
+  const svgH = padX + stages.length * (boxH + gap);
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} style={{ maxWidth: svgW, display: "block" }}>
+      <defs>
+        <marker id="a" markerWidth="7" markerHeight="7" refX="3.5" refY="3.5" orient="auto">
+          <path d="M0,0 L7,3.5 L0,7 Z" fill="#9ca3af" />
+        </marker>
+        <marker id="ad" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#f87171" />
+        </marker>
+      </defs>
+
+      <line x1={descX - 12} y1={padX} x2={descX - 12} y2={svgH - padX}
+        stroke="#e5e7eb" strokeWidth={1} />
+
+      {stages.map((st, i) => {
+        const y0 = padX + i * (boxH + gap);
+        const desc = st.label === "Briefs" ? modelLabel : DESC[st.label as keyof typeof DESC] ?? "";
+        const descLines = desc ? breakText(desc, 38) : [];
+        return (
+          <g key={st.label}>
+            <rect x={mainX} y={y0} width={boxW} height={boxH} rx={10}
+              fill={st.color} fillOpacity={0.1} stroke={st.color} strokeWidth={1.5} />
+            <text x={mainX + 14} y={y0 + boxH / 2 + 5} textAnchor="middle" fontSize={14}>
+              {st.icon}
+            </text>
+            <text x={mainX + 30} y={y0 + boxH / 2 + 5} textAnchor="start"
+              fontSize={12} fontWeight={600} fill="#1f2937">
+              {st.label}
+            </text>
+            <text x={mainX + boxW - 10} y={y0 + boxH / 2 - 4} textAnchor="end"
+              fontSize={16} fontWeight={700} fill={st.color}>
+              {fmt(st.count)}
+            </text>
+            <text x={mainX + boxW - 10} y={y0 + boxH / 2 + 12} textAnchor="end"
+              fontSize={10} fill="#9ca3af">
+              {pctStr(st.count)}
+            </text>
+
+            {i < stages.length - 1 && (
+              <line x1={mainX + boxW / 2} y1={y0 + boxH}
+                x2={mainX + boxW / 2} y2={y0 + boxH + gap}
+                stroke="#cbd5e1" strokeWidth={2} markerEnd="url(#a)" />
+            )}
+
+            {descLines.map((line, li) => (
+              <text key={li} x={descX} y={y0 + boxH / 2 - (descLines.length - 1) * 7 + li * 14}
+                textAnchor="start" fontSize={10} fill="#6b7280">
+                {line}
+              </text>
+            ))}
+
+            {st.label === "Briefs" && accumulated && (
+              <text x={descX} y={y0 + boxH / 2 + (descLines.length - 0.5) * 14 + 6}
+                textAnchor="start" fontSize={9} fill="#9ca3af" fontStyle="italic">
+                * incluye briefs de corridas anteriores
+              </text>
+            )}
+          </g>
+        );
+      })}
+
+      {drops.map((d) => {
+        const i = d.fromIdx;
+        const y0 = padX + i * (boxH + gap);
+        const yC = y0 + boxH / 2;
+        return (
+          <g key={`drop-${i}`}>
+            <line x1={mainX + boxW} y1={yC} x2={dropX} y2={yC}
+              stroke="#f87171" strokeWidth={1} strokeDasharray="3,2" markerEnd="url(#ad)" />
+            <rect x={dropX} y={yC - dropH / 2} width={dropW} height={dropH} rx={8}
+              fill="#fef2f2" stroke="#fca5a5" strokeWidth={1} />
+            <text x={dropX + dropW / 2} y={yC - 2} textAnchor="middle"
+              fontSize={13} fontWeight={600} fill="#dc2626">
+              -{fmt(d.count)}
+            </text>
+            <text x={dropX + dropW / 2} y={yC + 11} textAnchor="middle"
+              fontSize={9} fill="#9ca3af">
+              {d.label}
+            </text>
+          </g>
+        );
+      })}
+
+
+    </svg>
+  );
+};
 
 const ImpactPanelSkeleton = ({ rows = 3 }: { rows?: number }) => (
   <section className="data-panel impact-flow-panel skeleton-panel" aria-hidden="true">
@@ -189,11 +363,11 @@ export const ImpactPage = () => {
                   const pctStr = total > 0 ? `${((row.value / total) * 100).toFixed(0)}%` : "—";
                   return (
                     <div key={row.label} className="pipeline-step-row"
-                      style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.625rem" }}>
+                      style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
                       <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: PIPELINE_COLORS[i % PIPELINE_COLORS.length], flexShrink: 0 }} />
-                      <span style={{ fontSize: "0.9rem", color: "#374151" }}>{row.label}</span>
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280", marginLeft: "auto" }}>{pctStr}</span>
-                      <strong style={{ fontSize: "1rem", minWidth: "2.5rem", textAlign: "right" }}>{formatNumber(row.value)}</strong>
+                      <span style={{ fontSize: "0.85rem", color: "#374151" }}>{row.label}</span>
+                      <span style={{ fontSize: "0.75rem", color: "#6b7280", marginLeft: "auto" }}>{pctStr}</span>
+                      <strong style={{ fontSize: "0.95rem", minWidth: "2.2rem", textAlign: "right" }}>{formatNumber(row.value)}</strong>
                     </div>
                   );
                 })}
@@ -236,6 +410,9 @@ export const ImpactPage = () => {
                   </div>
                 </div>
               </div>
+            </div>
+            <div className="pipeline-svg-flow" style={{ marginTop: "0.75rem" }}>
+              <PipelineFlowSVG metrics={metrics} />
             </div>
           </section>
 
