@@ -426,7 +426,7 @@ class NewsScraper:
         return self._has_non_today_publish_date(published_at)
 
     def _now(self) -> datetime:
-        return datetime.now(self._tz)
+        return datetime.now(self._tz).replace(tzinfo=None)
 
     def _has_non_today_publish_date(self, published_at: datetime) -> bool:
         return published_at.date() != self._now().date()

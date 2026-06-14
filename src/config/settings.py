@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     github_api_key: str | None = Field(default=None, alias="GITHUB_API_KEY")
     llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
-    llm_model_summarize: str = Field(default="llama-3.3-70b-versatile", alias="LLM_MODEL_SUMMARIZE")
-    llm_model_classify: str = Field(default="llama-3.1-8b-instant", alias="LLM_MODEL_CLASSIFY")
-    llm_model_rewrite: str = Field(default="llama-3.1-70b-versatile", alias="LLM_MODEL_REWRITE")
+    llm_model_summarize: str | None = Field(default=None, alias="LLM_MODEL_SUMMARIZE")
+    llm_model_classify: str | None = Field(default=None, alias="LLM_MODEL_CLASSIFY")
+    llm_model_rewrite: str | None = Field(default=None, alias="LLM_MODEL_REWRITE")
 
     news_api_key: str | None = Field(default=None, alias="NEWS_API_KEY")
     news_api_country: str = Field(default="bo", alias="NEWS_API_COUNTRY")
