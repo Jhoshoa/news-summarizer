@@ -27,9 +27,9 @@ class LLMProvider:
         "github": {
             "base_url": "https://models.github.ai/inference",
             "models": {
-                "fast": "microsoft/Phi-4-reasoning",
-                "balanced": "microsoft/Phi-4-reasoning",
-                "quality": "microsoft/Phi-4-reasoning",
+                "fast": "openai/gpt-4.1-mini",
+                "balanced": "openai/gpt-4.1-mini",
+                "quality": "openai/gpt-4.1-mini",
             },
         },
     }
