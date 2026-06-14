@@ -986,7 +986,27 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    status = "healthy"
+    db_status = "not_configured"
+    categories_count = 0
+
+    if app_instance and app_instance.db:
+        try:
+            async with app_instance.db.session_maker() as session:
+                from sqlalchemy import select, func
+                from src.db import NewsCategory
+                result = await session.execute(select(func.count(NewsCategory.id)))
+                categories_count = result.scalar() or 0
+            db_status = "connected"
+        except Exception as e:
+            db_status = f"error: {e}"
+            status = "degraded"
+
+    return {
+        "status": status,
+        "database": db_status,
+        "categories": categories_count,
+    }
 
 
 @app.post("/webhook/whatsapp")

@@ -23,6 +23,7 @@ from sqlalchemy import (
     select,
 )
 from sqlalchemy import update as sql_update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
@@ -217,13 +218,17 @@ class Database:
         """Crea las tablas y semillas de referencia."""
 
         async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+            for table in Base.metadata.sorted_tables:
+                try:
+                    await conn.run_sync(table.create, checkfirst=True)
+                except IntegrityError:
+                    logger.warning(f"Tabla {table.name} ya existe, omitiendo")
 
         async with self.session_maker() as session:
             await self._seed_categories(session)
             await session.commit()
 
-        logger.info("Tablas creadas")
+        logger.info("Base de datos inicializada")
 
     async def save_subscription(
         self,
