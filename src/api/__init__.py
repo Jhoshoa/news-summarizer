@@ -5,6 +5,7 @@ from .preferences import create_preferences_router
 from .sources import create_sources_router
 from .summaries import create_summaries_router
 from .weather import create_weather_router
+from .worldcup import create_worldcup_router
 
 __all__ = [
     "create_articles_router",
@@ -14,4 +15,5 @@ __all__ = [
     "create_sources_router",
     "create_summaries_router",
     "create_weather_router",
+    "create_worldcup_router",
 ]

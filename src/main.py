@@ -22,6 +22,7 @@ from src.api import (
     create_sources_router,
     create_summaries_router,
     create_weather_router,
+    create_worldcup_router,
 )
 from src.api.security import require_cron_key
 from src.collectors import NewsAPICollector, NewsScraper
@@ -987,6 +988,7 @@ app.include_router(create_articles_router(lambda: app_instance))
 app.include_router(create_summaries_router(lambda: app_instance))
 app.include_router(create_impact_metrics_router(lambda: app_instance))
 app.include_router(create_preferences_router(lambda: app_instance))
+app.include_router(create_worldcup_router(lambda: app_instance))
 
 
 @app.get("/")

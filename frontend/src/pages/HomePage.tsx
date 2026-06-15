@@ -16,6 +16,7 @@ import {
   SummaryCardSkeleton,
 } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
+import { WorldCupPanel } from "../components/worldcup/WorldCupPanel";
 import {
   useGetArticlesQuery,
   useGetEconomicIndicatorsQuery,
@@ -231,6 +232,7 @@ export const HomePage = () => {
             </div>
 
             <aside className="side-stack">
+              <WorldCupPanel />
               {showWeatherSkeleton ? <PanelSkeleton /> : <WeatherPanel weather={weather} />}
               <section className="economic-side-section" aria-label="Indicadores economicos">
                 <div className="section-label">Datos clave</div>

@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    Time,
     UniqueConstraint,
     exists,
     func,
@@ -188,6 +189,25 @@ class NewsSummary(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class WorldCupMatch(Base):
+    __tablename__ = "worldcup_matches"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    match_date = Column(Date, nullable=False, index=True)
+    match_time = Column(Time, nullable=False)
+    group_name = Column(String(2), nullable=False)
+    home_team = Column(String(50), nullable=False)
+    away_team = Column(String(50), nullable=False)
+    home_flag = Column(String(20), nullable=True)
+    away_flag = Column(String(20), nullable=True)
+    home_score = Column(Integer, nullable=True)
+    away_score = Column(Integer, nullable=True)
+    is_playing = Column(Boolean, default=False)
+    is_finished = Column(Boolean, default=False)
+    stage = Column(String(20), nullable=False, default="group")
+    venue = Column(String(100), nullable=True)
+
+
 class Database:
     """Repositorio de base de datos."""
 
@@ -226,6 +246,7 @@ class Database:
 
         async with self.session_maker() as session:
             await self._seed_categories(session)
+            await self._seed_worldcup_matches(session)
             await session.commit()
 
         logger.info("Base de datos inicializada")
@@ -1186,6 +1207,36 @@ class Database:
                     existing.story_cluster_id = story_cluster_id
                     existing.source_article_count = source_article_count
                     updated += 1
+                elif article_id is not None:
+                    existing_by_article = await self._get_summary_by_article(
+                        session, article_id, summary_date
+                    )
+                    if existing_by_article:
+                        existing_by_article.category_id = category.id
+                        existing_by_article.title = title
+                        existing_by_article.summary = body
+                        existing_by_article.fact = fact
+                        existing_by_article.llm_provider = llm_provider
+                        existing_by_article.llm_model = llm_model
+                        existing_by_article.story_cluster_id = story_cluster_id
+                        existing_by_article.source_article_count = source_article_count
+                        updated += 1
+                    else:
+                        session.add(
+                            NewsSummary(
+                                article_id=article_id,
+                                category_id=category.id,
+                                story_cluster_id=story_cluster_id,
+                                source_article_count=source_article_count,
+                                title=title,
+                                summary=body,
+                                fact=fact,
+                                llm_provider=llm_provider,
+                                llm_model=llm_model,
+                                summary_date=summary_date,
+                            )
+                        )
+                        inserted += 1
                 else:
                     session.add(
                         NewsSummary(
@@ -1396,10 +1447,199 @@ class Database:
 
         return self._summary_row_to_dict(row) if row else None
 
+    async def get_worldcup_matches(self, match_date: date | None = None) -> list[dict]:
+        async with self.session_maker() as session:
+            stmt = select(WorldCupMatch).order_by(WorldCupMatch.match_date, WorldCupMatch.match_time)
+            if match_date:
+                stmt = stmt.where(WorldCupMatch.match_date == match_date)
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+        return [
+            {
+                "id": r.id,
+                "match_date": r.match_date.isoformat(),
+                "match_time": r.match_time.strftime("%H:%M"),
+                "group": r.group_name,
+                "home_team": r.home_team,
+                "away_team": r.away_team,
+                "home_flag": r.home_flag,
+                "away_flag": r.away_flag,
+                "home_score": r.home_score,
+                "away_score": r.away_score,
+                "is_playing": r.is_playing,
+                "is_finished": r.is_finished,
+                "stage": r.stage,
+                "venue": r.venue,
+            }
+            for r in rows
+        ]
+
+    async def start_match(self, match_id: int) -> dict | None:
+        async with self.session_maker() as session:
+            stmt = select(WorldCupMatch).where(WorldCupMatch.id == match_id)
+            result = await session.execute(stmt)
+            match = result.scalar_one_or_none()
+            if not match:
+                return None
+            match.is_playing = True
+            match.is_finished = False
+            await session.commit()
+            return {"id": match.id, "is_playing": match.is_playing, "is_finished": match.is_finished}
+
+    async def update_match_score(self, match_id: int, home_score: int, away_score: int) -> dict | None:
+        async with self.session_maker() as session:
+            stmt = select(WorldCupMatch).where(WorldCupMatch.id == match_id)
+            result = await session.execute(stmt)
+            match = result.scalar_one_or_none()
+            if not match:
+                return None
+            match.home_score = home_score
+            match.away_score = away_score
+            await session.commit()
+            return {
+                "id": match.id,
+                "home_team": match.home_team,
+                "away_team": match.away_team,
+                "home_score": match.home_score,
+                "away_score": match.away_score,
+            }
+
+    async def finish_match(self, match_id: int) -> dict | None:
+        async with self.session_maker() as session:
+            stmt = select(WorldCupMatch).where(WorldCupMatch.id == match_id)
+            result = await session.execute(stmt)
+            match = result.scalar_one_or_none()
+            if not match:
+                return None
+            if not match.is_playing:
+                raise ValueError("El partido no está en juego")
+            match.is_playing = False
+            match.is_finished = True
+            await session.commit()
+            return {
+                "id": match.id,
+                "is_playing": match.is_playing,
+                "is_finished": match.is_finished,
+            }
+
     async def close(self):
         """Cierra el pool de conexiones."""
         await self.engine.dispose()
         logger.info("Database cerrada")
+
+    @staticmethod
+    def _gmt_to_bolivia(gmt_date: date, gmt_time: time) -> tuple[date, time]:
+        dt = datetime.combine(gmt_date, gmt_time) - timedelta(hours=4)
+        return dt.date(), dt.time()
+
+    async def _seed_worldcup_matches(self, session: AsyncSession) -> None:
+        stmt = select(func.count(WorldCupMatch.id))
+        result = await session.execute(stmt)
+        if result.scalar() > 0:
+            return
+
+        # (gmt_date, gmt_time, group, home, away, home_flag, away_flag, venue)
+        raw: list[tuple[date, time, str, str, str, str, str, str]] = [
+            # Group A
+            (date(2026, 6, 11), time(19, 0), "A", "México", "Sudáfrica", "🇲🇽", "🇿🇦", "Mexico City Stadium"),
+            (date(2026, 6, 11), time(22, 0), "A", "Corea del Sur", "República Checa", "🇰🇷", "🇨🇿", "Estadio Guadalajara"),
+            (date(2026, 6, 18), time(16, 0), "A", "República Checa", "Sudáfrica", "🇨🇿", "🇿🇦", "Atlanta Stadium"),
+            (date(2026, 6, 18), time(23, 0), "A", "México", "Corea del Sur", "🇲🇽", "🇰🇷", "Estadio Guadalajara"),
+            (date(2026, 6, 24), time(23, 0), "A", "República Checa", "México", "🇨🇿", "🇲🇽", "Mexico City Stadium"),
+            (date(2026, 6, 24), time(23, 0), "A", "Sudáfrica", "Corea del Sur", "🇿🇦", "🇰🇷", "Estadio Monterrey"),
+            # Group B
+            (date(2026, 6, 12), time(19, 0), "B", "Canadá", "Bosnia y Herzegovina", "🇨🇦", "🇧🇦", "Toronto Stadium"),
+            (date(2026, 6, 13), time(19, 0), "B", "Catar", "Suiza", "🇶🇦", "🇨🇭", "San Francisco Bay Area Stadium"),
+            (date(2026, 6, 18), time(19, 0), "B", "Suiza", "Bosnia y Herzegovina", "🇨🇭", "🇧🇦", "Los Angeles Stadium"),
+            (date(2026, 6, 18), time(22, 0), "B", "Canadá", "Catar", "🇨🇦", "🇶🇦", "BC Place Vancouver"),
+            (date(2026, 6, 24), time(19, 0), "B", "Suiza", "Canadá", "🇨🇭", "🇨🇦", "BC Place Vancouver"),
+            (date(2026, 6, 24), time(19, 0), "B", "Bosnia y Herzegovina", "Catar", "🇧🇦", "🇶🇦", "Seattle Stadium"),
+            # Group C
+            (date(2026, 6, 13), time(22, 0), "C", "Brasil", "Marruecos", "🇧🇷", "🇲🇦", "New York New Jersey Stadium"),
+            (date(2026, 6, 13), time(23, 0), "C", "Haití", "Escocia", "🇭🇹", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Boston Stadium"),
+            (date(2026, 6, 19), time(22, 0), "C", "Escocia", "Marruecos", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "🇲🇦", "Boston Stadium"),
+            (date(2026, 6, 20), time(0, 30), "C", "Brasil", "Haití", "🇧🇷", "🇭🇹", "Philadelphia Stadium"),
+            (date(2026, 6, 24), time(22, 0), "C", "Escocia", "Brasil", "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "🇧🇷", "Miami Stadium"),
+            (date(2026, 6, 24), time(22, 0), "C", "Marruecos", "Haití", "🇲🇦", "🇭🇹", "Atlanta Stadium"),
+            # Group D
+            (date(2026, 6, 12), time(23, 0), "D", "Estados Unidos", "Paraguay", "🇺🇸", "🇵🇾", "Los Angeles Stadium"),
+            (date(2026, 6, 14), time(2, 0), "D", "Australia", "Turquía", "🇦🇺", "🇹🇷", "BC Place Vancouver"),
+            (date(2026, 6, 19), time(19, 0), "D", "Estados Unidos", "Australia", "🇺🇸", "🇦🇺", "Seattle Stadium"),
+            (date(2026, 6, 20), time(1, 0), "D", "Turquía", "Paraguay", "🇹🇷", "🇵🇾", "San Francisco Bay Area Stadium"),
+            (date(2026, 6, 26), time(1, 0), "D", "Turquía", "Estados Unidos", "🇹🇷", "🇺🇸", "Los Angeles Stadium"),
+            (date(2026, 6, 26), time(1, 0), "D", "Paraguay", "Australia", "🇵🇾", "🇦🇺", "San Francisco Bay Area Stadium"),
+            # Group E
+            (date(2026, 6, 14), time(17, 0), "E", "Alemania", "Curazao", "🇩🇪", "🇨🇼", "Houston Stadium"),
+            (date(2026, 6, 14), time(23, 0), "E", "Costa de Marfil", "Ecuador", "🇨🇮", "🇪🇨", "Philadelphia Stadium"),
+            (date(2026, 6, 20), time(20, 0), "E", "Alemania", "Costa de Marfil", "🇩🇪", "🇨🇮", "Toronto Stadium"),
+            (date(2026, 6, 21), time(1, 0), "E", "Ecuador", "Curazao", "🇪🇨", "🇨🇼", "Kansas City Stadium"),
+            (date(2026, 6, 25), time(20, 0), "E", "Ecuador", "Alemania", "🇪🇨", "🇩🇪", "New York New Jersey Stadium"),
+            (date(2026, 6, 25), time(20, 0), "E", "Curazao", "Costa de Marfil", "🇨🇼", "🇨🇮", "Philadelphia Stadium"),
+            # Group F
+            (date(2026, 6, 14), time(20, 0), "F", "Países Bajos", "Japón", "🇳🇱", "🇯🇵", "Dallas Stadium"),
+            (date(2026, 6, 15), time(0, 0), "F", "Suecia", "Túnez", "🇸🇪", "🇹🇳", "Estadio Monterrey"),
+            (date(2026, 6, 20), time(17, 0), "F", "Países Bajos", "Suecia", "🇳🇱", "🇸🇪", "Houston Stadium"),
+            (date(2026, 6, 21), time(2, 0), "F", "Túnez", "Japón", "🇹🇳", "🇯🇵", "Estadio Monterrey"),
+            (date(2026, 6, 25), time(23, 0), "F", "Japón", "Suecia", "🇯🇵", "🇸🇪", "Dallas Stadium"),
+            (date(2026, 6, 25), time(23, 0), "F", "Túnez", "Países Bajos", "🇹🇳", "🇳🇱", "Kansas City Stadium"),
+            # Group G
+            (date(2026, 6, 15), time(19, 0), "G", "Bélgica", "Egipto", "🇧🇪", "🇪🇬", "BC Place Vancouver"),
+            (date(2026, 6, 15), time(23, 0), "G", "Irán", "Nueva Zelanda", "🇮🇷", "🇳🇿", "Los Angeles Stadium"),
+            (date(2026, 6, 21), time(19, 0), "G", "Bélgica", "Irán", "🇧🇪", "🇮🇷", "Los Angeles Stadium"),
+            (date(2026, 6, 22), time(1, 0), "G", "Nueva Zelanda", "Egipto", "🇳🇿", "🇪🇬", "BC Place Vancouver"),
+            (date(2026, 6, 26), time(2, 0), "G", "Egipto", "Irán", "🇪🇬", "🇮🇷", "Seattle Stadium"),
+            (date(2026, 6, 26), time(2, 0), "G", "Nueva Zelanda", "Bélgica", "🇳🇿", "🇧🇪", "BC Place Vancouver"),
+            # Group H
+            (date(2026, 6, 15), time(16, 0), "H", "España", "Cabo Verde", "🇪🇸", "🇨🇻", "Atlanta Stadium"),
+            (date(2026, 6, 15), time(22, 0), "H", "Arabia Saudita", "Uruguay", "🇸🇦", "🇺🇾", "Miami Stadium"),
+            (date(2026, 6, 21), time(16, 0), "H", "España", "Arabia Saudita", "🇪🇸", "🇸🇦", "Atlanta Stadium"),
+            (date(2026, 6, 21), time(22, 0), "H", "Uruguay", "Cabo Verde", "🇺🇾", "🇨🇻", "Miami Stadium"),
+            (date(2026, 6, 26), time(0, 0), "H", "Cabo Verde", "Arabia Saudita", "🇨🇻", "🇸🇦", "Houston Stadium"),
+            (date(2026, 6, 26), time(0, 0), "H", "Uruguay", "España", "🇺🇾", "🇪🇸", "Estadio Guadalajara"),
+            # Group I
+            (date(2026, 6, 16), time(19, 0), "I", "Francia", "Senegal", "🇫🇷", "🇸🇳", "New York New Jersey Stadium"),
+            (date(2026, 6, 16), time(22, 0), "I", "Irak", "Noruega", "🇮🇶", "🇳🇴", "Boston Stadium"),
+            (date(2026, 6, 22), time(21, 0), "I", "Francia", "Irak", "🇫🇷", "🇮🇶", "Philadelphia Stadium"),
+            (date(2026, 6, 23), time(0, 0), "I", "Noruega", "Senegal", "🇳🇴", "🇸🇳", "New York New Jersey Stadium"),
+            (date(2026, 6, 26), time(19, 0), "I", "Noruega", "Francia", "🇳🇴", "🇫🇷", "Boston Stadium"),
+            (date(2026, 6, 26), time(19, 0), "I", "Senegal", "Irak", "🇸🇳", "🇮🇶", "Toronto Stadium"),
+            # Group J
+            (date(2026, 6, 16), time(23, 0), "J", "Argentina", "Argelia", "🇦🇷", "🇩🇿", "Kansas City Stadium"),
+            (date(2026, 6, 17), time(2, 0), "J", "Austria", "Jordania", "🇦🇹", "🇯🇴", "San Francisco Bay Area Stadium"),
+            (date(2026, 6, 22), time(17, 0), "J", "Argentina", "Austria", "🇦🇷", "🇦🇹", "Dallas Stadium"),
+            (date(2026, 6, 23), time(1, 0), "J", "Jordania", "Argelia", "🇯🇴", "🇩🇿", "San Francisco Bay Area Stadium"),
+            (date(2026, 6, 27), time(2, 0), "J", "Argelia", "Austria", "🇩🇿", "🇦🇹", "Kansas City Stadium"),
+            (date(2026, 6, 27), time(2, 0), "J", "Jordania", "Argentina", "🇯🇴", "🇦🇷", "Dallas Stadium"),
+            # Group K
+            (date(2026, 6, 17), time(17, 0), "K", "Portugal", "RD Congo", "🇵🇹", "🇨🇩", "Houston Stadium"),
+            (date(2026, 6, 18), time(0, 0), "K", "Uzbekistán", "Colombia", "🇺🇿", "🇨🇴", "Mexico City Stadium"),
+            (date(2026, 6, 23), time(17, 0), "K", "Portugal", "Uzbekistán", "🇵🇹", "🇺🇿", "Houston Stadium"),
+            (date(2026, 6, 24), time(0, 0), "K", "Colombia", "RD Congo", "🇨🇴", "🇨🇩", "Estadio Guadalajara"),
+            (date(2026, 6, 27), time(23, 30), "K", "Colombia", "Portugal", "🇨🇴", "🇵🇹", "Miami Stadium"),
+            (date(2026, 6, 27), time(23, 30), "K", "RD Congo", "Uzbekistán", "🇨🇩", "🇺🇿", "Atlanta Stadium"),
+            # Group L
+            (date(2026, 6, 17), time(20, 0), "L", "Inglaterra", "Croacia", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇭🇷", "Dallas Stadium"),
+            (date(2026, 6, 17), time(23, 0), "L", "Ghana", "Panamá", "🇬🇭", "🇵🇦", "Toronto Stadium"),
+            (date(2026, 6, 23), time(20, 0), "L", "Inglaterra", "Ghana", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇬🇭", "Boston Stadium"),
+            (date(2026, 6, 23), time(23, 0), "L", "Panamá", "Croacia", "🇵🇦", "🇭🇷", "Toronto Stadium"),
+            (date(2026, 6, 27), time(21, 0), "L", "Panamá", "Inglaterra", "🇵🇦", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "New York New Jersey Stadium"),
+            (date(2026, 6, 27), time(21, 0), "L", "Croacia", "Ghana", "🇭🇷", "🇬🇭", "Philadelphia Stadium"),
+        ]
+
+        for gmt_date, gmt_time, group, home, away, hf, af, venue in raw:
+            bolivia_date, bolivia_time = self._gmt_to_bolivia(gmt_date, gmt_time)
+            session.add(WorldCupMatch(
+                match_date=bolivia_date,
+                match_time=bolivia_time,
+                group_name=group,
+                home_team=home,
+                away_team=away,
+                home_flag=hf,
+                away_flag=af,
+                venue=venue,
+                stage="group",
+            ))
+        logger.info(f"Semilladas {len(raw)} jornadas de la Copa Mundial 2026")
 
     async def _seed_categories(self, session: AsyncSession) -> None:
         for name, display_name in DEFAULT_CATEGORIES.items():
@@ -1513,6 +1753,19 @@ class Database:
             NewsSummary.category_id == category_id,
             NewsSummary.summary_date == summary_date,
             NewsSummary.title == title,
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _get_summary_by_article(
+        self,
+        session: AsyncSession,
+        article_id: int,
+        summary_date: date,
+    ) -> NewsSummary | None:
+        stmt = select(NewsSummary).where(
+            NewsSummary.article_id == article_id,
+            NewsSummary.summary_date == summary_date,
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
