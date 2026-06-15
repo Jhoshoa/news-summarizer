@@ -1,0 +1,379 @@
+\documentclass[10pt,xcolor={dvipsnames}]{beamer}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows,shapes,positioning}
+
+\definecolor{verde-ecobrief}{HTML}{16a34a}
+\definecolor{gris-texto}{HTML}{374151}
+\definecolor{azul-profundo}{HTML}{1e3a5f}
+
+\usetheme[%
+    titleformat=smallcaps,
+    numbering=fraction,
+    progressbar=frametitle,
+]{metropolis}
+
+\setbeamercolor{normal text}{fg=gris-texto}
+\setbeamercolor{frametitle}{bg=azul-profundo, fg=white}
+\setbeamercolor{title}{fg=azul-profundo}
+\setbeamercolor{structure}{fg=verde-ecobrief}
+\setbeamercolor{alerted text}{fg=verde-ecobrief}
+\setbeamercolor{block title}{bg=verde-ecobrief!20, fg=azul-profundo}
+\setbeamercolor{block body}{bg=verde-ecobrief!5}
+\setbeamertemplate{itemize items}{\textcolor{verde-ecobrief}{\small$\blacktriangleright$}}
+\setbeamertemplate{enumerate items}{\textcolor{verde-ecobrief}{\arabic{enumi}.}}
+
+\hypersetup{colorlinks=true, linkcolor=azul-profundo, urlcolor=verde-ecobrief}
+
+\title{EcoBrief Bolivia}
+\subtitle{IA responsable para reducir el desperdicio digital informativo}
+\author[Equipo AssureSoft]{Josoe Ichuta --- Ingeniería \\ Raquel Auza --- Digital-Academy}
+\institute{AssureSoft}
+\date{Junio 2026}
+
+\begin{document}
+
+\begin{frame}
+\centering
+\vspace*{0.8cm}
+\includegraphics[width=4cm]{./images/logo-assuresoft.png}
+\titlepage
+\end{frame}
+
+\begin{frame}{El problema}
+\framesubtitle{Desperdicio digital informativo}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+Para informarse en Bolivia hoy:
+\begin{itemize}
+    \item Abrir múltiples sitios de noticias
+    \item Comparar titulares repetidos
+    \item Hacer \textit{scroll} en redes sociales
+    \item Consumir páginas enteras con publicidad
+\end{itemize}
+
+\column{0.5\textwidth}
+\centering
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{0.85\textwidth}{\centering\bfseries\large\color{azul-profundo} \alert{Desperdicio digital}\\[4pt] tiempo perdido\\ datos móviles innecesarios\\ sin fuente trazable}}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Solución}
+\framesubtitle{EcoBrief Bolivia}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{block}{Antes}
+\begin{itemize}
+    \item Abrir varios sitios
+    \item Titulares repetidos
+    \item \textit{Scroll} en redes
+    \item Páginas completas
+    \item Impacto desconocido
+\end{itemize}
+\end{block}
+
+\column{0.5\textwidth}
+\begin{block}{Con EcoBrief}
+\begin{itemize}
+    \item Resumen centralizado
+    \item Historias deduplicadas
+    \item Información trazable
+    \item Resúmenes compactos
+    \item Métricas visibles
+\end{itemize}
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Arquitectura del sistema}
+
+\centering
+\begin{tikzpicture}[
+    node distance=0.6cm and 1cm,
+    box/.style={rectangle, draw=verde-ecobrief, thick, rounded corners, fill=verde-ecobrief!5, minimum width=2.5cm, minimum height=0.8cm, align=center, font=\small\bfseries},
+    arrow/.style={->, thick, >=stealth, color=gris-texto},
+]
+\node[box] (api) {Backend\\ FastAPI};
+\node[box, above=of api] (front) {Frontend\\ React + Vite};
+\node[box, below=of api] (db) {PostgreSQL\\ SQLAlchemy};
+\node[box, left=of api] (scraper) {Scrapers\\ httpx + BS4};
+\node[box, right=of api] (ia) {LLM Client\\ Groq / OpenAI};
+\node[box, below=of scraper] (dist) {Distribución\\ Email \\ Telegram / Email};
+\draw[arrow] (front) -- (api);
+\draw[arrow] (api) -- (db);
+\draw[arrow] (scraper) -- (api);
+\draw[arrow] (api) -- (ia);
+\draw[arrow] (api) -- (dist);
+\end{tikzpicture}
+
+\vspace{0.3cm}
+\centering\small\textit{Frontend React, Backend FastAPI, Scrapers, BD PostgreSQL, LLMs y Distribución}
+
+\vspace{0.3cm}
+\centering\small\textit{Frontend React + Vite, Backend FastAPI, BD PostgreSQL, Scrapers, LLMs, Distribución}
+\end{frame}
+
+\begin{frame}{Pipeline de procesamiento}
+
+\centering
+\begin{tikzpicture}[
+    node distance=0.4cm and 0.3cm,
+    pbox/.style={rectangle, draw=verde-ecobrief, thick, rounded corners, fill=verde-ecobrief!10, minimum width=2.4cm, minimum height=0.9cm, align=center, font=\small},
+    arrow/.style={->, thick, >=stealth, color=gris-texto},
+]
+\node[pbox] (collect) {Recolección\\ 6 fuentes};
+\node[pbox, right=of collect] (filter) {Filtrado\\ y dedup.};
+\node[pbox, right=of filter] (classify) {Clasificación\\ + ranking};
+\node[pbox, right=of classify] (summ) {Resumen\\ IA};
+\node[pbox, below=of summ] (metric) {Métricas\\ Green Tech};
+\draw[arrow] (collect) -- (filter);
+\draw[arrow] (filter) -- (classify);
+\draw[arrow] (classify) -- (summ);
+\draw[arrow] (summ) -- (metric);
+\end{tikzpicture}
+
+\vspace{0.4cm}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{enumerate}
+    \item Iniciar corrida (manual o \textit{scheduler})
+    \item Verificar caché de resúmenes
+    \item Recolectar noticias nuevas
+    \item Filtrar artículos sin contenido
+\end{enumerate}
+\column{0.5\textwidth}
+\begin{enumerate}\setcounter{enumi}{4}
+    \item Deduplicar (URL + título + huella)
+    \item Clasificar por categoría
+    \item Rankear por relevancia
+    \item Generar briefs con IA
+\end{enumerate}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Clasificación por categorías}
+
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Categoría} & \textbf{Términos clave} \\
+\midrule
+Economía & Dólar, BCB, inflación, hidrocarburos, exportación \\
+\midrule
+Política & Gobierno, presidente, elecciones, Asamblea, leyes \\
+\midrule
+Deportes & Fútbol, clubes, selección boliviana, torneos \\
+\midrule
+Tecnología & IA, software, ciberseguridad, telecomunicaciones \\
+\midrule
+Entretenimiento & Cine, música, televisión, festivales \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.4cm}
+\begin{block}{Ponderación por campo}
+Título $\times 3.0$ \;|\; Descripción $\times 2.0$ \;|\; Contenido $\times 1.0$ \;|\; Categoría fuente $\times 2.5$
+\end{block}
+\end{frame}
+
+\begin{frame}{Ranking por relevancia}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Factor} & \textbf{Peso} & \textbf{Ejemplo} \\
+\midrule
+Actualidad & 15\% & 1h $\to$ 100 pts, 48h $\to$ 25 pts \\
+Relevancia local & 20\% & Regiones, ciudades, instituciones \\
+Impacto informativo & 20\% & Crisis, dólar, elecciones, ley \\
+Calidad del contenido & 17\% & $>120$ palabras + bono imagen \\
+Fuente & 10\% & RedUno 84, RadioFides 84, default 55 \\
+Corroboración & 10\% & 2 fuentes $\to$ 70, 3+ $\to$ 100 \\
+Confianza categoría & 8\% & $\ge 0.80 \to 100$ pts \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\[
+P = \sum_{f} w_f \cdot s_f - \text{penalizaciones}
+\]
+\end{frame}
+
+\begin{frame}{Eficiencia en el uso de IA}
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{block}{Antes de la IA}
+\begin{enumerate}
+    \item \alert{Filtrar} --- descartar sin contenido
+    \item \alert{Deduplicar} --- evitar repetidos
+    \item \alert{Rankear} --- solo lo relevante
+    \item \alert{Limitar} --- máximo por categoría
+\end{enumerate}
+\end{block}
+
+\column{0.5\textwidth}
+\begin{block}{Durante la IA}
+\begin{enumerate}\setcounter{enumi}{4}
+    \item \alert{Cachear} --- no reprocesar
+    \item \alert{Modelos pequeños} --- tareas simples
+    \item \alert{Control cruzado} --- sin duplicados
+\end{enumerate}
+\end{block}
+\end{columns}
+
+\vspace{0.3cm}
+\centering
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{0.8\textwidth}{\centering\bfseries\large La IA se usa solo después de limpiar, deduplicar y priorizar}}
+\end{frame}
+
+\begin{frame}{Proveedores LLM}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Proveedor} & \textbf{Fast} & \textbf{Balanced} & \textbf{Quality} \\
+\midrule
+Groq (gratuita) & Llama 3.1 8B & Llama 3.1 70B & Llama 3.3 70B \\
+\midrule
+OpenAI (pagada) & GPT-4o-mini & GPT-4o & GPT-4o \\
+\midrule
+GitHub Models & GPT-4.1-mini & GPT-4.1-mini & GPT-4.1-mini \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.3cm}
+\centering
+\small Abstracción con \texttt{LLMProvider} --- misma interfaz, distinto proveedor\\[4pt]
+Selección por variable de entorno, sin cambiar código
+\end{frame}
+
+\begin{frame}{Impacto --- Flujo del pipeline}
+\framesubtitle{Corrida del 15 de junio de 2026}
+
+\centering
+\setlength{\fboxsep}{8pt}
+\small
+\begin{tabular}{c@{\hspace{0.3cm}}c@{\hspace{0.3cm}}c}
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{3cm}{\centering\bfseries\Large 174\\[4pt] noticias\\[2pt] recolectadas\\[2pt] (100\%)}} &
+\fcolorbox{gris-texto}{white}{\parbox{2.5cm}{\centering\small\bfseries 78\% descartadas\\[2pt] filtrado + dedup.\\[2pt] ranking + caché}} &
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{2.5cm}{\centering\bfseries\Large 39\\[4pt] briefs\\[2pt] generados\\[2pt] (22\%)}} \\
+\end{tabular}
+
+\vspace{0.3cm}
+\end{frame}
+
+\begin{frame}{Impacto --- Panel de métricas}
+
+\centering
+\includegraphics[width=0.85\textwidth,keepaspectratio]{./images/metricas-15-junio-2026.png}
+\end{frame}
+
+\begin{frame}{Costos operativos}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Componente} & \textbf{Costo} \\
+\midrule
+VPS Hostinger KVM 2 & USD 107.88/año \\
+Dominio & USD 1.2/año \\
+Email (Gmail SMTP) & Gratuito \\
+Telegram Bot API & Gratuito \\
+WhatsApp (Twilio) & Variable opcional \\
+IA (Groq free tier) & Gratuito / variable \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.3cm}
+\centering
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{0.8\textwidth}{\centering\bfseries\large Costo fijo anual: \alert{< USD 110}}}
+\end{frame}
+
+\begin{frame}{Hoja de ruta}
+
+\begin{columns}[T]
+\column{0.33\textwidth}
+\centering\bfseries\color{verde-ecobrief} Corto\\[4pt]
+\small Comprometido
+\vspace{0.2cm}
+
+\small
+\begin{itemize}
+    \item Monitoreo y analiticas de la web con umami
+\end{itemize}
+
+\column{0.33\textwidth}
+\centering\bfseries\color{verde-ecobrief} Mediano\\[4pt]
+\small Planificado
+\vspace{0.2cm}
+
+\small
+\begin{itemize}
+    \item Distribucion por Telegram / WhatsApp
+\end{itemize}
+
+\column{0.33\textwidth}
+\centering\bfseries\color{verde-ecobrief} Largo\\[4pt]
+\small Aspiracional
+\vspace{0.2cm}
+
+\small
+\begin{itemize}
+    \item Detección de noticias por entidades estatales
+    \item Planes de suscripción con costo
+    \item Panel institucional
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Conclusiones}
+
+\begin{itemize}
+    \item \alert{Problema real:} el exceso de información redundante es desperdicio digital
+    \item \alert{Solución concreta:} plataforma funcional, desplegada, con métricas reales
+    \item \alert{Resultados:} 174 noticias $\to$ 39 briefs (77.6\% de reducción)
+    \item \alert{IA responsable:} solo después de filtrar, deduplicar y priorizar
+    \item \alert{Bajo costo:} menos de USD 110/año de infraestructura
+    \item \alert{Green Tech:} menos páginas, menos datos, menos ruido
+\end{itemize}
+
+\vspace{0.4cm}
+\begin{center}
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{0.85\textwidth}{\centering\textit{``EcoBrief Bolivia usa IA no para producir más ruido,\\ sino para reducirlo.''}}}
+\end{center}
+\end{frame}
+
+\begin{frame}[plain]
+\centering
+\vfill
+\includegraphics[width=3.5cm]{./images/logo-assuresoft.png}\\[0.5cm]
+{\LARGE\bfseries\color{azul-profundo} Gracias}\\[0.3cm]
+{\large\color{gris-texto} EcoBrief Bolivia}\\[0.3cm]
+\small
+\textbf{Equipo AssureSoft}\\[4pt]
+Josoe Ichuta --- Ingeniería\\
+Raquel Auza --- Digital-Academy\\[0.3cm]
+\url{https://briefs.ecobriefbolivia.online/}
+\url{https://github.com/Jhoshoa/news-summarizer/}
+\vfill
+\end{frame}
+
+\end{document}
