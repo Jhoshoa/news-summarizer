@@ -1,0 +1,110 @@
+\documentclass[12pt,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{float}
+\usepackage{parskip}
+\usepackage{array}
+
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+\onehalfspacing
+
+\definecolor{verde-ecobrief}{HTML}{16a34a}
+\definecolor{gris-texto}{HTML}{374151}
+\definecolor{azul-profundo}{HTML}{1e3a5f}
+\definecolor{gris-claro}{HTML}{f3f4f6}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=azul-profundo,
+    urlcolor=verde-ecobrief,
+    citecolor=azul-profundo
+}
+
+\titleformat{\chapter}[hang]
+    {\normalfont\huge\bfseries\color{azul-profundo}}
+    {\thechapter.}{0.5em}{}
+\titlespacing{\chapter}{0pt}{0pt}{20pt}
+
+\titleformat{\section}
+    {\normalfont\Large\bfseries\color{gris-texto}}
+    {\thesection}{0.5em}{}
+
+\titleformat{\subsection}
+    {\normalfont\large\bfseries\color{gris-texto}}
+    {\thesubsection}{0.5em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textit{EcoBrief Bolivia}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{15pt}
+
+\lstdefinestyle{python}{
+    language=Python,
+    backgroundcolor=\color{gris-claro},
+    basicstyle=\ttfamily\small,
+    commentstyle=\color{green!60!black},
+    keywordstyle=\color{blue!70!black},
+    stringstyle=\color{red!60!black},
+    frame=single,
+    breaklines=true,
+    tabsize=4,
+    captionpos=b
+}
+
+\lstdefinestyle{bash}{
+    backgroundcolor=\color{gris-claro},
+    basicstyle=\ttfamily\small,
+    frame=single,
+    breaklines=true,
+    captionpos=b
+}
+
+\lstdefinestyle{plaintext}{
+    backgroundcolor=\color{gris-claro},
+    basicstyle=\ttfamily\small,
+    frame=single,
+    breaklines=true,
+    captionpos=b
+}
+
+\lstset{style=python}
+
+\renewcommand{\cfttoctitlefont}{\huge\bfseries\color{azul-profundo}}
+\renewcommand{\cftchapfont}{\bfseries\color{azul-profundo}}
+\renewcommand{\cftsecfont}{\color{gris-texto}}
+
+\begin{document}
+
+\include{portada}
+\tableofcontents
+\newpage
+
+\include{resumen}
+\include{capitulo1}
+\include{capitulo2}
+\include{capitulo3}
+\include{capitulo4}
+\include{capitulo5}
+\include{capitulo6}
+\include{capitulo7}
+\include{conclusiones}
+\include{anexos}
+\include{referencias}
+
+\end{document}

@@ -1,0 +1,101 @@
+\chapter{Estado Actual y Roadmap}
+
+\section{MVP funcional}
+
+EcoBrief Bolivia no es solo una idea. El prototipo ya funciona y est\'a desplegado en un VPS de Hostinger con dominio propio. Las funcionalidades implementadas incluyen:
+
+\begin{itemize}[nosep]
+    \item \textit{Web scraping} de noticias locales desde 8 fuentes bolivianas.
+    \item Extracci\'on de contenido con selectores configurables y \textit{fallback} gen\'erico.
+    \item Clasificaci\'on por categor\'ias (econom\'ia, pol\'itica, deportes).
+    \item Ranking por relevancia con m\'ultiples criterios.
+    \item Deduplicaci\'on por URL, t\'itulo y huella hist\'orica de contenido.
+    \item Res\'umenes generados con IA (Groq / OpenAI / GitHub Models).
+    \item Persistencia en PostgreSQL con SQLAlchemy.
+    \item Frontend web con React + Vite (Home, Noticias, Detalle, Impacto, Suscripci\'on).
+    \item Preferencias de usuario por categor\'ia y frecuencia.
+    \item Endpoint manual para generar res\'umenes bajo demanda.
+    \item Base para distribuci\'on por WhatsApp y Telegram.
+    \item Panel de m\'etricas de impacto Green Tech.
+    \item Pruebas automatizadas con \texttt{pytest}.
+    \item C\'odigo fuente verificado con \texttt{ruff} y \texttt{mypy}.
+\end{itemize}
+
+\section{Tecnolog\'ias utilizadas}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Capa} & \textbf{Tecnolog\'ia} \\
+\midrule
+Backend & Python 3.11, FastAPI, Uvicorn \\
+Frontend & React 18, Vite, TypeScript \\
+Base de datos & PostgreSQL 16, SQLAlchemy (async) \\
+\textit{Web scraping} & httpx, BeautifulSoup4, lxml \\
+IA & Groq API, OpenAI API, GitHub Models \\
+Infraestructura & Docker, Hostinger VPS KVM 2 \\
+Distribuci\'on & Telegram Bot API, Twilio WhatsApp API \\
+Linting / Tipado & Ruff, mypy \\
+Pruebas & pytest, pytest-asyncio \\
+Control de versiones & Git, GitHub \\
+\bottomrule
+\end{tabular}
+\caption{Stack tecnol\'ogico de EcoBrief Bolivia}
+\end{table}
+
+\section{Trabajo pendiente y hoja de ruta}
+
+El MVP actual es funcional, pero existen funcionalidades que a\'un no han sido implementadas. Se dividen en tres horizontes seg\'un su prioridad y nivel de compromiso.
+
+\subsection{Comprometido (corto plazo)}
+
+Tareas definidas y con alta prioridad de implementaci\'on:
+
+\begin{itemize}[nosep]
+    \item Completar \textit{backfill} de \textit{fingerprints} hist\'oricos.
+    \item Exponer duplicados hist\'oricos en la p\'agina de impacto.
+    \item Mostrar en la UI cu\'antas coberturas fueron agrupadas por historia.
+    \item Mejorar el historial de m\'etricas.
+\end{itemize}
+
+\subsection{Planificado (mediano plazo)}
+
+Funcionalidades con dise\~no preliminar, pendientes de recursos y priorizaci\'on:
+
+\begin{itemize}[nosep]
+    \item Medir datos reales descargados y evitados (no solo estimaciones).
+    \item Activar WhatsApp y Telegram en producci\'on.
+    \item Crear dashboard hist\'orico por usuario.
+    \item Integrar boletines y comunicados de instituciones del Estado como fuentes verificables.
+\end{itemize}
+
+\subsection{Aspiracional (largo plazo)}
+
+Ideas identificadas como valor agregado potencial, sin compromiso de implementaci\'on:
+
+\begin{itemize}[nosep]
+    \item Detecci\'on por entidades, personas y lugares.
+    \item Planes de suscripci\'on para usuarios avanzados, organizaciones y analistas.
+    \item Panel institucional para monitoreo de noticias, comunicados y alertas p\'ublicas.
+    \item Monitoreo autom\'atico de cambios en fuentes.
+\end{itemize}
+
+\section{Riesgos t\'ecnicos y mitigaci\'on}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{5cm}p{8cm}}
+\toprule
+\textbf{Riesgo} & \textbf{Mitigaci\'on} \\
+\midrule
+Cambios de HTML en fuentes & Tests por fuente, selectores configurables y \textit{fallback} gen\'erico \\
+Falsos positivos en dedup. & Umbral conservador y marcado sin borrado \\
+Falsos negativos en dedup. & Ajuste de reglas y comparaci\'on multi-fuente \\
+Costos de IA imprevistos & Dedup., cach\'e, ranking y l\'imites por categor\'ia \\
+Mensajer\'ia en producci\'on & Activaci\'on gradual: Telegram primero \\
+M\'etricas ambientales imprecisas & Transparencia metodol\'ogica \\
+\bottomrule
+\end{tabular}
+\caption{Riesgos t\'ecnicos y estrategias de mitigaci\'on}
+\end{table}

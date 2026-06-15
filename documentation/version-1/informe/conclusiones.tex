@@ -1,0 +1,33 @@
+\chapter*{Conclusiones}
+\addcontentsline{toc}{chapter}{Conclusiones}
+
+El proyecto EcoBrief Bolivia se present\'o como una soluci\'on al problema del exceso de informaci\'on redundante en el ecosistema de noticias boliviano, con un enfoque Green Tech que prioriza la eficiencia, la reducci\'on del consumo digital y el uso responsable de inteligencia artificial. A continuaci\'on se resumen los hallazgos, logros y perspectivas del trabajo realizado.
+
+\section*{Resumen de resultados}
+
+El sistema fue desarrollado, desplegado y probado con fuentes reales de noticias bolivianas. En su corrida del 15 de junio de 2026, proces\'o 110 noticias y las redujo a 39 briefs priorizados, logrando una tasa de reducci\'on del 64.6\,\%. Esto se tradujo en 71 p\'aginas evitadas y un ahorro estimado de 35.5 minutos de lectura por corrida. Estos n\'umeros demuestran que la plataforma cumple su objetivo de sintetizar sin saturar.
+
+\section*{Logros alcanzados}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Alineaci\'on Green Tech demostrada:} El proyecto reduce la navegaci\'on innecesaria, el \textit{scroll} social, la duplicaci\'on de contenido, el consumo de datos y el procesamiento de IA redundante. Las m\'etricas del 15 de junio confirman una reducci\'on del flujo superior al 64\,\%.
+    \item \textbf{Prototipo funcional desplegado:} No es solo una idea. Existe una aplicaci\'on completa con backend en FastAPI, frontend en React con Vite, base de datos PostgreSQL, panel de m\'etricas Green Tech y canales de distribuci\'on, desplegada en un VPS de Hostinger con dominio propio.
+    \item \textbf{Arquitectura modular y eficiente:} El dise\~no permite cambiar de proveedor de IA (Groq, OpenAI, GitHub Models), agregar nuevas fuentes de noticias y escalar componentes de forma independiente sin afectar el resto del sistema.
+    \item \textbf{Bajo costo operativo:} La plataforma puede operar con un costo anual reducido, utilizando \textit{free tiers} de inteligencia artificial, canales de distribuci\'on gratuitos como Telegram y una infraestructura minimalista de un solo VPS.
+    \item \textbf{Inteligencia artificial responsable:} Filtrar, deduplicar y rankear antes de invocar al modelo reduce el n\'umero de llamadas IA. El cach\'e evita reprocesar contenido ya resumido y los modelos peque\~nos se asignan a tareas simples, maximizando la eficiencia.
+    \item \textbf{Impacto medible y transparente:} Cada corrida del pipeline produce m\'etricas cuantificables que se muestran en el panel de impacto, permitiendo al usuario y al equipo evaluar la efectividad del sistema en tiempo real.
+\end{enumerate}
+
+\section*{Trabajo futuro}
+
+El proyecto tiene un camino claro de evoluci\'on. A corto plazo, se completar\'a el \textit{backfill} de \textit{fingerprints} hist\'oricos para mejorar la detecci\'on de duplicados entre corridas, y se expon\'an los duplicados hist\'oricos en la interfaz de impacto. A mediano plazo, se medir\'an datos reales descargados y evitados (no solo estimaciones), se activar\'an los canales de Telegram y WhatsApp en producci\'on, y se integrar\'an boletines institucionales como fuentes verificables. A largo plazo, se explorar\'a la detecci\'on por entidades, planes de suscripci\'on para usuarios avanzados y un panel institucional de monitoreo.
+
+\section*{Mensaje final}
+
+EcoBrief Bolivia convierte un problema cotidiano ---el exceso de informaci\'on redundante--- en una soluci\'on Green Tech concreta, funcional y medible. Con una reducci\'on superior al 64\,\% del flujo informativo, la plataforma demuestra que es posible consumir noticias de forma m\'as inteligente, con menos impacto digital y mayor trazabilidad. Este proyecto, desarrollado por \textbf{Josoe Ichuta} (Ingenier\'ia) y \textbf{Raquel Auza} (Digital-Academy) bajo el equipo \textbf{AssureSoft}, representa una apuesta por informaci\'on esencial, inteligencia artificial responsable y eficiencia digital desde Bolivia.
+
+\begin{center}
+    \fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{0.85\textwidth}{
+        \centering\textit{``EcoBrief Bolivia demuestra que la IA puede ser m\'as sostenible\\ cuando se usa para reducir, no para multiplicar, el contenido digital.''}
+    }}
+\end{center}

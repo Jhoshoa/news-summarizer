@@ -1,0 +1,282 @@
+\chapter{Soluci\'on Propuesta}
+
+\section{EcoBrief Bolivia}
+
+EcoBrief Bolivia act\'ua como una capa de eficiencia entre las fuentes de noticias y las personas. Es una plataforma tecnol\'ogica que automatiza el proceso de recolecci\'on, filtrado, priorizaci\'on y s\'intesis de noticias locales.
+
+\subsection{Comparativa antes vs. despu\'es}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{6.5cm}p{6.5cm}}
+\toprule
+\textbf{Antes} & \textbf{Con EcoBrief} \\
+\midrule
+Abrir varios sitios de noticias & Ver un resumen centralizado \\
+Leer titulares repetidos & Ver historias deduplicadas \\
+Hacer \textit{scroll} en redes para informarse & Consumir informaci\'on sintetizada y trazable \\
+Ver contenido viral sin contexto & Acceder a fuentes identificadas y enlaces originales \\
+Consumir p\'aginas completas & Consumir res\'umenes compactos \\
+Procesar todo con IA & Usar IA solo despu\'es de filtrar y priorizar \\
+No saber cu\'anto se reduce & Ver m\'etricas de impacto \\
+Recibir informaci\'on no personalizada & Elegir categor\'ias y frecuencia \\
+\bottomrule
+\end{tabular}
+\caption{Comparativa antes y despu\'es del uso de EcoBrief Bolivia}
+\end{table}
+
+\section{Arquitectura del sistema}
+
+El sistema est\'a construido como una aplicaci\'on web modular con los siguientes componentes:
+
+\begin{figure}[H]
+\centering
+\begin{lstlisting}[style=plaintext, caption=Arquitectura general]
++------------------+     +--------------------+
+|                  |     |                    |
+|   Frontend       |     |   Backend          |
+|   React + Vite   |<--->|   FastAPI          |
+|                  |     |                    |
++------------------+     +--------+-----------+
+                                   |
+                    +--------------+--------------+
+                    |              |              |
+               +----+---+   +----+-----+   +-----+-----+
+               |        |   |          |   |           |
+               |Scrapers|   |Processors|   |  LLM      |
+               |httpx+  |   |Dedupe,   |   |  Client   |
+               |BS4     |   |Classify, |   |  Groq/    |
+               |        |   |Rank,     |   |  OpenAI   |
+               |        |   |Summarize |   |           |
+               +--------+   +----+-----+   +-----------+
+                                 |
+                          +------+------+
+                          |             |
+                     +----+----+  +-----+------+
+                     |         |  |            |
+                     |PostgreSQL|  |Distributors|
+                     |         |  |WhatsApp,   |
+                     +---------+  |Telegram    |
+                                  +------------+
+\end{lstlisting}
+\end{figure}
+
+\subsection{Frontend}
+
+Aplicaci\'on web desarrollada con React y Vite, con las siguientes vistas:
+
+\begin{itemize}[nosep]
+    \item \textbf{Home:} Noticias destacadas, resumen visual e indicadores de impacto.
+    \item \textbf{Noticias:} Listado completo de art\'iculos y res\'umenes.
+    \item \textbf{Detalle:} Art\'iculo original, fuente, resumen IA y cuerpo completo.
+    \item \textbf{Impacto:} Panel de m\'etricas Green Tech.
+    \item \textbf{Suscripci\'on:} Preferencias de categor\'ia, frecuencia y canal de entrega.
+\end{itemize}
+
+\subsection{Backend API}
+
+El backend es el coraz\'on de EcoBrief. Construido con \textbf{FastAPI} sobre Python as\'incrono, orquesta todo el pipeline de recolecci\'on, procesamiento y distribuci\'on. Expone una API REST que sirve como puente entre el frontend y la l\'ogica del sistema.
+
+Sus responsabilidades principales incluyen:
+
+\begin{itemize}[nosep]
+    \item Ejecutar el pipeline completo de noticias (scraping, dedup., clasificaci\'on, ranking, resumen) bajo demanda o mediante programaci\'on horaria.
+    \item Servir datos estructurados al frontend a trav\'es de endpoints ligeros dise\~nados para consumo eficiente.
+    \item Gestionar suscriptores, preferencias y la distribuci\'on personalizada de res\'umenes.
+    \item Calcular y exponer m\'etricas de impacto Green Tech en tiempo real.
+    \item Validar solicitudes sensibles mediante una clave API (\texttt{X-API-Key}) en endpoints de escritura.
+\end{itemize}
+
+El cliente de inteligencia artificial est\'a abstra\'ido detr\'as de una capa que permite cambiar de proveedor (Groq, OpenAI, GitHub Models) sin modificar el resto del sistema. La mayor\'ia de los endpoints del backend son de consulta (\texttt{GET}), mientras que la operaci\'on cr\'itica de generaci\'on de res\'umenes se activa a trav\'es de \texttt{POST /trigger/summary}, lo que permite controlar cu\'ando se consume el proveedor IA.
+
+\section{Pipeline de procesamiento}
+
+El flujo principal del sistema sigue una secuencia estrictamente ordenada para maximizar la eficiencia:
+
+\begin{lstlisting}[caption=Pipeline simplificado de procesamiento]
+1. Iniciar corrida (manual o programada)
+2. Reutilizar resumenes recientes si no se solicita refresh
+3. Recolectar noticias nuevas de fuentes configuradas
+4. Filtrar articulos sin contenido suficiente
+5. Deduplicar dentro del lote (URL y titulo)
+6. Clasificar por categoria
+7. Rankear por relevancia
+8. Persistir articulos en base de datos
+9. Calcular fingerprints y detectar duplicados historicos
+10. Seleccionar candidatos unicos para resumen
+11. Generar resumenes con IA
+12. Reescribir o normalizar resumenes
+13. Deduplicar resumenes
+14. Guardar resultados
+15. Calcular metricas
+16. Preparar envio segun suscriptores
+\end{lstlisting}
+
+\subsection{Web Scraping}
+
+El sistema utiliza \texttt{httpx} junto con \texttt{BeautifulSoup} y \texttt{lxml} para realizar \textit{web scraping} de fuentes bolivianas. Cada fuente est\'a definida en \texttt{config/sources.yaml} con selectores CSS configurables (selector de art\'iculo, t\'itulo, URL, fecha, imagen y cuerpo). Cuando una fuente cambia su estructura HTML, el sistema cuenta con un mecanismo de \textit{fallback} gen\'erico que extrae todos los enlaces del documento y filtra aquellos que parecen art\'iculos period\'isticos, permitiendo seguir recolectando incluso si los selectores originales no coinciden.
+
+\subsection{Deduplicaci\'on}
+
+EcoBrief implementa tres niveles de deduplicaci\'on a lo largo del pipeline:
+
+\begin{enumerate}[nosep]
+    \item \textbf{Deduplicaci\'on por URL:} Cada URL se convierte en un hash MD5. Esto evita guardar o procesar el mismo enlace repetido dentro de una misma corrida.
+    \item \textbf{Deduplicaci\'on por t\'itulo:} Los t\'itulos se normalizan (min\'usculas, sin acentos, sin signos) y se comparan con \texttt{SequenceMatcher}. Si la similitud supera 0.85, se considera duplicado y se conserva la versi\'on m\'as reciente.
+    \item \textbf{Deduplicaci\'on hist\'orica por huella:} Se calcula una huella (\textit{fingerprint}) SHA-256 basada en la categor\'ia, el t\'itulo normalizado y un fragmento del contenido. Esto permite agrupar noticias equivalentes a trav\'es de distintas corridas, aunque tengan URL y fuente diferentes.
+\end{enumerate}
+
+\begin{lstlisting}[caption=Algoritmo de huella de contenido]
+canonical_key = categoria + titulo_normalizado + fragmento_contenido
+content_fingerprint = sha256(canonical_key)
+\end{lstlisting}
+
+Los duplicados no se eliminan definitivamente; se marcan para auditor\'ia y se excluyen de los candidatos a resumen, preservando la trazabilidad.
+
+\subsection{Clasificaci\'on}
+
+Cada noticia se clasifica en una de cinco categor\'ias mediante un sistema de reglas ponderadas configurable en \texttt{config/classification.yaml}:
+
+\begin{itemize}[nosep]
+    \item \textbf{Econom\'ia:} Finanzas, d\'olar, tipo de cambio, BCB, inflaci\'on, hidrocarburos.
+    \item \textbf{Pol\'itica:} Gobierno, presidente, elecciones, Asamblea, leyes, partidos.
+    \item \textbf{Deportes:} F\'utbol, clubes, torneos, selecci\'on boliviana, resultados.
+    \item \textbf{Tecnolog\'ia:} IA, software, internet, ciberseguridad, telecomunicaciones.
+    \item \textbf{Entretenimiento:} Cine, m\'usica, televisi\'on, festivales, far\'andula.
+\end{itemize}
+
+El clasificador asigna puntuaci\'on a cada categor\'ia ponderando cuatro campos del art\'iculo:
+\begin{itemize}[nosep]
+    \item T\'itulo ($\times 3.0$)
+    \item Descripci\'on ($\times 2.0$)
+    \item Contenido ($\times 1.0$)
+    \item Categor\'ia de la fuente ($\times 2.5$)
+\end{itemize}
+
+Si la diferencia entre la primera y segunda categor\'ia es menor a 2.0 puntos, o la confianza es baja ($<0.62$), el sistema puede recurrir a un LLM como fallback para reclasificar el art\'iculo.
+
+\subsection{Ranking por relevancia}
+
+Una vez clasificadas, las noticias se ordenan seg\'un un puntaje compuesto por siete factores ponderados, definidos en \texttt{config/scoring.yaml}:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcr}
+\toprule
+\textbf{Factor} & \textbf{Peso} & \textbf{Detalle} \\
+\midrule
+Actualidad & 15\% & Noticias m\'as recientes reciben mayor puntaje. \\
+& & 1h $\to$ 100, 3h $\to$ 90, 6h $\to$ 75, \\
+& & 12h $\to$ 60, 24h $\to$ 45, 48h $\to$ 25 \\
+\midrule
+Relevancia local & 20\% & Menci\'on de regiones (Santa Cruz, La Paz), \\
+& & ciudades (Cochabamba, El Alto), autoridades \\
+& & e instituciones bolivianas (BCB, YPFB, TSE). \\
+\midrule
+Impacto informativo & 20\% & T\'erminos de alto impacto (crisis, d\'olar, \\
+& & bloqueo, elecciones), medio (inflaci\'on, \\
+& & protesta, ley) y bajo (anuncio, informe). \\
+\midrule
+Calidad del contenido & 17\% & Base 35, bonos por: $>120$ palabras (+20), \\
+& & $>300$ palabras (+10), imagen (+10), \\
+& & descripci\'on \'util (+10), t\'itulo informativo (+10). \\
+\midrule
+Fuente & 10\% & Puntajes por fuente reconocida: RedUno 84, \\
+& & RadioFides 84, El Deber 84, Unitel 82, \\
+& & La Raz\'on 82, RedBolivisi\'on 78, default 55. \\
+\midrule
+Corroboraci\'on & 10\% & Noticias cubiertas por 2 fuentes $\to$ 70 pts, \\
+& & 3 o m\'as fuentes $\to$ 100 pts. \\
+\midrule
+Confianza de categor\'ia & 8\% & Coherencia del contenido con la categor\'ia \\
+& & asignada: confianza $\ge 0.80 \to 100$, \\
+& & $\ge 0.60 \to 75$, $\ge 0.40 \to 55$. \\
+\bottomrule
+\end{tabular}
+\caption{Factores de ranking y sus pesos}
+\end{table}
+
+Adicionalmente, el sistema aplica penalizaciones por contenido ausente (-25), contenido muy corto (-15), descripci\'on duplicada (-20), fecha faltante (-10), fuente desconocida (-8), confianza baja de categor\'ia (-10) y noticias internacionales sin contexto boliviano (-20).
+
+El puntaje final se calcula como:
+
+\begin{equation}
+P = \sum_{f} w_f \cdot s_f - \text{penalizaciones}
+\end{equation}
+
+Donde $w_f$ es el peso del factor y $s_f$ su puntuaci\'on normalizada. El resultado se acota entre 0 y 100.
+
+El objetivo no es resumir todo, sino resumir lo m\'as relevante.
+
+\section{Eficiencia en el uso de IA}
+
+La inteligencia artificial se emplea en dos fases del pipeline: clasificaci\'on de art\'iculos (solo como fallback ante casos ambiguos) y generaci\'on de res\'umenes. Para minimizar el costo operativo y la latencia, el sistema aplica las siguientes estrategias antes de invocar cualquier modelo:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Estrategia} & \textbf{Descripci\'on} \\
+\midrule
+Filtrar antes de IA  & Se descartan art\'iculos sin contenido suficiente o con metadatos incompletos antes de cualquier procesamiento. \\
+\midrule
+Deduplicar antes de IA & Se eliminan duplicados por URL y t\'itulo dentro del lote, evitando enviar la misma noticia al modelo m\'as de una vez. \\
+\midrule
+Rankear antes de IA  & Solo los art\'iculos mejor puntuados por el ranking de relevancia son candidatos a resumen. \\
+\midrule
+Limitar por categor\'ia & Se establece un m\'aximo de candidatos por categor\'ia para distribuir el presupuesto de c\'omputo entre todas las \'areas tem\'aticas. \\
+\midrule
+Cachear res\'umenes  & Los res\'umenes ya generados se reutilizan si el art\'iculo original no ha cambiado, evitando reprocesar contenido ya sintetizado. \\
+\midrule
+Control de duplicados & Se verifica que no exista un resumen equivalente en la misma corrida antes de generar uno nuevo. \\
+\bottomrule
+\end{tabular}
+\caption{Estrategias de eficiencia en el uso de IA}
+\end{table}
+
+\subsection{Abstracci\'on de proveedores LLM}
+
+El cliente de inteligencia artificial est\'a dise\~nado como una capa de abstracci\'on que permite cambiar de proveedor sin modificar el resto del sistema. La clase \texttt{LLMProvider} expone una interfaz unificada (\texttt{chat()}, \texttt{chat\_batch()}) independientemente del proveedor subyacente.
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+\textbf{Proveedor} & \textbf{Fast} & \textbf{Balanced} & \textbf{Quality} \\
+\midrule
+Groq (gratuita) & \texttt{llama-3.1-8b-instant} & \texttt{llama-3.1-70b-versatile} & \texttt{llama-3.3-70b-versatile} \\
+\midrule
+OpenAI (pagada) & \texttt{gpt-4o-mini} & \texttt{gpt-4o} & \texttt{gpt-4o} \\
+\midrule
+GitHub Models (150 RPD) & \texttt{gpt-4.1-mini} & \texttt{gpt-4.1-mini} & \texttt{gpt-4.1-mini} \\
+\bottomrule
+\end{tabular}
+}
+\caption{Modelos disponibles por proveedor y nivel de calidad}
+\end{table}
+
+Cada proveedor ofrece tres niveles de calidad (\textit{fast}, \textit{balanced}, \textit{quality}) que se seleccionan seg\'un la tarea. Las tareas de clasificaci\'on usan \textit{fast}, mientras que la generaci\'on de res\'umenes emplea \textit{balanced} o \textit{quality} seg\'un la configuraci\'on. La selecci\'on del proveedor activo se realiza mediante variable de entorno, lo que permite alternar entre costo cero (Groq, GitHub Models) y mayor capacidad (OpenAI) sin cambiar una l\'inea de c\'odigo.
+
+\section{Base de datos}
+
+El sistema utiliza PostgreSQL con SQLAlchemy como ORM. Las tablas principales son:
+
+\textbf{news\_articles}: Almacena los art\'iculos recolectados con campos para trazabilidad y deduplicaci\'on: \texttt{title}, \texttt{url}, \texttt{url\_hash}, \texttt{description}, \texttt{content}, \texttt{source\_id}, \texttt{category\_id}, \texttt{score}, \texttt{canonical\_key}, \texttt{content\_fingerprint}, \texttt{story\_cluster\_id}, \texttt{duplicate\_of\_article\_id}, \texttt{duplicate\_reason}, \texttt{similarity\_score}.
+
+\textbf{news\_summaries}: Almacena los res\'umenes generados: \texttt{article\_id}, \texttt{category\_id}, \texttt{title}, \texttt{summary}, \texttt{fact}, \texttt{llm\_provider}, \texttt{llm\_model}, \texttt{summary\_date}, \texttt{story\_cluster\_id}, \texttt{source\_article\_count}.
+
+\textbf{collection\_runs}: Registra cada ejecuci\'on del pipeline con m\'etricas de trazabilidad: \texttt{raw\_collected\_count}, \texttt{usable\_count}, \texttt{deduplicated\_count}, \texttt{ranked\_count}, \texttt{summary\_candidates\_count}, \texttt{summaries\_count}, \texttt{used\_cached\_articles}, \texttt{used\_cached\_summaries}.
+
+\section{Distribuci\'on y suscripciones}
+
+EcoBrief prepara la distribuci\'on personalizada de res\'umenes a trav\'es de:
+
+\begin{itemize}[nosep]
+    \item \textbf{Web:} Acceso p\'ublico a res\'umenes y art\'iculos.
+    \item \textbf{Telegram:} Canal de distribuci\'on gratuito mediante Bot API.
+    \item \textbf{WhatsApp:} Canal opcional mediante Twilio WhatsApp Business API.
+    \item \textbf{Email:} Notificaciones mediante SMTP (Gmail con App Password).
+\end{itemize}
+
+Los usuarios pueden configurar sus preferencias: categor\'ias de inter\'es, frecuencia de entrega (ma\~nana, tarde, noche) y canal preferido. Esto evita el env\'io de informaci\'on no solicitada y reduce el consumo innecesario de datos.

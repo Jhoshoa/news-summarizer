@@ -1,0 +1,90 @@
+\chapter{Costos y Sostenibilidad Econ\'omica}
+
+EcoBrief fue dise\~nado para operar con bajo costo y una infraestructura simple: un solo VPS para backend, frontend, base de datos y cron-jobs.
+
+\section{Infraestructura propuesta para un a\~no}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{5cm}r}
+\toprule
+\textbf{Componente} & \textbf{Proveedor} & \textbf{Costo referencial} \\
+\midrule
+Servidor VPS & Hostinger KVM 2 & USD 107.88/a\~no \\
+Dominio & NIC Bolivia & 55 Bs/a\~no \\
+Base de datos & PostgreSQL en VPS & Incluido \\
+Backend & FastAPI en VPS & Incluido \\
+Frontend & React/Vite en VPS & Incluido \\
+Cron-jobs & Scheduler en VPS & Incluido \\
+Email & Gmail SMTP + App Password & Gratuito* \\
+Telegram & Bot API & Gratuito \\
+WhatsApp & Twilio (opcional) & Variable** \\
+IA & Groq API & Free tier / variable \\
+\bottomrule
+\multicolumn{3}{l}{*Dentro de l\'imites de Google; migrable a Brevo.}\\
+\multicolumn{3}{l}{**Desde USD 0.0116/minuto outbound seg\'un Twilio.}
+\end{tabular}
+\caption{Infraestructura propuesta para el primer a\~no de operaci\'on}
+\end{table}
+
+\section{Costos de inteligencia artificial}
+
+\subsection{Modelos actuales}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Tarea} & \textbf{Modelo} & \textbf{Input/1M tok.} & \textbf{Output/1M tok.} \\
+\midrule
+Resumen de calidad & Llama 3.3 70B Versatile & USD 0.59 & USD 0.79 \\
+Tareas r\'apidas & Llama 3.1 8B Instant & USD 0.05 & USD 0.08 \\
+Balanceado/reescritura & Llama 3.1 70B Versatile & USD 0.59 & USD 0.79 \\
+\bottomrule
+\end{tabular}
+\caption{Costos de modelos Groq usados actualmente}
+\end{table}
+
+\subsection{Comparativa de proveedores}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Proveedor} & \textbf{Modelo} & \textbf{Input/1M tok.} & \textbf{Output/1M tok.} \\
+\midrule
+Groq & Llama 3.3 70B Versatile & USD 0.59 & USD 0.79 \\
+OpenAI & GPT-4.1 mini & USD 0.75 & USD 4.50 \\
+DeepSeek & V4 Flash & USD 0.14 & USD 0.28 \\
+Anthropic & Claude Haiku 4.5 & USD 1.00 & USD 5.00 \\
+\bottomrule
+\end{tabular}
+\caption{Comparativa de costos entre proveedores de IA}
+\end{table}
+
+\section{Control de costos}
+
+El sistema reduce costos operativos mediante las siguientes estrategias:
+
+\begin{itemize}[nosep]
+    \item No resume todo lo recolectado: filtra, deduplica y rankea primero.
+    \item Cachea resultados: evita reprocesar contenido ya resumido.
+    \item Limita candidatos por categor\'ia: m\'aximo por corrida.
+    \item Utiliza modelos peque\~nos para tareas simples.
+    \item Telegram como canal gratuito: sin costo por mensaje.
+\end{itemize}
+
+\section{Escenario operativo recomendado}
+
+Para el concurso y un primer despliegue p\'ublico:
+
+\begin{enumerate}[nosep]
+    \item Desplegar todo en Hostinger KVM 2 por un a\~no.
+    \item Usar dominio comprado en NIC Bolivia.
+    \item Utilizar Groq \textit{free tier} o pago bajo para IA.
+    \item Usar Telegram y Gmail SMTP como canales de bajo costo.
+    \item Activar WhatsApp/Twilio como opci\'on futura o piloto controlado.
+    \item Medir llamadas IA, usuarios y volumen antes de escalar.
+\end{enumerate}
+
+Con este enfoque, el MVP puede operar con un costo fijo anual bajo y costos variables controlados.

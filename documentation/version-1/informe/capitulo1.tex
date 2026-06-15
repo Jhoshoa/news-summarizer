@@ -1,0 +1,75 @@
+\chapter{Introducci\'on}
+
+\section{Contexto y motivaci\'on}
+
+En la era digital, el acceso a la informaci\'on nunca ha sido tan amplio ni tan fragmentado. Para una persona en Bolivia, informarse sobre la actualidad nacional implica revisar m\'ultiples medios de comunicaci\'on, abrir decenas de pesta\~nas del navegador, comparar titulares, buscar contexto en redes sociales y descartar noticias repetidas. Este proceso, que parece cotidiano e inofensivo, genera un volumen significativo de desperdicio digital.
+
+El \textbf{desperdicio digital informativo} se manifiesta de varias formas: tiempo perdido revisando la misma noticia en distintos sitios, datos m\'oviles consumidos al cargar p\'aginas completas con publicidad y \textit{trackers}, procesamiento redundante cuando los sistemas de IA resumen art\'iculos duplicados, y exposici\'on a informaci\'on fragmentada o sin fuente verificable en redes sociales.
+
+Esta problem\'atica se alinea directamente con los principios de \textbf{Green Tech}: promover un uso m\'as eficiente, responsable y sostenible de la tecnolog\'ia, la inteligencia artificial, el \textit{cloud}, los datos y los procesos internos. No se trata solo de ahorrar tiempo, sino de repensar c\'omo consumimos y procesamos informaci\'on digital.
+
+\section{El problema del desperdicio digital informativo}
+
+El desperdicio ocurre en cinco niveles interconectados:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Nivel} & \textbf{Problema} \\
+\midrule
+Usuario & Tiempo perdido revisando noticias repetidas o poco relevantes \\
+Datos & Carga innecesaria de p\'aginas, im\'agenes, scripts y publicidad \\
+IA & Procesamiento redundante si se resumen art\'iculos duplicados \\
+Ecosistema digital & Mayor navegaci\'on, m\'as \textit{requests} y m\'as consumo de recursos \\
+Confianza & Exposici\'on a contenido viral, fragmentado o sin fuente trazable \\
+\bottomrule
+\end{tabular}
+\caption{Niveles del desperdicio digital informativo}
+\end{table}
+
+Una misma noticia puede aparecer en varios medios con t\'itulos distintos o URL diferentes. Tambi\'en puede circular como video corto, captura o publicaci\'on sin contexto en redes sociales como TikTok o Facebook. Sin una capa de deduplicaci\'on, priorizaci\'on y trazabilidad, el usuario y el sistema terminan procesando informaci\'on redundante o dif\'icil de verificar.
+
+\section{Objetivos}
+
+\subsection{Objetivo general}
+
+Desarrollar e implementar una plataforma de inteligencia artificial responsable que reduzca el desperdicio digital informativo mediante la recolecci\'on, deduplicaci\'on, clasificaci\'on, priorizaci\'on y resumen eficiente de noticias locales bolivianas.
+
+\subsection{Objetivos espec\'ificos}
+
+\begin{enumerate}[nosep]
+    \item Recolectar autom\'aticamente noticias de las principales fuentes informativas de Bolivia mediante \textit{web scraping}.
+    \item Implementar un sistema de deduplicaci\'on multinivel (URL, t\'itulo y huella de contenido) para eliminar redundancias.
+    \item Clasificar y priorizar noticias por categor\'ias y relevancia para el contexto nacional.
+    \item Generar res\'umenes con IA aplicando criterios de eficiencia: filtrar, deduplicar y rankear antes de enviar al modelo.
+    \item Medir y visualizar el impacto de la reducci\'on del flujo informativo mediante m\'etricas cuantificables.
+    \item Distribuir la informaci\'on de forma personalizada seg\'un preferencias del usuario, reduciendo el consumo innecesario de datos.
+\end{enumerate}
+
+\section{Alcance y limitaciones}
+
+\subsection{Alcance}
+
+El proyecto abarca el desarrollo completo de una plataforma funcional que incluye:
+\begin{itemize}[nosep]
+    \item \textit{Web scraping} de medios de comunicaci\'on bolivianos (Radio Fides, Unitel, Red Uno, Red Bolivisi\'on, Los Tiempos, El Deber, P\'agina Siete y ATB).
+    \item Pipeline de procesamiento con deduplicaci\'on, clasificaci\'on, ranking y resumen.
+    \item Integraci\'on con proveedores de IA (Groq, OpenAI, GitHub Models) mediante un cliente abstracto.
+    \item Aplicaci\'on web con frontend React y backend FastAPI.
+    \item Base de datos PostgreSQL para persistencia.
+    \item Sistema de suscripci\'on con preferencias por categor\'ia y frecuencia.
+    \item Panel de m\'etricas de impacto Green Tech.
+    \item Despliegue en VPS con Hostinger.
+\end{itemize}
+
+\subsection{Limitaciones}
+
+El prototipo tiene limitaciones claramente identificadas:
+\begin{itemize}[nosep]
+    \item Las m\'etricas de tiempo y MB son estimaciones, no mediciones energ\'eticas directas.
+    \item Los \textit{scrapers} dependen de cambios en el HTML de los medios.
+    \item WhatsApp en producci\'on requiere credenciales y costos externos (Twilio).
+    \item No todos los art\'iculos hist\'oricos tienen \textit{backfill} de huellas.
+    \item La verificaci\'on autom\'atica de informaci\'on falsa no forma parte del MVP.
+\end{itemize}

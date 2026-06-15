@@ -1,0 +1,631 @@
+\documentclass[12pt,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{tocloft}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{listings}
+\usepackage{enumitem}
+\lstdefinestyle{plaintext}{language=,basicstyle=\ttfamily,breaklines=true,columns=fullflexible,keepspaces=true}
+\usepackage{titlesec}
+\usepackage{float}
+\usepackage{parskip}
+\usepackage{array}
+
+\geometry{
+    left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm
+}
+
+\onehalfspacing
+
+\definecolor{verde-ecobrief}{HTML}{16a34a}
+\definecolor{gris-texto}{HTML}{374151}
+\definecolor{azul-profundo}{HTML}{1e3a5f}
+\definecolor{gris-claro}{HTML}{f3f4f6}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=azul-profundo,
+    urlcolor=verde-ecobrief,
+    citecolor=azul-profundo
+}
+
+\titleformat{\chapter}[hang]
+    {\normalfont\huge\bfseries\color{azul-profundo}}
+    {\thechapter.}{0.5em}{}
+\titlespacing{\chapter}{0pt}{0pt}{20pt}
+
+\titleformat{\section}
+    {\normalfont\Large\bfseries\color{gris-texto}}
+    {\thesection}{0.5em}{}
+
+\titleformat{\subsection}
+    {\normalfont\large\bfseries\color{gris-texto}}
+    {\thesubsection}{0.5em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textit{EcoBrief Bolivia}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{15pt}
+
+\lstdefinestyle{python}{
+    language=Python,
+    backgroundcolor=\color{gris-claro},
+    basicstyle=\ttfamily\small,
+    commentstyle=\color{green!60!black},
+    keywordstyle=\color{blue!70!black},
+    stringstyle=\color{red!60!black},
+    frame=single,
+    breaklines=true,
+    tabsize=4,
+    captionpos=b
+}
+
+\lstdefinestyle{bash}{
+    backgroundcolor=\color{gris-claro},
+    basicstyle=\ttfamily\small,
+    frame=single,
+    breaklines=true,
+    captionpos=b
+}
+
+\lstset{style=python}
+
+\renewcommand{\cfttoctitlefont}{\huge\bfseries\color{azul-profundo}}
+\renewcommand{\cftchapfont}{\bfseries\color{azul-profundo}}
+\renewcommand{\cftsecfont}{\color{gris-texto}}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    \includegraphics[width=5cm]{./images/logo-assuresoft.png}\\[1.5cm]
+    {\Huge\bfseries\color{azul-profundo} EcoBrief Bolivia}\\[0.8cm]
+    {\Large\color{gris-texto} IA responsable para reducir el desperdicio\\ digital informativo}\\[1.5cm]
+    \rule{\textwidth}{0.4pt}\\[0.8cm]
+    {\large\textbf{Equipo EcoBrief Lab}}\\[0.3cm]
+    {\large Josoe Ichuta --- Ingenieria}\\
+    {\large Raquel Auza --- Digital-Academy}\\[1.2cm]
+    {\large\textit{Propuesta presentada para el concurso Green Tech}}\\[0.5cm]
+    \vfill
+    {\large 2026}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\chapter*{Resumen}
+\addcontentsline{toc}{chapter}{Resumen}
+
+EcoBrief Bolivia es una plataforma que utiliza inteligencia artificial de forma responsable para reducir el desperdicio digital informativo. El sistema recolecta noticias de medios bolivianos, elimina duplicados, prioriza el contenido relevante y genera resumenes claros para que las personas no tengan que abrir multiples paginas, leer la misma historia varias veces o consumir datos innecesarios.
+
+La propuesta no busca crear mas contenido sino reducir el ruido digital. EcoBrief transforma un flujo disperso de noticias, redes sociales y fuentes digitales en informacion breve, priorizada y medible.
+
+El prototipo ya cuenta con \textit{web scraping} real de medios locales, clasificacion por categorias, ranking de prioridad, resumenes con IA, deduplicacion historica, base de datos PostgreSQL, frontend web y pagina de impacto. El sistema esta desplegado en un VPS de Hostinger y accesible publicamente en https://briefs.ecobriefbolivia.online/.
+
+\begin{center}
+    \fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{0.85\textwidth}{
+        \centering\textbf{Mensaje central:}\\[0.3cm]
+        \textit{EcoBrief Bolivia usa IA no para producir mas ruido, sino para reducirlo.}
+    }}
+\end{center}
+
+\chapter{Introduccion}
+
+\section{Contexto y motivacion}
+
+En la era digital, el acceso a la informacion nunca ha sido tan amplio ni tan fragmentado. Para una persona en Bolivia, informarse sobre la actualidad nacional implica revisar multiples medios de comunicacion, abrir decenas de pestanas del navegador, comparar titulares, buscar contexto en redes sociales y descartar noticias repetidas. Este proceso genera un volumen significativo de desperdicio digital.
+
+El \textbf{desperdicio digital informativo} se manifiesta en tiempo perdido revisando la misma noticia en distintos sitios, datos moviles consumidos al cargar paginas completas con publicidad y exposicion a informacion fragmentada o sin fuente verificable en redes sociales.
+
+Esta problematica se alinea con los principios de \textbf{Green Tech}: promover un uso mas eficiente, responsable y sostenible de la tecnologia, la IA, el \textit{cloud}, los datos y los procesos internos.
+
+\section{El problema del desperdicio digital informativo}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Nivel} & \textbf{Problema} \\
+\midrule
+Usuario & Tiempo perdido revisando noticias repetidas \\
+Datos & Carga innecesaria de paginas, imagenes, scripts \\
+IA & Procesamiento redundante de articulos duplicados \\
+Ecosistema digital & Mayor navegacion y consumo de recursos \\
+Confianza & Contenido viral sin fuente trazable \\
+\bottomrule
+\end{tabular}
+\caption{Niveles del desperdicio digital informativo}
+\end{table}
+
+\section{Objetivos}
+
+\textbf{Objetivo general:} Desarrollar una plataforma de IA responsable que reduzca el desperdicio digital informativo mediante recoleccion, deduplicacion, clasificacion y resumen eficiente de noticias bolivianas.
+
+\textbf{Objetivos especificos:}
+\begin{enumerate}[nosep]
+    \item Recolectar automaticamente noticias de fuentes bolivianas mediante \textit{web scraping}.
+    \item Implementar deduplicacion multinivel (URL, titulo, huella de contenido).
+    \item Clasificar y priorizar noticias por categoria y relevancia.
+    \item Generar resumenes con IA aplicando filtrado, deduplicacion y ranking previos.
+    \item Medir y visualizar el impacto mediante metricas cuantificables.
+    \item Distribuir informacion personalizada segun preferencias del usuario.
+\end{enumerate}
+
+\chapter{Marco Conceptual}
+
+\section{Desperdicio digital informativo}
+
+El desperdicio digital es el consumo innecesario de recursos tecnologicos ---datos, energia, tiempo de procesamiento y atencion humana--- que no agregan valor al usuario final. Ocurre cuando un usuario carga multiples paginas para obtener informacion que podria presentarse en un solo formato compacto, o cuando sistemas automatizados procesan contenido redundante.
+
+\section{Green Tech y sostenibilidad digital}
+
+En el software, implica eficiencia computacional, reduccion de datos innecesarios, optimizacion de consultas IA y diseno de sistemas que promuevan consumo digital responsable.
+
+\section{Inteligencia artificial responsable}
+
+En EcoBrief, la IA se usa solo despues de filtrar, deduplicar y priorizar el contenido. No se envia contenido irrelevante al modelo, se usan modelos pequeños para tareas simples y se cachean resultados.
+
+\chapter{Propuesta Tecnologica}
+
+\section{EcoBrief Bolivia}
+
+EcoBrief Bolivia actua como una capa de eficiencia entre las fuentes de noticias y las personas. Automatiza recoleccion, filtrado, priorizacion y sintesis de noticias locales.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{p{6.5cm}p{6.5cm}}
+\toprule
+\textbf{Antes} & \textbf{Con EcoBrief} \\
+\midrule
+Abrir varios sitios & Un resumen centralizado \\
+Titulares repetidos & Historias deduplicadas \\
+Scroll en redes & Informacion trazable \\
+Paginas completas & Resumenes compactos \\
+No tiene IA & IA solo tras filtrar \\
+Impacto desconocido & Metricas visibles \\
+\bottomrule
+\end{tabular}
+\caption{Comparativa antes y despues}
+\end{table}
+
+\section{Arquitectura del sistema}
+
+El sistema se compone de frontend React, backend FastAPI, base de datos PostgreSQL y servicios de scraping, procesamiento, distribucion y tareas que se ejecutan repetidamente (cron jobs).
+
+\subsection{Frontend}
+
+Vistas: Home (noticias destacadas), Noticias (listado completo), Detalle (articulo original y resumen), Impacto (metricas Green Tech), Suscripcion (preferencias).
+
+\subsection{Backend API}
+
+El backend es el coraz\'on de EcoBrief. Construido con \textbf{FastAPI} sobre Python as\'incrono, orquesta todo el pipeline de recolecci\'on, procesamiento y distribuci\'on. Expone una API REST que sirve como puente entre el frontend y la l\'ogica del sistema.
+
+Sus responsabilidades principales incluyen:
+
+\begin{itemize}[nosep]
+    \item Ejecutar el pipeline completo de noticias (scraping, dedup., clasificaci\'on, ranking, resumen) bajo demanda o mediante programaci\'on horaria.
+    \item Servir datos estructurados al frontend a trav\'es de endpoints ligeros.
+    \item Gestionar suscriptores, preferencias y la distribuci\'on personalizada de res\'umenes.
+    \item Calcular y exponer m\'etricas de impacto Green Tech en tiempo real.
+    \item Validar solicitudes sensibles mediante una clave API (\texttt{X-API-Key}).
+\end{itemize}
+
+El cliente de inteligencia artificial est\'a abstra\'ido detr\'as de una capa que permite cambiar de proveedor (Groq, OpenAI, GitHub Models) sin modificar el resto del sistema. La operaci\'on cr\'itica de generaci\'on de res\'umenes se activa a trav\'es de \texttt{POST /trigger/summary}, permitiendo controlar cu\'ando se consume el proveedor IA.
+
+
+\section{Pipeline de procesamiento}
+
+El flujo de EcoBrief sigue un proceso secuencial dise\~nado para minimizar el procesamiento innecesario antes de usar inteligencia artificial. Se organiza en cuatro fases:
+
+\paragraph{Recolecci\'on}
+\begin{itemize}[nosep]
+    \item \textbf{Inicio:} Se activa una corrida, manualmente o mediante el programador horario (\textit{scheduler}).
+    \item \textbf{Cach\'e:} Se verifican res\'umenes recientes v\'alidos; de existir, se reutilizan sin ejecutar el pipeline completo.
+    \item \textbf{Scraping:} Se recolectan noticias desde las fuentes configuradas.
+\end{itemize}
+
+\paragraph{Filtrado y deduplicaci\'on}
+\begin{itemize}[nosep]
+    \item \textbf{Filtro:} Se descartan art\'iculos sin contenido suficiente.
+    \item \textbf{Deduplicaci\'on en lote:} Se eliminan duplicados dentro de la corrida por URL y t\'itulo normalizado.
+\end{itemize}
+
+\paragraph{Clasificaci\'on y priorizaci\'on}
+\begin{itemize}[nosep]
+    \item \textbf{Clasificaci\'on:} Cada art\'iculo se asigna a una categor\'ia (econom\'ia, pol\'itica, deportes, etc.).
+    \item \textbf{Ranking:} Puntaje de prioridad seg\'un recencia, confiabilidad, calidad e impacto nacional.
+    \item \textbf{Persistencia:} Los art\'iculos se almacenan en PostgreSQL.
+    \item \textbf{Huella hist\'orica:} Se calcula un \textit{fingerprint} SHA-256 por art\'iculo para detectar duplicados entre corridas.
+\end{itemize}
+
+\paragraph{Generaci\'on y distribuci\'on}
+\begin{itemize}[nosep]
+    \item \textbf{Selecci\'on:} Los mejores candidatos \'unicos se env\'ian al modelo de IA.
+    \item \textbf{Resumen:} El LLM genera un resumen breve para cada candidato.
+    \item \textbf{Normalizaci\'on:} Se reescriben los res\'umenes para mantener coherencia de estilo.
+    \item \textbf{M\'etricas:} Se guardan resultados y se calculan las m\'etricas de impacto.
+    \item \textbf{Entrega:} Se prepara el env\'io seg\'un las preferencias del suscriptor.
+\end{itemize}
+
+\subsection{Web Scraping}
+
+El sistema utiliza \texttt{httpx} junto con \texttt{BeautifulSoup} y \texttt{lxml} para realizar \textit{web scraping} de fuentes bolivianas. Cada fuente est\'a definida en \texttt{config/sources.yaml} con selectores CSS configurables (selector de art\'iculo, t\'itulo, URL, fecha, imagen y cuerpo). Cuando una fuente cambia su estructura HTML, el sistema cuenta con un mecanismo de \textit{fallback} gen\'erico que extrae todos los enlaces del documento y filtra aquellos que parecen art\'iculos period\'isticos, permitiendo seguir recolectando incluso si los selectores originales no coinciden.
+
+\subsection{Deduplicacion}
+
+EcoBrief implementa tres niveles de deduplicaci\'on a lo largo del pipeline:
+
+\begin{enumerate}[nosep]
+    \item \textbf{Deduplicaci\'on por URL:} Cada URL se convierte en un hash MD5. Esto evita guardar o procesar el mismo enlace repetido dentro de una misma corrida.
+    \item \textbf{Deduplicaci\'on por t\'itulo:} Los t\'itulos se normalizan (min\'usculas, sin acentos, sin signos) y se comparan con \texttt{SequenceMatcher}. Si la similitud supera 0.85, se considera duplicado y se conserva la versi\'on m\'as reciente.
+    \item \textbf{Deduplicaci\'on hist\'orica por huella:} Se calcula una huella (\textit{fingerprint}) SHA-256 basada en la categor\'ia, el t\'itulo normalizado y un fragmento del contenido. Esto permite agrupar noticias equivalentes a trav\'es de distintas corridas, aunque tengan URL y fuente diferentes.
+\end{enumerate}
+
+Los duplicados no se eliminan definitivamente; se marcan para auditor\'ia y se excluyen de los candidatos a resumen, preservando la trazabilidad.
+
+\subsection{Clasificacion}
+
+Cada noticia se clasifica en una de cinco categor\'ias mediante un sistema de reglas ponderadas configurable en \texttt{config/classification.yaml}:
+
+\begin{itemize}[nosep]
+    \item \textbf{Econom\'ia:} Finanzas, d\'olar, tipo de cambio, BCB, inflaci\'on, hidrocarburos.
+    \item \textbf{Pol\'itica:} Gobierno, presidente, elecciones, Asamblea, leyes, partidos.
+    \item \textbf{Deportes:} F\'utbol, clubes, torneos, selecci\'on boliviana, resultados.
+    \item \textbf{Tecnolog\'ia:} IA, software, internet, ciberseguridad, telecomunicaciones.
+    \item \textbf{Entretenimiento:} Cine, m\'usica, televisi\'on, festivales, far\'andula.
+\end{itemize}
+
+El clasificador asigna puntuaci\'on a cada categor\'ia ponderando cuatro campos del art\'iculo:
+\begin{itemize}[nosep]
+    \item T\'itulo ($\times 3.0$)
+    \item Descripci\'on ($\times 2.0$)
+    \item Contenido ($\times 1.0$)
+    \item Categor\'ia de la fuente ($\times 2.5$)
+\end{itemize}
+
+Si la diferencia entre la primera y segunda categor\'ia es menor a 2.0 puntos, o la confianza es baja ($<0.62$), el sistema puede recurrir a un LLM como fallback para reclasificar el art\'iculo.
+
+\subsection{Ranking por relevancia}
+
+Una vez clasificadas, las noticias se ordenan seg\'un un puntaje compuesto por siete factores ponderados, definidos en \texttt{config/scoring.yaml}:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcr}
+\toprule
+\textbf{Factor} & \textbf{Peso} & \textbf{Detalle} \\
+\midrule
+Actualidad & 15\% & Noticias m\'as recientes reciben mayor puntaje. \\
+& & 1h $\to$ 100, 3h $\to$ 90, 6h $\to$ 75, \\
+& & 12h $\to$ 60, 24h $\to$ 45, 48h $\to$ 25 \\
+\midrule
+Relevancia local & 20\% & Menci\'on de regiones (Santa Cruz, La Paz), \\
+& & ciudades (Cochabamba, El Alto), autoridades \\
+& & e instituciones bolivianas (BCB, YPFB, TSE). \\
+\midrule
+Impacto informativo & 20\% & T\'erminos de alto impacto (crisis, d\'olar, \\
+& & bloqueo, elecciones), medio (inflaci\'on, \\
+& & protesta, ley) y bajo (anuncio, informe). \\
+\midrule
+Calidad del contenido & 17\% & Base 35, bonos por: $>120$ palabras (+20), \\
+& & $>300$ palabras (+10), imagen (+10), \\
+& & descripci\'on \'util (+10), t\'itulo informativo (+10). \\
+\midrule
+Fuente & 10\% & Puntajes por fuente reconocida: RedUno 84, \\
+& & RadioFides 84, El Deber 84, Unitel 82, \\
+& & La Raz\'on 82, RedBolivisi\'on 78, default 55. \\
+\midrule
+Corroboraci\'on & 10\% & Noticias cubiertas por 2 fuentes $\to$ 70 pts, \\
+& & 3 o m\'as fuentes $\to$ 100 pts. \\
+\midrule
+Confianza de categor\'ia & 8\% & Coherencia del contenido con la categor\'ia \\
+& & asignada: confianza $\ge 0.80 \to 100$, \\
+& & $\ge 0.60 \to 75$, $\ge 0.40 \to 55$. \\
+\bottomrule
+\end{tabular}
+\caption{Factores de ranking y sus pesos}
+\end{table}
+
+Adicionalmente, el sistema aplica penalizaciones por contenido ausente (-25), contenido muy corto (-15), descripci\'on duplicada (-20), fecha faltante (-10), fuente desconocida (-8), confianza baja de categor\'ia (-10) y noticias internacionales sin contexto boliviano (-20).
+
+El puntaje final se calcula como:
+
+\begin{equation}
+P = \sum_{f} w_f \cdot s_f - \text{penalizaciones}
+\end{equation}
+
+Donde $w_f$ es el peso del factor y $s_f$ su puntuaci\'on normalizada. El resultado se acota entre 0 y 100.
+
+El objetivo no es resumir todo, sino resumir lo m\'as relevante.
+
+\section{Eficiencia en el uso de IA}
+
+La inteligencia artificial se emplea en dos fases del pipeline: clasificaci\'on de art\'iculos (solo como fallback ante casos ambiguos) y generaci\'on de res\'umenes. Para minimizar el costo operativo y la latencia, el sistema aplica las siguientes estrategias antes de invocar cualquier modelo:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lp{10cm}}
+\toprule
+\textbf{Estrategia} & \textbf{Descripci\'on} \\
+\midrule
+Filtrar antes de IA  & Se descartan art\'iculos sin contenido suficiente o con metadatos incompletos antes de cualquier procesamiento. \\
+\midrule
+Deduplicar antes de IA & Se eliminan duplicados por URL y t\'itulo dentro del lote, evitando enviar la misma noticia al modelo m\'as de una vez. \\
+\midrule
+Rankear antes de IA  & Solo los art\'iculos mejor puntuados por el ranking de relevancia son candidatos a resumen. \\
+\midrule
+Limitar por categor\'ia & Se establece un m\'aximo de candidatos por categor\'ia para distribuir el presupuesto de c\'omputo entre todas las \'areas tem\'aticas. \\
+\midrule
+Cachear res\'umenes  & Los res\'umenes ya generados se reutilizan si el art\'iculo original no ha cambiado, evitando reprocesar contenido ya sintetizado. \\
+\midrule
+Control de duplicados & Se verifica que no exista un resumen equivalente en la misma corrida antes de generar uno nuevo. \\
+\bottomrule
+\end{tabular}
+\caption{Estrategias de eficiencia en el uso de IA}
+\end{table}
+
+\subsection{Abstracci\'on de proveedores LLM}
+
+El cliente de inteligencia artificial est\'a dise\~nado como una capa de abstracci\'on que permite cambiar de proveedor sin modificar el resto del sistema. La clase \texttt{LLMProvider} expone una interfaz unificada (\texttt{chat()}, \texttt{chat\_batch()}) independientemente del proveedor subyacente.
+
+\begin{table}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+\textbf{Proveedor} & \textbf{Fast} & \textbf{Balanced} & \textbf{Quality} \\
+\midrule
+Groq (gratuita) & \texttt{llama-3.1-8b-instant} & \texttt{llama-3.1-70b-versatile} & \texttt{llama-3.3-70b-versatile} \\
+\midrule
+OpenAI (pagada) & \texttt{gpt-4o-mini} & \texttt{gpt-4o} & \texttt{gpt-4o} \\
+\midrule
+GitHub Models (150 RPD) & \texttt{gpt-4.1-mini} & \texttt{gpt-4.1-mini} & \texttt{gpt-4.1-mini} \\
+\bottomrule
+\end{tabular}
+}
+\caption{Modelos disponibles por proveedor y nivel de calidad}
+\end{table}
+
+Cada proveedor ofrece tres niveles de calidad (\textit{fast}, \textit{balanced}, \textit{quality}) que se seleccionan seg\'un la tarea. Las tareas de clasificaci\'on usan \textit{fast}, mientras que la generaci\'on de res\'umenes emplea \textit{balanced} o \textit{quality} seg\'un la configuraci\'on. La selecci\'on del proveedor activo se realiza mediante variable de entorno, lo que permite alternar entre costo cero (Groq, GitHub Models) y mayor capacidad (OpenAI) sin cambiar una l\'inea de c\'odigo.
+
+
+
+\chapter{Impacto y Metricas}
+
+\section{Flujo del pipeline}
+
+\begin{figure}[H]
+\centering
+\setlength{\fboxsep}{10pt}
+\small
+\begin{tabular}{c@{\hspace{0.5cm}}c@{\hspace{0.5cm}}c}
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{3.5cm}{\centering\bfseries\Large 174\\[4pt] noticias\\[2pt] recolectadas\\[2pt] (100\%)}} &
+\fcolorbox{gris-texto}{gris-claro}{\parbox{5cm}{\centering\small\bfseries 78\% descartadas\\[2pt] filtrado + deduplicados\\[2pt] ranking + cache}} &
+\fcolorbox{verde-ecobrief}{verde-ecobrief!5!white}{\parbox{2.8cm}{\centering\bfseries\Large 39\\[4pt] briefs\\[2pt] generados\\[2pt] (22\%)}} \\
+\end{tabular}
+\vspace{6pt}
+
+\fcolorbox{azul-profundo}{azul-profundo!5!white}{\parbox{0.85\textwidth}{\centering\bfseries 135 paginas evitadas \quad| \quad 67.5\,min de lectura \quad| \quad 77.6\% de reduccion}}
+\caption{Flujo del pipeline --- 15 de junio de 2026}
+\end{figure}
+
+\section{Metricas de la corrida}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrr}
+\toprule
+\textbf{Metrica} & \textbf{Valor} & \textbf{Porcentaje} \\
+\midrule
+Noticias recolectadas & 174 & 100\,\% \\
+Articulos utiles & 173 & 99\,\% \\
+Articulos unicos & 169 & 97\,\% \\
+Briefs generados & 39 & 22\,\% \\
+Paginas evitadas & 135 & 78\,\% \\
+Minutos de lectura ahorrados & 67.5 & --- \\
+\bottomrule
+\end{tabular}
+\caption{Metricas reales del 15 de junio de 2026}
+\end{table}
+
+\section{Panel de impacto}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{./images/metricas-15-junio-2026.png}
+\caption{Panel de metricas Green Tech -- 15 de junio de 2026}
+\end{figure}
+
+\section{Formulas de impacto}
+
+Las estimaciones se derivan de tres calculos conservadores. Se define $R$ como el total de noticias recolectadas y $B$ como los briefs generados:
+
+\paragraph{Paginas evitadas.} Diferencia entre lo recolectado y lo sintetizado:
+\begin{equation}
+P_{\text{evitadas}} = R - B = 110 - 39 = 71
+\end{equation}
+
+\paragraph{Tiempo de lectura ahorrado.} Estimando 30 segundos por pagina evitada:
+\begin{equation}
+M_{\text{ahorrados}} = P_{\text{evitadas}} \times 0.5 = 71 \times 0.5 = 35.5\text{ min}
+\end{equation}
+
+\paragraph{Tasa de reduccion del flujo.} Proporcion de contenido descartado respecto al total recolectado:
+\begin{equation}
+T_{\text{reduccion}} = 1 - \frac{B}{R} = 1 - \frac{39}{110} = 0.646 = 64.6\%
+\end{equation}
+
+\chapter{Costos y Sostenibilidad}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrl}
+\toprule
+\textbf{Componente} & \textbf{Costo ref.} & \textbf{Detalle} \\
+\midrule
+VPS Hostinger KVM 2 & USD 107.88/anual & Backend, frontend, BD, cron \\
+Dominio NIC Bolivia & 55 Bs/anual & .bolivia.bo \\
+Email & Gratuito* & Gmail SMTP + App Password \\
+Telegram & Gratuito & Bot API \\
+WhatsApp & Variable** & Twilio (opcional) \\
+IA Groq & Free tier / variable & Segun volumen \\
+\bottomrule
+\multicolumn{3}{l}{*Limites Google; **USD 0.0116/min Twilio}
+\end{tabular}
+\caption{Costos del primer ano de operacion}
+\end{table}
+
+
+
+\chapter{Estado Actual}
+
+\section{MVP funcional}
+
+El prototipo esta desplegado y operativo con:
+\begin{itemize}[nosep]
+    \item Scraping de 6 fuentes bolivianas.
+    \item Clasificacion, ranking y deduplicacion.
+    \item Resumenes con Groq/OpenAI/GitHub Models.
+    \item Frontend React + Vite.
+    \item Panel de metricas Green Tech.
+    \item Pruebas automatizadas (pytest).
+\end{itemize}
+
+\section{Tecnologias}
+
+Backend: Python 3.11, FastAPI. Frontend: React 18, Vite, TypeScript. BD: PostgreSQL 16, SQLAlchemy. Scraping: httpx, BeautifulSoup4. IA: Groq/OpenAI/GitHub. Infra: Docker, Hostinger VPS.
+
+\section{Roadmap}
+
+El MVP actual es funcional, pero existen funcionalidades pendientes de implementar. Se dividen en tres horizontes segun su prioridad:
+
+\textbf{Comprometido (corto plazo):} backfill de fingerprints, exponer duplicados historicos, mostrar coberturas agrupadas por historia, mejorar historial de metricas.
+
+\textbf{Planificado (mediano plazo):} medicion real de bytes descargados, activar Telegram/WhatsApp en produccion, dashboard historico por usuario, integrar boletines estatales como fuentes.
+
+\textbf{Aspiracional (largo plazo):} deteccion por entidades, planes de suscripcion, panel institucional, monitoreo automatico de cambios en fuentes.
+
+\chapter*{Conclusiones}
+\addcontentsline{toc}{chapter}{Conclusiones}
+
+El proyecto EcoBrief Bolivia se presento como una solucion al problema del exceso de informacion redundante en el ecosistema de noticias boliviano, con un enfoque Green Tech que prioriza la eficiencia, la reduccion del consumo digital y el uso responsable de inteligencia artificial.
+
+\section*{Resumen de resultados}
+
+El sistema fue desarrollado, desplegado y probado con fuentes reales de noticias bolivianas. En su corrida del 15 de junio de 2026, proceso 174 noticias y las redujo a 39 briefs priorizados, logrando una tasa de reduccion del 78\,\%. Esto se tradujo en 135 paginas evitadas y un ahorro estimado de 67.5 minutos de lectura por corrida.
+
+\section*{Logros alcanzados}
+
+\begin{enumerate}[nosep]
+    \item \textbf{Alineacion Green Tech demostrada:} El proyecto reduce la navegacion innecesaria, la duplicacion de contenido, el consumo de datos y el procesamiento de IA redundante. Las metricas del 15 de junio confirman una reduccion del flujo superior al 78\,\%.
+    \item \textbf{Prototipo funcional desplegado:} Aplicacion completa con backend FastAPI, frontend React con Vite, base de datos PostgreSQL, panel de metricas Green Tech y canales de distribucion, desplegada en un VPS de Hostinger con dominio propio.
+    \item \textbf{Arquitectura modular y eficiente:} El diseno permite cambiar de proveedor de IA (Groq, OpenAI, GitHub Models), agregar nuevas fuentes y escalar componentes de forma independiente.
+    \item \textbf{Bajo costo operativo:} La plataforma puede operar con un costo anual reducido, utilizando free tiers de IA, canales gratuitos como Telegram y un solo VPS como infraestructura.
+    \item \textbf{IA responsable:} Filtrar, deduplicar y rankear antes de invocar al modelo reduce las llamadas IA. El cache evita reprocesar contenido ya resumido.
+    \item \textbf{Impacto medible:} Cada corrida del pipeline produce metricas cuantificables que se muestran en el panel de impacto en tiempo real.
+\end{enumerate}
+
+\section*{Trabajo futuro}
+
+A corto plazo, se implementará Umami a través de la infraestructura de Dokploy como la solución principal para la analítica web. A mediano plazo se activaran la distribusion por Telegram y WhatsApp en produccion. A largo plazo se explorara deteccion de informacion por entidades ejecutivas y gubernamentales del estado Boliviano, planes de suscripcion con precios accesibles.
+
+\section*{Mensaje final}
+
+EcoBrief Bolivia convierte un problema cotidiano ---el exceso de informacion redundante--- en una solucion Green Tech concreta, funcional y medible. Este proyecto, desarrollado por \textbf{Raquel Auza} (Digital-Academy) y \textbf{Josoe Ichuta} (Ingenieria), representa una apuesta por informacion esencial, inteligencia artificial responsable y eficiencia digital desde Bolivia.
+
+
+\addcontentsline{toc}{chapter}{Anexos}
+\section*{Anexo 1: Pagina principal}
+\addcontentsline{toc}{section}{Anexo 1: Pagina principal}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{./images/1-home-page.png}
+\caption{Vista principal del sistema con noticias destacadas y resumen visual}
+\end{figure}
+
+\newpage
+
+\section*{Anexo 2: Noticias y resumenes}
+\addcontentsline{toc}{section}{Anexo 2: Noticias y resumenes}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{./images/2-news-summaries.png}
+\caption{Listado completo de noticias con resumenes generados por IA}
+\end{figure}
+
+\newpage
+
+\section*{Anexo 3: Noticias recolectadas}
+\addcontentsline{toc}{section}{Anexo 3: Noticias recolectadas}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{./images/3-news-recolectadas.png}
+\caption{Panel de noticias recolectadas con detalles de fuente y fecha}
+\end{figure}
+
+\newpage
+
+\section*{Anexo 4: Pagina de datos}
+\addcontentsline{toc}{section}{Anexo 4: Pagina de datos}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{./images/4-datos-page.png}
+\caption{Vista de datos e indicadores del sistema}
+\end{figure}
+
+\newpage
+
+\section*{Anexo 5: Panel de impacto}
+\addcontentsline{toc}{section}{Anexo 5: Panel de impacto}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{./images/5-impacto-page.png}
+\caption{Panel de metricas Green Tech con indicadores de impacto ambiental}
+\end{figure}
+
+\newpage
+
+\section*{Anexo 6: Suscripcion y preferencias}
+\addcontentsline{toc}{section}{Anexo 6: Suscripcion y preferencias}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,keepaspectratio]{./images/6-suscripcion-page.png}
+\caption{Formulario de suscripcion con preferencias de categoria, frecuencia y canal de entrega}
+\end{figure}
+
+\newpage
+
+\chapter*{Referencias}
+\addcontentsline{toc}{chapter}{Referencias}
+
+\begin{enumerate}[nosep]
+    \item Hostinger VPS. \url{https://www.hostinger.com/vps-hosting}
+    \item Groq Pricing. \url{https://groq.com/pricing/}
+    \item DeepSeek Pricing. \url{https://api-docs.deepseek.com/quick_start/pricing}
+    \item OpenAI API Pricing. \url{https://openai.com/api/pricing/}
+    \item Twilio WhatsApp. \url{https://www.twilio.com/en-us/whatsapp/pricing}
+    \item FastAPI. \url{https://fastapi.tiangolo.com/}
+    \item React. \url{https://react.dev/}
+    \item PostgreSQL. \url{https://www.postgresql.org/}
+\end{enumerate}
+
+\end{document}
