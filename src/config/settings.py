@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
     log_level: str = Field(default="DEBUG", alias="LOG_LEVEL")
 
-    llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     github_api_key: str | None = Field(default=None, alias="GITHUB_API_KEY")
@@ -98,14 +97,6 @@ class Settings(BaseSettings):
     @property
     def scraper_sources_list(self) -> list[str]:
         return [s.strip() for s in self.scraper_sources.split(",")]
-
-    @property
-    def llm_api_key(self) -> str | None:
-        if self.llm_provider == "groq":
-            return self.groq_api_key
-        if self.llm_provider == "github":
-            return self.github_api_key
-        return self.openai_api_key
 
     @property
     def llm_providers_list(self) -> list[dict]:

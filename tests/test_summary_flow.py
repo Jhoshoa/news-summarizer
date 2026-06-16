@@ -55,6 +55,9 @@ class FakeLLM:
     provider = "fake"
     models = {"quality": "fake-quality"}
 
+    def reset(self):
+        pass
+
     async def chat(self, prompt, **kwargs):
         if prompt.startswith("Reescribe"):
             return "1. Titulo reescrito | Resumen reescrito"

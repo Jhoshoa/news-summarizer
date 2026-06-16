@@ -232,7 +232,7 @@ def test_build_impact_metrics_payload_calculates_transparent_estimates():
         {"label": "Unicas", "value": 42},
         {"label": "Briefs", "value": 18},
     ]
-    assert "no medicion energetica directa" in response["methodology"]["note"]
+    assert "articulos evitados" in response["methodology"]["note"]
 
 
 def test_build_impact_metrics_payload_includes_real_pipeline_fields():
