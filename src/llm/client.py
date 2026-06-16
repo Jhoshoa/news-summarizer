@@ -32,6 +32,14 @@ class LLMProvider:
                 "quality": "openai/gpt-4.1-mini",
             },
         },
+        "nvidia": {
+            "base_url": "https://integrate.api.nvidia.com/v1",
+            "models": {
+                "fast": "mistralai/mistral-small-4-119b-2603",
+                "balanced": "mistralai/mistral-small-4-119b-2603",
+                "quality": "mistralai/mistral-small-4-119b-2603",
+            },
+        },
     }
 
     def __init__(

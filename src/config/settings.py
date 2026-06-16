@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     github_api_key: str | None = Field(default=None, alias="GITHUB_API_KEY")
-    llm_fallback_order: str = Field(default="groq,github,openai", alias="LLM_FALLBACK_ORDER")
+    nvidia_api_key: str | None = Field(default=None, alias="NVIDIA_API_KEY")
+    llm_fallback_order: str = Field(default="groq,github,nvidia,openai", alias="LLM_FALLBACK_ORDER")
     llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
 
     news_api_key: str | None = Field(default=None, alias="NEWS_API_KEY")
@@ -112,6 +113,7 @@ class Settings(BaseSettings):
         key_map = {
             "groq": self.groq_api_key,
             "github": self.github_api_key,
+            "nvidia": self.nvidia_api_key,
             "openai": self.openai_api_key,
         }
         result: list[dict] = []
