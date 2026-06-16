@@ -21,6 +21,7 @@ const HeaderComponent = ({
     <Link className="brand" href="/" aria-label="EcoBrief Bolivia inicio">
       <BoliviaFlag />
       <span>EcoBrief Bolivia</span>
+      <span className="tz-indicator">Hora Bolivia</span>
     </Link>
     <nav className="nav" aria-label="Navegacion principal">
       <Link aria-current={activePath === "/news" || activePath === "/article" ? "page" : undefined} href="/news">

@@ -14,5 +14,6 @@ export const formatPublishedDate = (value?: string | null) => {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/La_Paz",
   }).format(date);
 };

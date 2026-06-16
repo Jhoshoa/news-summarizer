@@ -135,10 +135,17 @@ p {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   color: var(--color-text);
   font-size: var(--text-lg);
   font-weight: 700;
+}
+
+.tz-indicator {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--color-text-muted);
+  margin-left: 2px;
 }
 
 .flag {

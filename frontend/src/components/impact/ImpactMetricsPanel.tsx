@@ -39,6 +39,7 @@ const formatContentDate = (value?: string | null) => {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    timeZone: "America/La_Paz",
   }).format(date);
 };
 

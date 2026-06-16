@@ -1784,6 +1784,16 @@ class Database:
             return [self._json_safe_value(item) for item in value]
         return value
 
+    @staticmethod
+    def _utc_iso(value: date | datetime | None) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return value.isoformat()
+        return value.isoformat()
+
     def _coerce_datetime(self, value: Any) -> datetime:
         if isinstance(value, datetime):
             return value.replace(tzinfo=None) if value.tzinfo else value
@@ -1818,8 +1828,8 @@ class Database:
             "content": self._article_content_for_response(article.content, article.description),
             "author": article.author,
             "image": self._public_image_url(article.image_url),
-            "published_at": article.published_at,
-            "collected_at": article.collected_at,
+            "published_at": self._utc_iso(article.published_at),
+            "collected_at": self._utc_iso(article.collected_at),
             "source": source_name,
             "source_type": source_type,
             "category": category_name,
@@ -1889,13 +1899,13 @@ class Database:
             "source": source_name,
             "url": article_url,
             "article_title": article_title,
-            "published_at": published_at,
+            "published_at": self._utc_iso(published_at),
             "image": image_url,
             "article_description": article_description,
             "llm_provider": summary.llm_provider,
             "llm_model": summary.llm_model,
-            "summary_date": summary.summary_date,
-            "created_at": summary.created_at,
+            "summary_date": self._utc_iso(summary.summary_date),
+            "created_at": self._utc_iso(summary.created_at),
         }
 
     def _public_image_url(self, value: str | None) -> str | None:
