@@ -29,7 +29,7 @@ from src.collectors import NewsAPICollector, NewsScraper
 from src.config import Settings, get_settings
 from src.db import Database
 from src.distributors import EmailHandler, TelegramHandler, WhatsAppHandler
-from src.llm import LLMProvider
+from src.llm import LLMRouter
 from src.processors import Deduplicator, NewsClassifier, NewsRanker, NewsRewriter, NewsSummarizer
 from src.scheduler import NewsScheduler
 
@@ -40,7 +40,7 @@ class NewsSummarizerApp:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.db: Database | None = None
-        self.llm: LLMProvider | None = None
+        self.llm: LLMRouter | None = None
         self.whatsapp: WhatsAppHandler | None = None
         self.telegram: TelegramHandler | None = None
         self.email: EmailHandler | None = None
@@ -83,22 +83,12 @@ class NewsSummarizerApp:
         except Exception as e:
             logger.warning(f"DB no disponible: {e}. Continuando sin DB.")
 
-        if self.settings.llm_api_key:
+        if self.settings.llm_providers_list:
             try:
-                override_models = {}
-                if self.settings.llm_model_classify:
-                    override_models["fast"] = self.settings.llm_model_classify
-                if self.settings.llm_model_summarize:
-                    override_models["quality"] = self.settings.llm_model_summarize
-                if self.settings.llm_model_rewrite and "fast" not in override_models:
-                    override_models["fast"] = self.settings.llm_model_rewrite
-                self.llm = LLMProvider(
-                    provider=self.settings.llm_provider,
-                    api_key=self.settings.llm_api_key,
-                    models=override_models or None,
-                    base_url=self.settings.llm_base_url,
+                self.llm = LLMRouter(
+                    providers=self.settings.llm_providers_list,
                 )
-                logger.info(f"LLM Provider: {self.llm}")
+                logger.info(f"LLM Router: {self.llm}")
             except Exception as e:
                 logger.error(f"Error inicializando LLM: {e}")
                 raise
@@ -132,6 +122,8 @@ class NewsSummarizerApp:
         """Generates summaries and optionally delivers them to active subscribers."""
 
         logger.info(f"Generating summaries ({time_of_day}) refresh={refresh} deliver={deliver}")
+        if self.llm:
+            self.llm.reset()
 
         categories = self.settings.categories_list
         brief_date = self._brief_date()

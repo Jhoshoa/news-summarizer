@@ -17,10 +17,8 @@ class Settings(BaseSettings):
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     github_api_key: str | None = Field(default=None, alias="GITHUB_API_KEY")
+    llm_fallback_order: str = Field(default="groq,github,openai", alias="LLM_FALLBACK_ORDER")
     llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
-    llm_model_summarize: str | None = Field(default=None, alias="LLM_MODEL_SUMMARIZE")
-    llm_model_classify: str | None = Field(default=None, alias="LLM_MODEL_CLASSIFY")
-    llm_model_rewrite: str | None = Field(default=None, alias="LLM_MODEL_REWRITE")
 
     news_api_key: str | None = Field(default=None, alias="NEWS_API_KEY")
     news_api_country: str = Field(default="bo", alias="NEWS_API_COUNTRY")
@@ -107,6 +105,21 @@ class Settings(BaseSettings):
         if self.llm_provider == "github":
             return self.github_api_key
         return self.openai_api_key
+
+    @property
+    def llm_providers_list(self) -> list[dict]:
+        order = [o.strip() for o in self.llm_fallback_order.split(",")]
+        key_map = {
+            "groq": self.groq_api_key,
+            "github": self.github_api_key,
+            "openai": self.openai_api_key,
+        }
+        result: list[dict] = []
+        for name in order:
+            key = key_map.get(name)
+            if key:
+                result.append({"provider": name, "api_key": key})
+        return result
 
 
 @lru_cache

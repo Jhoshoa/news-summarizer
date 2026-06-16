@@ -280,3 +280,5 @@ Check:
 
 ### Port fordwarding
 https://c1jx73qz-5173.brs.devtunnels.ms/
+
+HTML con pdf2htmlEX o Pandoc — para compartir en web
