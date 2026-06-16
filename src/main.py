@@ -30,7 +30,14 @@ from src.config import Settings, get_settings
 from src.db import Database
 from src.distributors import EmailHandler, TelegramHandler, WhatsAppHandler
 from src.llm import LLMRouter
-from src.processors import Deduplicator, NewsClassifier, NewsRanker, NewsRewriter, NewsSummarizer
+from src.processors import (
+    AIStoryDeduplicator,
+    Deduplicator,
+    NewsClassifier,
+    NewsRanker,
+    NewsRewriter,
+    NewsSummarizer,
+)
 from src.scheduler import NewsScheduler
 
 
@@ -307,6 +314,11 @@ class NewsSummarizerApp:
 
             summary_candidates = self._select_summary_candidates(news, categories)
             pipeline_metrics["summary_candidates_count"] = len(summary_candidates)
+
+            story_deduplicator = AIStoryDeduplicator(self.llm)
+            summary_candidates = await story_deduplicator.deduplicate(summary_candidates)
+            pipeline_metrics["ai_dedup_count"] = len(summary_candidates)
+
             summaries = await self._build_summaries(summary_candidates, categories)
 
             if summaries:
