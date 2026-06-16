@@ -163,6 +163,7 @@ class CollectionRun(Base):
     ranked_count = Column(Integer, nullable=False, default=0)
     summary_candidates_count = Column(Integer, nullable=False, default=0)
     summaries_count = Column(Integer, nullable=False, default=0)
+    ai_dedup_count = Column(Integer, nullable=False, default=0)
     used_cached_articles = Column(Boolean, nullable=False, default=False)
     used_cached_summaries = Column(Boolean, nullable=False, default=False)
     metrics_payload = Column(JSON, nullable=False, default=dict)
@@ -434,6 +435,7 @@ class Database:
         ranked_count: int = 0,
         summary_candidates_count: int = 0,
         summaries_count: int = 0,
+        ai_dedup_count: int = 0,
         used_cached_articles: bool = False,
         used_cached_summaries: bool = False,
         metrics_payload: dict[str, Any] | None = None,
@@ -458,6 +460,7 @@ class Database:
                     ranked_count=max(int(ranked_count), 0),
                     summary_candidates_count=max(int(summary_candidates_count), 0),
                     summaries_count=max(int(summaries_count), 0),
+                    ai_dedup_count=max(int(ai_dedup_count), 0),
                     used_cached_articles=used_cached_articles,
                     used_cached_summaries=used_cached_summaries,
                     metrics_payload=metrics_payload or {},
@@ -707,6 +710,7 @@ class Database:
             "ai_calls_avoided_estimated": duplicate_articles_estimated,
             "pipeline": [
                 {"label": "Recolectadas", "value": collected_articles},
+                {"label": "Utiles", "value": max(int(usable_articles), 0)},
                 {"label": "Unicas", "value": unique_articles},
                 {"label": "Briefs", "value": summaries},
             ],
