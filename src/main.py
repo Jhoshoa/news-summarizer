@@ -665,6 +665,7 @@ class NewsSummarizerApp:
 
         for category in categories:
             category_news = [article for article in news if article.get("category") == category]
+            category_news.sort(key=lambda a: a.get("score", 0) or 0, reverse=True)
             category_selection = self._select_diverse_articles(
                 category_news,
                 limit=per_category_limit,

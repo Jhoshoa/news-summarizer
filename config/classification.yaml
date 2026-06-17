@@ -56,13 +56,17 @@ categories:
       - { term: "gol", weight: 3 }
       - { term: "club", weight: 3 }
       - { term: "liga profesional", weight: 4 }
-      - { term: "seleccion boliviana", weight: 4 }
+      - { term: "seleccion", weight: 3 }
       - { term: "copa", weight: 2 }
       - { term: "torneo", weight: 2 }
       - { term: "campeonato", weight: 3 }
+      - { term: "mundial", weight: 4 }
       - { term: "jugador", weight: 2 }
       - { term: "entrenador", weight: 2 }
       - { term: "partido de futbol", weight: 5 }
+      - { term: "minuto a minuto", weight: 1 }
+      - { term: "goleada", weight: 3 }
+      - { term: "debut", weight: 2 }
       - { term: "bolivar", weight: 2 }
       - { term: "the strongest", weight: 3 }
       - { term: "oriente petrolero", weight: 3 }
