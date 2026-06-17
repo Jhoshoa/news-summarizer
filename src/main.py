@@ -372,7 +372,7 @@ class NewsSummarizerApp:
                     logger.info(f"AI dedup elimino {llm_dedup_removed} articulos redundantes, quedan {len(summary_candidates)}")
 
             logger.info(
-                "Dedup metrics: %d ya resumidas, %d por AI dedup, %d candidatos finales",
+                "Dedup metrics: {} ya resumidas, {} por AI dedup, {} candidatos finales",
                 already_summarized_removed,
                 llm_dedup_removed,
                 len(summary_candidates),
