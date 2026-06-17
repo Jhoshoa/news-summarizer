@@ -513,12 +513,21 @@ class Database:
     ) -> dict[str, Any]:
         article_start, article_end = self._day_bounds(metrics_date)
 
+        collected_articles = int(
+            await session.scalar(
+                select(func.count(NewsArticle.id)).where(
+                    NewsArticle.published_at >= article_start,
+                    NewsArticle.published_at < article_end,
+                )
+            )
+            or 0
+        )
         unique_articles = int(
             await session.scalar(
                 select(func.count(NewsArticle.id)).where(
-                    NewsArticle.is_active.is_(True),
                     NewsArticle.published_at >= article_start,
                     NewsArticle.published_at < article_end,
+                    NewsArticle.duplicate_of_article_id.is_(None),
                 )
             )
             or 0
@@ -531,53 +540,30 @@ class Database:
         )
         latest_run = await self._latest_collection_run_for_date(session, metrics_date)
         run_has_pipeline_metrics = self._collection_run_has_pipeline_metrics(latest_run)
-        if latest_run and run_has_pipeline_metrics:
-            collected_articles = max(
-                self._safe_int(latest_run.raw_collected_count),
-                self._safe_int(latest_run.scraper_count) + self._safe_int(latest_run.newsapi_count),
-                unique_articles,
-            )
-            unique_from_run = self._safe_int(latest_run.deduplicated_count) or unique_articles
-            summaries_from_run = self._impact_summary_count(
-                stored_summaries=summaries,
-                run_summaries=latest_run.summaries_count,
-            )
-            return {
-                "data_source": "pipeline_run",
-                "collected_articles": collected_articles,
-                "unique_articles": unique_from_run,
-                "summaries": summaries_from_run,
-                "quality_dropped_articles": self._safe_int(latest_run.quality_dropped_count),
-                "duplicate_articles": self._safe_int(latest_run.duplicate_dropped_count),
-                "summary_candidates": self._safe_int(latest_run.summary_candidates_count),
-                "usable_articles": self._safe_int(latest_run.usable_count),
-                "ranked_articles": self._safe_int(latest_run.ranked_count),
-                "cache_reused": bool(
-                    latest_run.used_cached_articles or latest_run.used_cached_summaries
-                ),
-                "has_data": collected_articles > 0 or unique_from_run > 0 or summaries_from_run > 0,
-            }
 
-        collected_from_run = (
-            self._safe_int(latest_run.scraper_count) + self._safe_int(latest_run.newsapi_count)
-            if latest_run
-            else 0
-        )
-        collected_articles = max(collected_from_run, unique_articles)
-
-        return {
-            "data_source": "derived" if collected_articles > 0 or summaries > 0 else "empty",
+        duplicate_articles = max(collected_articles - unique_articles, 0)
+        derived = {
             "collected_articles": collected_articles,
             "unique_articles": unique_articles,
             "summaries": summaries,
             "quality_dropped_articles": 0,
-            "duplicate_articles": max(collected_articles - unique_articles, 0),
-            "summary_candidates": summaries,
-            "usable_articles": unique_articles,
+            "duplicate_articles": duplicate_articles,
+            "summary_candidates": unique_articles,
+            "usable_articles": collected_articles,
             "ranked_articles": unique_articles,
-            "cache_reused": False,
             "has_data": collected_articles > 0 or unique_articles > 0 or summaries > 0,
         }
+
+        if latest_run and run_has_pipeline_metrics:
+            return {
+                "data_source": "pipeline_run",
+                **derived,
+                "cache_reused": bool(
+                    latest_run.used_cached_articles or latest_run.used_cached_summaries
+                ),
+            }
+
+        return {"data_source": "derived" if collected_articles > 0 or summaries > 0 else "empty", **derived, "cache_reused": False}
 
     def _collection_run_has_pipeline_metrics(self, run: CollectionRun | None) -> bool:
         if not run:

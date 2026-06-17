@@ -229,6 +229,7 @@ def test_build_impact_metrics_payload_calculates_transparent_estimates():
     assert response["ai_calls_avoided_estimated"] == 44
     assert response["pipeline"] == [
         {"label": "Recolectadas", "value": 86},
+        {"label": "Utiles", "value": 0},
         {"label": "Unicas", "value": 42},
         {"label": "Briefs", "value": 18},
     ]

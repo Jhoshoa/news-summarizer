@@ -196,6 +196,27 @@ class NewsSummarizerApp:
                     pipeline_metrics["raw_collected_count"] = len(news)
 
         if not used_cached_summaries:
+            bolivia_tz = ZoneInfo("America/La_Paz")
+            today = self._brief_date()
+            today_start_utc = (
+                datetime(today.year, today.month, today.day, tzinfo=bolivia_tz)
+                .astimezone(ZoneInfo("UTC"))
+                .replace(tzinfo=None)
+            )
+            before_date_filter = len(news)
+            news = [
+                n for n in news
+                if n.get("published_at") is None
+                or (
+                    n["published_at"].replace(tzinfo=None)
+                    if n["published_at"].tzinfo is not None
+                    else n["published_at"]
+                ) >= today_start_utc
+            ]
+            dropped_date = before_date_filter - len(news)
+            if dropped_date:
+                logger.info(f"Filtradas {dropped_date} noticias con fecha de publicacion antigua")
+
             if not news:
                 logger.warning("No hay noticias para procesar")
                 if self.db and collection_run_id is not None:
@@ -1009,7 +1030,8 @@ async def health():
     if app_instance and app_instance.db:
         try:
             async with app_instance.db.session_maker() as session:
-                from sqlalchemy import select, func
+                from sqlalchemy import func, select
+
                 from src.db import NewsCategory
                 result = await session.execute(select(func.count(NewsCategory.id)))
                 categories_count = result.scalar() or 0
