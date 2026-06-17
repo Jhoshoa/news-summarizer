@@ -7,10 +7,13 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
+
+TZ_BOLIVIA = ZoneInfo("America/La_Paz")
 
 
 @dataclass
@@ -74,7 +77,7 @@ class EconomicIndicatorCollector:
 
     async def fetch_all(self) -> list[dict[str, Any]]:
         snapshot_key = str(uuid.uuid4())
-        collected_at = datetime.utcnow()
+        collected_at = datetime.now(TZ_BOLIVIA).replace(tzinfo=None)
         timeout = httpx.Timeout(float(self.timeout), connect=min(10.0, float(self.timeout)))
         headers = {"User-Agent": self.user_agent}
 
@@ -161,7 +164,7 @@ class EconomicIndicatorCollector:
                     asset="USDT",
                     side=side,
                     observed_at=date.today(),
-                    collected_at=collected_at or datetime.utcnow(),
+                    collected_at=collected_at or datetime.now(TZ_BOLIVIA).replace(tzinfo=None),
                     snapshot_key=snapshot_key,
                     raw_payload={
                         "trade_type": trade_type,
@@ -205,7 +208,7 @@ class EconomicIndicatorCollector:
                     asset=asset,
                     side=self._normalize_side(label),
                     observed_at=observed_at,
-                    collected_at=collected_at or datetime.utcnow(),
+                    collected_at=collected_at or datetime.now(TZ_BOLIVIA).replace(tzinfo=None),
                     snapshot_key=snapshot_key,
                     raw_payload={
                         "group": group_name,

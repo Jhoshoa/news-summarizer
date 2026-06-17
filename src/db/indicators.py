@@ -17,7 +17,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from .repository import Base
+from .repository import Base, _now_bolivia
 
 
 class EconomicIndicatorValue(Base):
@@ -34,7 +34,7 @@ class EconomicIndicatorValue(Base):
     asset = Column(String(20), nullable=True)
     side = Column(String(20), nullable=True, index=True)
     observed_at = Column(Date, nullable=True, index=True)
-    collected_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    collected_at = Column(DateTime, nullable=False, default=_now_bolivia, index=True)
     snapshot_key = Column(String(64), nullable=False, index=True)
     raw_payload = Column(JSON, nullable=False, default=dict)
 
@@ -167,7 +167,7 @@ class EconomicIndicatorRepository:
             "asset": indicator.get("asset"),
             "side": indicator.get("side"),
             "observed_at": indicator.get("observed_at"),
-            "collected_at": indicator.get("collected_at") or datetime.utcnow(),
+            "collected_at": indicator.get("collected_at") or _now_bolivia(),
             "snapshot_key": str(indicator.get("snapshot_key") or ""),
             "raw_payload": indicator.get("raw_payload") or {},
         }

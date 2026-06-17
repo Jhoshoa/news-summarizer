@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from loguru import logger
 from sqlalchemy import (
@@ -34,6 +35,13 @@ from src.processors.story_fingerprint import (
     story_similarity,
 )
 
+TZ_BOLIVIA = ZoneInfo("America/La_Paz")
+
+
+def _now_bolivia() -> datetime:
+    return datetime.now(TZ_BOLIVIA).replace(tzinfo=None)
+
+
 Base = declarative_base()
 
 DEFAULT_CATEGORIES = {
@@ -60,12 +68,12 @@ class Subscriber(Base):
     preferred_time = Column(String(20), nullable=False, default="manana")
     timezone = Column(String(50), nullable=False, default="America/La_Paz")
     consent_accepted = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=_now_bolivia)
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_now_bolivia,
+        onupdate=_now_bolivia,
     )
     is_active = Column(Boolean, nullable=False, default=True)
     unsubscribed_at = Column(DateTime, nullable=True)
@@ -81,12 +89,12 @@ class NewsCategory(Base):
     name = Column(String(50), nullable=False, unique=True, index=True)
     display_name = Column(String(100), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=_now_bolivia)
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_now_bolivia,
+        onupdate=_now_bolivia,
     )
 
 
@@ -99,12 +107,12 @@ class NewsSource(Base):
     source_type = Column(String(20), nullable=False, default="scraper")
     base_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=_now_bolivia)
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_now_bolivia,
+        onupdate=_now_bolivia,
     )
 
 
@@ -130,16 +138,16 @@ class NewsArticle(Base):
     category_id = Column(Integer, ForeignKey("news_categories.id"), nullable=False, index=True)
     country = Column(String(50), nullable=True)
     published_at = Column(DateTime, nullable=False, index=True)
-    collected_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    collected_at = Column(DateTime, nullable=False, default=_now_bolivia, index=True)
     raw_payload = Column(JSON, nullable=False, default=dict)
     score = Column(Float, nullable=False, default=0.0)
     is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=_now_bolivia)
     updated_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_now_bolivia,
+        onupdate=_now_bolivia,
     )
 
 
@@ -147,7 +155,7 @@ class CollectionRun(Base):
     __tablename__ = "collection_runs"
 
     id = Column(Integer, primary_key=True)
-    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    started_at = Column(DateTime, nullable=False, default=_now_bolivia)
     finished_at = Column(DateTime, nullable=True)
     status = Column(String(20), nullable=False, default="running")
     requested_categories = Column(JSON, nullable=False, default=list)
@@ -187,7 +195,7 @@ class NewsSummary(Base):
     llm_provider = Column(String(50), nullable=True)
     llm_model = Column(String(100), nullable=True)
     summary_date = Column(Date, nullable=False, index=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=_now_bolivia)
 
 
 class WorldCupMatch(Base):
@@ -284,7 +292,7 @@ class Database:
                 subscriber.preferred_time = preferred_time
                 subscriber.timezone = timezone
                 subscriber.consent_accepted = consent_accepted
-                subscriber.updated_at = datetime.utcnow()
+                subscriber.updated_at = _now_bolivia()
                 subscriber.is_active = True
                 subscriber.unsubscribed_at = None
                 logger.info(f"Actualizada suscripcion: {phone or telegram_id or email}")
@@ -347,8 +355,8 @@ class Database:
                 )
                 .values(
                     is_active=False,
-                    updated_at=datetime.utcnow(),
-                    unsubscribed_at=datetime.utcnow(),
+                    updated_at=_now_bolivia(),
+                    unsubscribed_at=_now_bolivia(),
                 )
             )
             await session.execute(stmt)
@@ -446,7 +454,7 @@ class Database:
                 sql_update(CollectionRun)
                 .where(CollectionRun.id == run_id)
                 .values(
-                    finished_at=datetime.utcnow(),
+                    finished_at=_now_bolivia(),
                     status=status,
                     scraper_count=scraper_count,
                     newsapi_count=newsapi_count,
@@ -835,7 +843,7 @@ class Database:
                         category_id=category.id,
                         country=article.get("country"),
                         published_at=published_at,
-                        collected_at=datetime.utcnow(),
+                        collected_at=_now_bolivia(),
                         raw_payload=payload,
                         score=score,
                         is_active=True,
@@ -1699,7 +1707,7 @@ class Database:
             source.source_type = source_type
             source.base_url = base_url or source.base_url
             source.is_active = True
-            source.updated_at = datetime.utcnow()
+            source.updated_at = _now_bolivia()
         else:
             source = NewsSource(
                 name=name,
@@ -1807,7 +1815,7 @@ class Database:
     def _coerce_datetime(self, value: Any) -> datetime:
         if isinstance(value, datetime):
             return value.replace(tzinfo=None) if value.tzinfo else value
-        return datetime.now()
+        return _now_bolivia()
 
     def _should_update_article_published_at(
         self,

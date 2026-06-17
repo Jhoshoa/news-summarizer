@@ -387,7 +387,7 @@ class NewsScraper:
         article["content"] = content or None
         article["excerpt"] = self._build_excerpt(content) if content else None
         article["content_word_count"] = word_count
-        article["content_collected_at"] = datetime.now()
+        article["content_collected_at"] = self._now()
         if meta_description and not article.get("description"):
             article["description"] = meta_description
         elif content and not article.get("description"):
@@ -889,7 +889,7 @@ class NewsScraper:
         return url
 
     def _extract_date(self, article_soup, source: NewsSource) -> datetime:
-        return self._extract_optional_date(article_soup, source) or datetime.now()
+        return self._extract_optional_date(article_soup, source) or self._now()
 
     def _extract_optional_date(self, article_soup, source: NewsSource) -> datetime | None:
         if not source.date_selector:
