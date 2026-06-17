@@ -40,7 +40,6 @@ from src.processors import (
 )
 from src.scheduler import NewsScheduler
 
-
 tz_bolivia = ZoneInfo("America/La_Paz")
 
 
@@ -172,7 +171,8 @@ class NewsSummarizerApp:
                     pipeline_metrics["summaries_count"] = len(summaries)
                     logger.info(f"Reusing {len(summaries)} cached summaries")
                 else:
-                    since = datetime.utcnow() - timedelta(
+                    now_bolivia = datetime.now(tz_bolivia).replace(tzinfo=None)
+                    since = now_bolivia - timedelta(
                         minutes=self.settings.news_cache_ttl_minutes
                     )
                     news = await self.db.get_recent_articles(categories, since=since, limit=200)
@@ -351,9 +351,18 @@ class NewsSummarizerApp:
             summary_candidates = self._select_summary_candidates(news, categories)
             pipeline_metrics["summary_candidates_count"] = len(summary_candidates)
 
-            story_deduplicator = AIStoryDeduplicator(self.llm)
-            summary_candidates = await story_deduplicator.deduplicate(summary_candidates)
-            pipeline_metrics["ai_dedup_count"] = len(summary_candidates)
+            if summaries and summary_candidates:
+                story_deduplicator = AIStoryDeduplicator(self.llm)
+                deduped: list[dict] = []
+                for cat in categories:
+                    cat_articles = [a for a in summary_candidates if a.get("category") == cat]
+                    if cat_articles:
+                        cat_existing = [s for s in summaries if s.get("category") == cat]
+                        deduped.extend(
+                            await story_deduplicator.deduplicate(cat_articles, existing_summaries=cat_existing)
+                        )
+                summary_candidates = deduped
+                pipeline_metrics["ai_dedup_count"] = len(summary_candidates)
 
             summaries = await self._build_summaries(summary_candidates, categories)
 
