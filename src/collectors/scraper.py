@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from html import unescape
+from typing import Any
 from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
@@ -216,7 +217,10 @@ class NewsScraper:
             articles = self._deduplicate(articles)
             articles = self._filter_articles_for_detail_fetch(articles, source)
             enriched = await self._enrich_articles(client, articles, source)
-            return self._filter_usable_articles(enriched, source)
+            usable = self._filter_usable_articles(enriched, source)
+            for article in usable:
+                article["published_at"] = self._bolivia_dt_to_utc(article.get("published_at"))
+            return usable
         except Exception as e:
             logger.error(f"Error fetching {source.name}: {e}")
             return []
@@ -239,7 +243,7 @@ class NewsScraper:
             listing_date = self._extract_optional_date(article_soup, source)
             if listing_date is None:
                 listing_date = self._extract_date_from_url(url)
-            published_at = listing_date or datetime.now()
+            published_at = listing_date or datetime.now(self._tz).replace(tzinfo=None)
             image = self._extract_image(article_soup, source)
             category = self._extract_category(article_soup, source)
 
@@ -283,7 +287,7 @@ class NewsScraper:
                     "source_url": source.url,
                     "category": source.category,
                     "country": source.country,
-                    "published_at": datetime.now(),
+                    "published_at": datetime.now(self._tz).replace(tzinfo=None),
                     "published_at_from_listing": False,
                     "image": None,
                     "hash": hashlib.md5(url.encode()).hexdigest(),
@@ -427,6 +431,13 @@ class NewsScraper:
 
     def _now(self) -> datetime:
         return datetime.now(self._tz).replace(tzinfo=None)
+
+    def _bolivia_dt_to_utc(self, dt: Any) -> Any:
+        if not isinstance(dt, datetime):
+            return dt
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=self._tz)
+        return dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
     def _has_non_today_publish_date(self, published_at: datetime) -> bool:
         return published_at.date() != self._now().date()
@@ -990,7 +1001,7 @@ class NewsScraper:
 
     def _parse_date(self, date_text: str, *, fallback_to_now: bool = True) -> datetime | None:
         if not date_text:
-            return datetime.now() if fallback_to_now else None
+            return datetime.now(self._tz).replace(tzinfo=None) if fallback_to_now else None
 
         from dateutil import parser
 
@@ -1010,7 +1021,7 @@ class NewsScraper:
                 dayfirst=self._should_parse_dayfirst(date_text),
             )
         except Exception:
-            return datetime.now() if fallback_to_now else None
+            return datetime.now(self._tz).replace(tzinfo=None) if fallback_to_now else None
 
     def _should_parse_dayfirst(self, date_text: str) -> bool:
         return bool(re.search(r"\b\d{1,2}/\d{1,2}/\d{4}\b", date_text))

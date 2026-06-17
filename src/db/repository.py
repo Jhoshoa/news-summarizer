@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from loguru import logger
 from sqlalchemy import (
@@ -22,6 +23,7 @@ from sqlalchemy import (
     func,
     or_,
     select,
+    text,
 )
 from sqlalchemy import update as sql_update
 from sqlalchemy.exc import IntegrityError
@@ -625,9 +627,9 @@ class Database:
         session: AsyncSession,
         before_or_on: date,
     ) -> date | None:
-        end_at = datetime.combine(before_or_on + timedelta(days=1), time.min)
+        _, end_at = self._day_bounds(before_or_on)
         latest_article_date = await session.scalar(
-            select(func.max(func.date(NewsArticle.published_at))).where(
+            select(func.max(func.date(NewsArticle.published_at - text("INTERVAL '4 hours'")))).where(
                 NewsArticle.is_active.is_(True),
                 NewsArticle.published_at < end_at,
             )
@@ -638,7 +640,7 @@ class Database:
             )
         )
         latest_run_date = await session.scalar(
-            select(func.max(func.date(CollectionRun.started_at))).where(
+            select(func.max(func.date(CollectionRun.started_at - text("INTERVAL '4 hours'")))).where(
                 CollectionRun.started_at < end_at,
             )
         )
@@ -1091,22 +1093,34 @@ class Database:
         exclude_summarized: bool = False,
     ) -> date | None:
         filters = self._article_filters(category=category, source=source, q=q)
-        end_at = datetime.combine(before_or_on + timedelta(days=1), time.min)
+        _, end_at = self._day_bounds(before_or_on)
         filters.append(NewsArticle.published_at < end_at)
         if exclude_summarized:
             filters.append(self._article_not_summarized_filter())
 
         stmt = (
-            select(func.max(func.date(NewsArticle.published_at)))
+            select(func.max(NewsArticle.published_at))
             .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
             .join(NewsSource, NewsArticle.source_id == NewsSource.id)
             .where(*filters)
         )
-        return await session.scalar(stmt)
+        max_pub = await session.scalar(stmt)
+        if max_pub is None:
+            return None
+        return (
+            max_pub.replace(tzinfo=ZoneInfo("UTC"))
+            .astimezone(ZoneInfo("America/La_Paz"))
+            .date()
+        )
 
     def _day_bounds(self, value: date) -> tuple[datetime, datetime]:
-        start_at = datetime.combine(value, time.min)
-        return start_at, start_at + timedelta(days=1)
+        tz = ZoneInfo("America/La_Paz")
+        start = datetime(value.year, value.month, value.day, tzinfo=tz)
+        end = start + timedelta(days=1)
+        return (
+            start.astimezone(ZoneInfo("UTC")).replace(tzinfo=None),
+            end.astimezone(ZoneInfo("UTC")).replace(tzinfo=None),
+        )
 
     async def get_article_by_id(self, article_id: int) -> dict | None:
         async with self.session_maker() as session:
@@ -1269,6 +1283,7 @@ class Database:
         limit: int | None = None,
     ) -> list[dict]:
         summary_date = summary_date or date.today()
+        start_at, end_at = self._day_bounds(summary_date)
 
         async with self.session_maker() as session:
             stmt = (
@@ -1289,7 +1304,8 @@ class Database:
                     NewsCategory.name.in_(categories),
                     NewsSummary.summary_date == summary_date,
                     NewsArticle.published_at.is_not(None),
-                    func.date(NewsArticle.published_at) == summary_date,
+                    NewsArticle.published_at >= start_at,
+                    NewsArticle.published_at < end_at,
                 )
                 .order_by(NewsSummary.created_at.desc())
             )

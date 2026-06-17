@@ -130,8 +130,8 @@ def test_day_bounds_cover_exact_selected_date():
 
     start_at, end_at = db._day_bounds(date(2026, 5, 28))
 
-    assert start_at == datetime(2026, 5, 28, 0, 0, 0)
-    assert end_at == datetime(2026, 5, 29, 0, 0, 0)
+    assert start_at == datetime(2026, 5, 28, 4, 0, 0)
+    assert end_at == datetime(2026, 5, 29, 4, 0, 0)
 
 
 def test_existing_scraper_article_keeps_original_published_at_when_new_date_is_fallback():
