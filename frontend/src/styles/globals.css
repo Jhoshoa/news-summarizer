@@ -1661,6 +1661,15 @@ a.worldcup-match.live {
   text-align: right;
 }
 
+.worldcup-date-tiny {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  font-size: 0.55rem;
+  color: var(--color-muted);
+  opacity: 0.6;
+}
+
 .worldcup-time {
   font-size: 0.7rem;
   font-weight: 600;

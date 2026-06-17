@@ -133,6 +133,7 @@ export const newsApi = createApi({
           fallback_to_latest: args?.fallback_to_latest ?? true,
         },
       }),
+      keepUnusedDataFor: 0,
       providesTags: ["ImpactMetrics"],
     }),
     getPreferenceOptions: builder.query<PreferenceOptionsResponse, void>({
