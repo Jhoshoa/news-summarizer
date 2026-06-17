@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from loguru import logger
 
@@ -85,7 +85,8 @@ class NewsRanker:
         if not isinstance(published_at, datetime):
             return 0.5
 
-        hours_ago = (datetime.now() - published_at).total_seconds() / 3600
+        now = datetime.now() if published_at.tzinfo is None else datetime.now(UTC)
+        hours_ago = (now - published_at).total_seconds() / 3600
 
         if hours_ago < 1:
             return 1.0

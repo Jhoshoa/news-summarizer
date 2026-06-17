@@ -41,6 +41,9 @@ from src.processors import (
 from src.scheduler import NewsScheduler
 
 
+tz_bolivia = ZoneInfo("America/La_Paz")
+
+
 class NewsSummarizerApp:
     """Main News Summarizer application."""
 
@@ -196,6 +199,11 @@ class NewsSummarizerApp:
                     pipeline_metrics["raw_collected_count"] = len(news)
 
         if not used_cached_summaries:
+            for n in news:
+                pa = n.get("published_at")
+                if isinstance(pa, datetime) and pa.tzinfo is not None:
+                    n["published_at"] = pa.astimezone(tz_bolivia).replace(tzinfo=None)
+
             today = self._brief_date()
             bolivia_midnight = datetime(today.year, today.month, today.day)
             before_date_filter = len(news)
