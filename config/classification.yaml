@@ -19,6 +19,44 @@ categories:
       - { term: "credito", weight: 2 }
       - { term: "deuda", weight: 2 }
       - { term: "economia", weight: 3 }
+      - { term: "bono", weight: 2 }
+      - { term: "subsidio", weight: 3 }
+      - { term: "impuesto", weight: 3 }
+      - { term: "inversion", weight: 3 }
+      - { term: "inversor", weight: 2 }
+      - { term: "fiscal", weight: 2 }
+      - { term: "deficit", weight: 3 }
+      - { term: "superavit", weight: 3 }
+      - { term: "pib", weight: 4 }
+      - { term: "crecimiento", weight: 2 }
+      - { term: "recaudacion", weight: 2 }
+      - { term: "presupuesto", weight: 3 }
+      - { term: "salario", weight: 2 }
+      - { term: "sueldo", weight: 2 }
+      - { term: "ganancia", weight: 2 }
+      - { term: "perdida", weight: 1.5 }
+      - { term: "ingreso", weight: 1.5 }
+      - { term: "ahorro", weight: 2 }
+      - { term: "prestamo", weight: 2 }
+      - { term: "moneda", weight: 2 }
+      - { term: "cotizacion", weight: 3 }
+      - { term: "proveedor", weight: 1.5 }
+      - { term: "consumo", weight: 2 }
+      - { term: "produccion", weight: 2 }
+      - { term: "industrial", weight: 2 }
+      - { term: "manufactura", weight: 2 }
+      - { term: "mineria", weight: 3 }
+      - { term: "litio", weight: 3 }
+      - { term: "gas", weight: 3 }
+      - { term: "petroleo", weight: 3 }
+      - { term: "energia electrica", weight: 2 }
+      - { term: "factura", weight: 1.5 }
+      - { term: "canon", weight: 2 }
+      - { term: "regalias", weight: 3 }
+      - { term: "financiero", weight: 2 }
+      - { term: "bursatil", weight: 3 }
+      - { term: "bolsa de valores", weight: 4 }
+      - { term: "tasa de interes", weight: 3 }
     negative:
       - { term: "club", weight: 2 }
       - { term: "gol", weight: 2 }
@@ -40,9 +78,44 @@ categories:
       - { term: "tribunal supremo electoral", weight: 4 }
       - { term: "tse", weight: 3 }
       - { term: "partido politico", weight: 4 }
-      - { term: "\\bmas\\b", weight: 2, regex: true }
+      - { term: "movimiento al socialismo", weight: 4 }
       - { term: "evo morales", weight: 3 }
       - { term: "luis arce", weight: 3 }
+      - { term: "congreso", weight: 3 }
+      - { term: "senado", weight: 3 }
+      - { term: "camara de diputados", weight: 4 }
+      - { term: "alcalde", weight: 3 }
+      - { term: "concejal", weight: 3 }
+      - { term: "gobernador", weight: 3 }
+      - { term: "asambleista", weight: 3 }
+      - { term: "militante", weight: 2 }
+      - { term: "dirigente", weight: 2 }
+      - { term: "vocero", weight: 2 }
+      - { term: "portavoz", weight: 2 }
+      - { term: "comision", weight: 1.5 }
+      - { term: "constitucion", weight: 3 }
+      - { term: "reforma", weight: 2 }
+      - { term: "voto", weight: 3 }
+      - { term: "sufragio", weight: 4 }
+      - { term: "urna", weight: 3 }
+      - { term: "campana electoral", weight: 4 }
+      - { term: "debate", weight: 2 }
+      - { term: "oposicion", weight: 3 }
+      - { term: "oficialismo", weight: 3 }
+      - { term: "autoridad", weight: 1.5 }
+      - { term: "municipal", weight: 2 }
+      - { term: "departamental", weight: 2 }
+      - { term: "legislacion", weight: 3 }
+      - { term: "resolucion", weight: 1.5 }
+      - { term: "ordenanza", weight: 2 }
+      - { term: "pliego petitorio", weight: 3 }
+      - { term: "paro", weight: 2 }
+      - { term: "huelga", weight: 3 }
+      - { term: "bloqueo", weight: 2 }
+      - { term: "marcha", weight: 2 }
+      - { term: "manifestacion", weight: 2 }
+      - { term: "protesta", weight: 2 }
+      - { term: "conflicto social", weight: 3 }
     negative:
       - { term: "partido de futbol", weight: 5 }
       - { term: "liga profesional", weight: 4 }
@@ -71,6 +144,43 @@ categories:
       - { term: "the strongest", weight: 3 }
       - { term: "oriente petrolero", weight: 3 }
       - { term: "wilstermann", weight: 3 }
+      - { term: "equipo", weight: 1.5 }
+      - { term: "cancha", weight: 2 }
+      - { term: "estadio", weight: 2 }
+      - { term: "arbitro", weight: 2 }
+      - { term: "penal", weight: 2 }
+      - { term: "arquero", weight: 2 }
+      - { term: "portero", weight: 2 }
+      - { term: "defensa", weight: 1.5 }
+      - { term: "delantero", weight: 2 }
+      - { term: "mediocampista", weight: 2 }
+      - { term: "volante", weight: 2 }
+      - { term: "titular", weight: 1 }
+      - { term: "suplente", weight: 1.5 }
+      - { term: "lesion", weight: 1 }
+      - { term: "clasificacion", weight: 2 }
+      - { term: "ascenso", weight: 2 }
+      - { term: "descenso", weight: 2 }
+      - { term: "final", weight: 1.5 }
+      - { term: "semifinal", weight: 2 }
+      - { term: "cuartos de final", weight: 2 }
+      - { term: "victoria", weight: 1.5 }
+      - { term: "derrota", weight: 1.5 }
+      - { term: "empate", weight: 2 }
+      - { term: "triunfo", weight: 1.5 }
+      - { term: "tabla de posiciones", weight: 3 }
+      - { term: "goleador", weight: 2 }
+      - { term: "basquet", weight: 4 }
+      - { term: "basquetbol", weight: 4 }
+      - { term: "voley", weight: 4 }
+      - { term: "voleibol", weight: 4 }
+      - { term: "tenis", weight: 4 }
+      - { term: "atletismo", weight: 3 }
+      - { term: "boxeo", weight: 3 }
+      - { term: "ciclismo", weight: 3 }
+      - { term: "natacion", weight: 3 }
+      - { term: "artes marciales", weight: 3 }
+      - { term: "ajedrez", weight: 2 }
     negative:
       - { term: "partido politico", weight: 5 }
       - { term: "candidato", weight: 3 }
@@ -91,6 +201,48 @@ categories:
       - { term: "digital", weight: 2 }
       - { term: "telecomunicaciones", weight: 3 }
       - { term: "redes sociales", weight: 2 }
+      - { term: "aprendizaje automatico", weight: 4 }
+      - { term: "chip", weight: 2 }
+      - { term: "algoritmo", weight: 2 }
+      - { term: "nanotecnologia", weight: 3 }
+      - { term: "robot", weight: 3 }
+      - { term: "informatica", weight: 3 }
+      - { term: "programacion", weight: 3 }
+      - { term: "desarrollador", weight: 2 }
+      - { term: "dispositivo", weight: 2 }
+      - { term: "movil", weight: 2 }
+      - { term: "celular", weight: 2 }
+      - { term: "smartphone", weight: 3 }
+      - { term: "computadora", weight: 2 }
+      - { term: "pantalla", weight: 1.5 }
+      - { term: "hardware", weight: 3 }
+      - { term: "innovacion", weight: 2 }
+      - { term: "electronico", weight: 2 }
+      - { term: "automatizacion", weight: 3 }
+      - { term: "sensor", weight: 2 }
+      - { term: "realidad virtual", weight: 4 }
+      - { term: "criptomoneda", weight: 4 }
+      - { term: "bitcoin", weight: 4 }
+      - { term: "blockchain", weight: 4 }
+      - { term: "streaming", weight: 2 }
+      - { term: "nube", weight: 2 }
+      - { term: "hackeo", weight: 3 }
+      - { term: "hacker", weight: 3 }
+      - { term: "malware", weight: 3 }
+      - { term: "virus informatico", weight: 4 }
+      - { term: "phishing", weight: 3 }
+      - { term: "actualizacion", weight: 2 }
+      - { term: "wifi", weight: 2 }
+      - { term: "conectividad", weight: 2 }
+      - { term: "fibra optica", weight: 3 }
+      - { term: "impresora", weight: 2 }
+      - { term: "servidor", weight: 2 }
+      - { term: "base de datos", weight: 3 }
+      - { term: "computo", weight: 2 }
+      - { term: "procesador", weight: 2 }
+      - { term: "memoria", weight: 1.5 }
+      - { term: "disco duro", weight: 2 }
+      - { term: "gadget", weight: 2 }
     negative: []
 
   entretenimiento:
@@ -108,6 +260,39 @@ categories:
       - { term: "serie", weight: 2 }
       - { term: "famoso", weight: 2 }
       - { term: "farandula", weight: 3 }
+      - { term: "artista", weight: 2 }
+      - { term: "teatro", weight: 2 }
+      - { term: "escenario", weight: 2 }
+      - { term: "show", weight: 2 }
+      - { term: "espectaculo", weight: 3 }
+      - { term: "estreno", weight: 2 }
+      - { term: "trailer", weight: 2 }
+      - { term: "documental", weight: 2 }
+      - { term: "premio", weight: 2 }
+      - { term: "nominacion", weight: 2 }
+      - { term: "comedia", weight: 2 }
+      - { term: "drama", weight: 2 }
+      - { term: "romance", weight: 2 }
+      - { term: "banda", weight: 2 }
+      - { term: "grupo musical", weight: 3 }
+      - { term: "disco", weight: 2 }
+      - { term: "album", weight: 3 }
+      - { term: "lanzamiento", weight: 1.5 }
+      - { term: "gira", weight: 2 }
+      - { term: "concierto", weight: 3 }
+      - { term: "bailar", weight: 2 }
+      - { term: "baile", weight: 2 }
+      - { term: "danza", weight: 2 }
+      - { term: "animador", weight: 2 }
+      - { term: "reality", weight: 2 }
+      - { term: "telenovela", weight: 3 }
+      - { term: "novela", weight: 2 }
+      - { term: "entretenimiento", weight: 3 }
+      - { term: "ocio", weight: 2 }
+      - { term: "funcion", weight: 1.5 }
+      - { term: "cartelera", weight: 2 }
+      - { term: "exito de taquilla", weight: 3 }
+      - { term: "videojuego", weight: 3 }
     negative:
       - { term: "tribunal supremo electoral", weight: 4 }
       - { term: "banco central", weight: 4 }
