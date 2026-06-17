@@ -196,22 +196,13 @@ class NewsSummarizerApp:
                     pipeline_metrics["raw_collected_count"] = len(news)
 
         if not used_cached_summaries:
-            bolivia_tz = ZoneInfo("America/La_Paz")
             today = self._brief_date()
-            today_start_utc = (
-                datetime(today.year, today.month, today.day, tzinfo=bolivia_tz)
-                .astimezone(ZoneInfo("UTC"))
-                .replace(tzinfo=None)
-            )
+            bolivia_midnight = datetime(today.year, today.month, today.day)
             before_date_filter = len(news)
             news = [
                 n for n in news
                 if n.get("published_at") is not None
-                and (
-                    n["published_at"].replace(tzinfo=None)
-                    if n["published_at"].tzinfo is not None
-                    else n["published_at"]
-                ) >= today_start_utc
+                and n["published_at"] >= bolivia_midnight
             ]
             dropped_date = before_date_filter - len(news)
             if dropped_date:

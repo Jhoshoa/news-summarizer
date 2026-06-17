@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 from html import unescape
-from typing import Any
 from urllib.parse import urljoin, urlparse
 from zoneinfo import ZoneInfo
 
@@ -218,8 +217,6 @@ class NewsScraper:
             articles = self._filter_articles_for_detail_fetch(articles, source)
             enriched = await self._enrich_articles(client, articles, source)
             usable = self._filter_usable_articles(enriched, source)
-            for article in usable:
-                article["published_at"] = self._bolivia_dt_to_utc(article.get("published_at"))
             return usable
         except Exception as e:
             logger.error(f"Error fetching {source.name}: {e}")
@@ -432,13 +429,6 @@ class NewsScraper:
 
     def _now(self) -> datetime:
         return datetime.now(self._tz).replace(tzinfo=None)
-
-    def _bolivia_dt_to_utc(self, dt: Any) -> Any:
-        if not isinstance(dt, datetime):
-            return dt
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=self._tz)
-        return dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
 
     def _has_non_today_publish_date(self, published_at: datetime) -> bool:
         return published_at.date() != self._now().date()

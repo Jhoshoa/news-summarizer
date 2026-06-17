@@ -50,6 +50,8 @@ services:
     container_name: news-summarizer-new-frontend
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      TZ: America/La_Paz
     depends_on:
       - backend
     restart: unless-stopped

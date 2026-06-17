@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, time, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from loguru import logger
 from sqlalchemy import (
@@ -23,7 +22,6 @@ from sqlalchemy import (
     func,
     or_,
     select,
-    text,
 )
 from sqlalchemy import update as sql_update
 from sqlalchemy.exc import IntegrityError
@@ -615,7 +613,7 @@ class Database:
     ) -> date | None:
         _, end_at = self._day_bounds(before_or_on)
         latest_article_date = await session.scalar(
-            select(func.max(func.date(NewsArticle.published_at - text("INTERVAL '4 hours'")))).where(
+            select(func.max(func.date(NewsArticle.published_at))).where(
                 NewsArticle.is_active.is_(True),
                 NewsArticle.published_at < end_at,
             )
@@ -626,7 +624,7 @@ class Database:
             )
         )
         latest_run_date = await session.scalar(
-            select(func.max(func.date(CollectionRun.started_at - text("INTERVAL '4 hours'")))).where(
+            select(func.max(func.date(CollectionRun.started_at))).where(
                 CollectionRun.started_at < end_at,
             )
         )
@@ -1093,20 +1091,12 @@ class Database:
         max_pub = await session.scalar(stmt)
         if max_pub is None:
             return None
-        return (
-            max_pub.replace(tzinfo=ZoneInfo("UTC"))
-            .astimezone(ZoneInfo("America/La_Paz"))
-            .date()
-        )
+        return max_pub.date()
 
     def _day_bounds(self, value: date) -> tuple[datetime, datetime]:
-        tz = ZoneInfo("America/La_Paz")
-        start = datetime(value.year, value.month, value.day, tzinfo=tz)
+        start = datetime(value.year, value.month, value.day)
         end = start + timedelta(days=1)
-        return (
-            start.astimezone(ZoneInfo("UTC")).replace(tzinfo=None),
-            end.astimezone(ZoneInfo("UTC")).replace(tzinfo=None),
-        )
+        return (start, end)
 
     async def get_article_by_id(self, article_id: int) -> dict | None:
         async with self.session_maker() as session:
@@ -1805,12 +1795,12 @@ class Database:
         return value
 
     @staticmethod
-    def _utc_iso(value: date | datetime | None) -> str | None:
+    def _format_datetime(value: date | datetime | None) -> str | None:
         if value is None:
             return None
         if isinstance(value, datetime):
             if value.tzinfo is None:
-                return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+                return value.isoformat() + "-04:00"
             return value.isoformat()
         return value.isoformat()
 
@@ -1848,8 +1838,8 @@ class Database:
             "content": self._article_content_for_response(article.content, article.description),
             "author": article.author,
             "image": self._public_image_url(article.image_url),
-            "published_at": self._utc_iso(article.published_at),
-            "collected_at": self._utc_iso(article.collected_at),
+            "published_at": self._format_datetime(article.published_at),
+            "collected_at": self._format_datetime(article.collected_at),
             "source": source_name,
             "source_type": source_type,
             "category": category_name,
@@ -1919,13 +1909,13 @@ class Database:
             "source": source_name,
             "url": article_url,
             "article_title": article_title,
-            "published_at": self._utc_iso(published_at),
+            "published_at": self._format_datetime(published_at),
             "image": image_url,
             "article_description": article_description,
             "llm_provider": summary.llm_provider,
             "llm_model": summary.llm_model,
-            "summary_date": self._utc_iso(summary.summary_date),
-            "created_at": self._utc_iso(summary.created_at),
+            "summary_date": self._format_datetime(summary.summary_date),
+            "created_at": self._format_datetime(summary.created_at),
         }
 
     def _public_image_url(self, value: str | None) -> str | None:
