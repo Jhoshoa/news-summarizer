@@ -141,6 +141,7 @@ async def test_fresh_collection_is_classified_persisted_and_summarized():
                     "source_url": "https://example.com/",
                     "category": "general",
                     "hash": "abc",
+                    "published_at": datetime.utcnow(),
                 }
             ],
             {"scraper": 1, "newsapi": 0, "inserted": 0, "updated": 0},
@@ -192,6 +193,7 @@ async def test_refresh_collects_fresh_news_when_cache_db_read_fails():
                     "source_url": "https://example.com/",
                     "category": "politica",
                     "hash": "abc",
+                    "published_at": datetime.utcnow(),
                 }
             ],
             {"scraper": 1, "newsapi": 0, "inserted": 0, "updated": 0},
@@ -232,6 +234,7 @@ async def test_fresh_collection_skips_title_only_articles():
                     "source_url": "https://example.com/",
                     "category": "general",
                     "hash": "abc",
+                    "published_at": datetime.utcnow(),
                 }
             ],
             {"scraper": 1, "newsapi": 0, "inserted": 0, "updated": 0},

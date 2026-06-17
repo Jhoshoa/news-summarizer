@@ -206,8 +206,8 @@ class NewsSummarizerApp:
             before_date_filter = len(news)
             news = [
                 n for n in news
-                if n.get("published_at") is None
-                or (
+                if n.get("published_at") is not None
+                and (
                     n["published_at"].replace(tzinfo=None)
                     if n["published_at"].tzinfo is not None
                     else n["published_at"]
@@ -332,6 +332,22 @@ class NewsSummarizerApp:
                     "collection_stats": collection_stats,
                     "delivery_stats": delivery_stats,
                 }
+
+            before_dedup = len(news)
+            news = [n for n in news if n.get("published_at") is not None]
+            if len(news) < before_dedup:
+                logger.info(f"Filtradas {before_dedup - len(news)} noticias sin fecha de publicacion")
+
+            if self.db:
+                try:
+                    article_ids = [n["id"] for n in news if n.get("id")]
+                    summarized_ids = await self.db.get_article_ids_with_summaries(article_ids)
+                    if summarized_ids:
+                        before = len(news)
+                        news = [n for n in news if n.get("id") not in summarized_ids]
+                        logger.info(f"Filtradas {before - len(news)} noticias ya resumidas")
+                except Exception as e:
+                    logger.warning(f"Error al filtrar noticias ya resumidas: {e}")
 
             summary_candidates = self._select_summary_candidates(news, categories)
             pipeline_metrics["summary_candidates_count"] = len(summary_candidates)

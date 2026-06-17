@@ -243,7 +243,7 @@ class NewsScraper:
             listing_date = self._extract_optional_date(article_soup, source)
             if listing_date is None:
                 listing_date = self._extract_date_from_url(url)
-            published_at = listing_date or datetime.now(self._tz).replace(tzinfo=None)
+            published_at = listing_date
             image = self._extract_image(article_soup, source)
             category = self._extract_category(article_soup, source)
 
@@ -287,7 +287,7 @@ class NewsScraper:
                     "source_url": source.url,
                     "category": source.category,
                     "country": source.country,
-                    "published_at": datetime.now(self._tz).replace(tzinfo=None),
+                    "published_at": None,
                     "published_at_from_listing": False,
                     "image": None,
                     "hash": hashlib.md5(url.encode()).hexdigest(),
@@ -321,6 +321,7 @@ class NewsScraper:
             if self._has_usable_text(article)
             and not self._has_future_publish_date(article)
             and not self._has_non_today_detail_skip(article)
+            and article.get("published_at") is not None
         ]
         dropped = len(articles) - len(usable)
         if dropped:

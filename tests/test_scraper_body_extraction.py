@@ -907,6 +907,7 @@ def test_filter_usable_articles_drops_title_only_results():
     scraper = NewsScraper(sources=[])
     source = NewsSource(name="RedBolivision", url="https://www.redbolivision.tv.bo/")
 
+    now = datetime.now()
     articles = scraper._filter_usable_articles(
         [
             {
@@ -914,12 +915,14 @@ def test_filter_usable_articles_drops_title_only_results():
                 "url": "https://www.redbolivision.tv.bo/programa/la-cancha-de-bolivision/",
                 "description": "",
                 "content": None,
+                "published_at": now,
             },
             {
                 "title": "Noticia con desarrollo",
                 "url": "https://www.redbolivision.tv.bo/noticia-real/",
                 "description": "La nota incluye informacion suficiente para entender el hecho.",
                 "content": "",
+                "published_at": now,
             },
         ],
         source,

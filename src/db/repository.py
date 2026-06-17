@@ -1776,6 +1776,20 @@ class Database:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_article_ids_with_summaries(
+        self,
+        article_ids: list[int],
+    ) -> set[int]:
+        if not article_ids:
+            return set()
+        async with self.session_maker() as session:
+            result = await session.execute(
+                select(NewsSummary.article_id).where(
+                    NewsSummary.article_id.in_(article_ids),
+                )
+            )
+            return {row[0] for row in result.all()}
+
     def _normalize_payload(self, article: dict) -> dict[str, Any]:
         return {key: self._json_safe_value(value) for key, value in article.items()}
 
