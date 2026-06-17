@@ -337,6 +337,7 @@ class NewsSummarizerApp:
             if len(news) < before_dedup:
                 logger.info(f"Filtradas {before_dedup - len(news)} noticias sin fecha de publicacion")
 
+            already_summarized_removed = 0
             if self.db:
                 try:
                     article_ids = [n["id"] for n in news if n.get("id")]
@@ -344,13 +345,16 @@ class NewsSummarizerApp:
                     if summarized_ids:
                         before = len(news)
                         news = [n for n in news if n.get("id") not in summarized_ids]
-                        logger.info(f"Filtradas {before - len(news)} noticias ya resumidas")
+                        already_summarized_removed = before - len(news)
+                        logger.info(f"Filtradas {already_summarized_removed} noticias ya resumidas")
                 except Exception as e:
                     logger.warning(f"Error al filtrar noticias ya resumidas: {e}")
 
             summary_candidates = self._select_summary_candidates(news, categories)
             pipeline_metrics["summary_candidates_count"] = len(summary_candidates)
+            logger.info(f"Candidatos a resumir: {len(summary_candidates)}")
 
+            llm_dedup_removed = 0
             if summaries and summary_candidates:
                 story_deduplicator = AIStoryDeduplicator(self.llm)
                 deduped: list[dict] = []
@@ -361,8 +365,18 @@ class NewsSummarizerApp:
                         deduped.extend(
                             await story_deduplicator.deduplicate(cat_articles, existing_summaries=cat_existing)
                         )
+                llm_dedup_removed = len(summary_candidates) - len(deduped)
                 summary_candidates = deduped
                 pipeline_metrics["ai_dedup_count"] = len(summary_candidates)
+                if llm_dedup_removed:
+                    logger.info(f"AI dedup elimino {llm_dedup_removed} articulos redundantes, quedan {len(summary_candidates)}")
+
+            logger.info(
+                "Dedup metrics: %d ya resumidas, %d por AI dedup, %d candidatos finales",
+                already_summarized_removed,
+                llm_dedup_removed,
+                len(summary_candidates),
+            )
 
             summaries = await self._build_summaries(summary_candidates, categories)
 
