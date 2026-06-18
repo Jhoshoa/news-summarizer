@@ -1,4 +1,5 @@
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,6 +10,7 @@ CRON_SRC = Path(__file__).resolve().parents[1] / "cron-job" / "src"
 if str(CRON_SRC) not in sys.path:
     sys.path.insert(0, str(CRON_SRC))
 
+import news_cron.jobs.runner as runner_module  # noqa: E402
 from news_cron.clients.backend import BackendClient, BackendRequestError  # noqa: E402
 from news_cron.config.settings import CronSettings  # noqa: E402
 from news_cron.jobs.runner import RefreshJobRunner  # noqa: E402
@@ -162,3 +164,34 @@ def test_cron_delivery_time_accepts_schedule_summary_aliases(monkeypatch):
         "afternoon": "15:45",
         "night": "21:10",
     }
+
+
+def test_cron_summary_hours_disable_interval_mode(monkeypatch):
+    monkeypatch.setenv("BACKEND_BASE_URL", "http://backend:8000")
+    monkeypatch.setenv("API_AUTH_KEY", "test-api-auth-key-value")
+    monkeypatch.setenv("SUMMARY_REFRESH_HOURS", "8,10,13,16,19,22")
+    monkeypatch.setenv("SUMMARY_REFRESH_EVERY", "4")
+    monkeypatch.setenv("SUMMARY_REFRESH_UNIT", "hours")
+
+    settings = CronSettings.from_env()
+
+    assert settings.summary_refresh_hours == [8, 10, 13, 16, 19, 22]
+    assert settings.summary_refresh_interval_seconds is None
+
+
+def test_fixed_summary_schedule_does_not_catch_up_current_hour_after_restart(monkeypatch):
+    settings = SimpleNamespace(
+        schedule_timezone="America/La_Paz",
+        summary_refresh_hours=[8, 10, 13, 16, 19, 22],
+    )
+    runner = RefreshJobRunner.__new__(RefreshJobRunner)
+    runner.settings = settings
+    monkeypatch.setattr(
+        runner_module,
+        "utc_now",
+        lambda: datetime(2026, 6, 18, 12, 30, tzinfo=UTC),
+    )
+
+    next_run = runner._next_summary_run()
+
+    assert next_run == datetime(2026, 6, 18, 14, 0, tzinfo=UTC)

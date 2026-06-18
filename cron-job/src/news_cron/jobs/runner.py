@@ -40,21 +40,29 @@ class RefreshJobRunner:
         for window, scheduled_at in delivery_next.items():
             LOGGER.info("delivery window scheduled window=%s next_run=%s", window, scheduled_at)
 
-        economic_ok = await self._run_safely("economic_refresh", self.run_economic_refresh())
-        summary_ok = await self._run_safely("summary_refresh", self.run_summary_refresh())
+        if self.settings.summary_refresh_hours:
+            LOGGER.info("summary refresh hours=%s", self.settings.summary_refresh_hours)
+        else:
+            LOGGER.info(
+                "summary refresh interval=%s seconds",
+                self.settings.summary_refresh_interval_seconds,
+            )
+
+        await self._run_safely("economic_refresh", self.run_economic_refresh())
 
         if self.settings.run_once:
-            if not economic_ok or not summary_ok:
-                raise RuntimeError("RUN_ONCE refresh failed")
             LOGGER.info("RUN_ONCE enabled; cron job finished")
             return
 
         economic_next = utc_now() + timedelta(
             seconds=self.settings.economic_refresh_interval_seconds
         )
-        summary_next = utc_now() + timedelta(
-            seconds=self.settings.summary_refresh_interval_seconds
+        summary_next = (
+            self._next_summary_run()
+            if self.settings.summary_refresh_hours
+            else utc_now() + timedelta(seconds=self.settings.summary_refresh_interval_seconds)
         )
+        LOGGER.info("summary refresh scheduled next_run=%s", summary_next)
 
         while not self._stop_event.is_set():
             now = utc_now()
@@ -63,11 +71,18 @@ class RefreshJobRunner:
                 economic_next = utc_now() + timedelta(
                     seconds=self.settings.economic_refresh_interval_seconds
                 )
+
             if now >= summary_next:
-                await self._run_safely("summary_refresh", self.run_summary_refresh())
-                summary_next = utc_now() + timedelta(
-                    seconds=self.settings.summary_refresh_interval_seconds
-                )
+                if self.settings.summary_refresh_hours:
+                    await self._run_safely("summary_refresh", self.run_summary_refresh())
+                    summary_next = self._next_summary_run(after=summary_next)
+                else:
+                    await self._run_safely("summary_refresh", self.run_summary_refresh())
+                    summary_next = utc_now() + timedelta(
+                        seconds=self.settings.summary_refresh_interval_seconds
+                    )
+                LOGGER.info("summary refresh rescheduled next_run=%s", summary_next)
+
             for window, due_at in list(delivery_next.items()):
                 if now >= due_at:
                     await self._run_safely(
@@ -83,16 +98,16 @@ class RefreshJobRunner:
                         delivery_next[window],
                     )
 
-            next_waits = [
+            waits = [
                 max((economic_next - utc_now()).total_seconds(), 1),
-                max((summary_next - utc_now()).total_seconds(), 1),
                 60,
             ]
-            next_waits.extend(
+            waits.append(max((summary_next - utc_now()).total_seconds(), 1))
+            waits.extend(
                 max((due_at - utc_now()).total_seconds(), 1)
                 for due_at in delivery_next.values()
             )
-            sleep_for = min(next_waits)
+            sleep_for = min(waits)
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=sleep_for)
             except TimeoutError:
@@ -148,6 +163,18 @@ class RefreshJobRunner:
         if candidate <= now:
             candidate += timedelta(days=1)
         return candidate.astimezone(UTC)
+
+    def _next_summary_run(self, *, after: datetime | None = None) -> datetime:
+        zone = ZoneInfo(self.settings.schedule_timezone)
+        now = (after or utc_now()).astimezone(zone)
+        for hour in self.settings.summary_refresh_hours or []:
+            candidate = datetime.combine(now.date(), time(hour, 0), tzinfo=zone)
+            if candidate > now:
+                return candidate.astimezone(UTC)
+
+        first_hour = (self.settings.summary_refresh_hours or [0])[0]
+        tomorrow = now.date() + timedelta(days=1)
+        return datetime.combine(tomorrow, time(first_hour, 0), tzinfo=zone).astimezone(UTC)
 
     async def _run_safely(self, name: str, task: Any) -> bool:
         try:

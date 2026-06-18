@@ -11,7 +11,8 @@ class CronSettings:
     api_auth_key: str
     run_once: bool
     economic_refresh_interval_seconds: int
-    summary_refresh_interval_seconds: int
+    summary_refresh_interval_seconds: int | None
+    summary_refresh_hours: list[int] | None
     economic_request_timeout_seconds: float
     summary_request_timeout_seconds: float
     delivery_request_timeout_seconds: float
@@ -30,6 +31,17 @@ class CronSettings:
         if len(api_auth_key) < 16:
             raise ValueError("API_AUTH_KEY must be at least 16 characters long")
 
+        summary_refresh_hours = _env_summary_hours()
+        summary_refresh_interval_seconds = (
+            _env_interval_seconds(
+                prefix="SUMMARY_REFRESH",
+                default_minutes=180,
+                minimum_seconds=60,
+            )
+            if summary_refresh_hours is None
+            else None
+        )
+
         return cls(
             backend_base_url=_required_env("BACKEND_BASE_URL").rstrip("/"),
             api_auth_key=api_auth_key,
@@ -39,11 +51,8 @@ class CronSettings:
                 default_minutes=60,
                 minimum_seconds=60,
             ),
-            summary_refresh_interval_seconds=_env_interval_seconds(
-                prefix="SUMMARY_REFRESH",
-                default_minutes=180,
-                minimum_seconds=60,
-            ),
+            summary_refresh_interval_seconds=summary_refresh_interval_seconds,
+            summary_refresh_hours=summary_refresh_hours,
             economic_request_timeout_seconds=float(
                 _env_timeout_seconds(
                     "ECONOMIC_REQUEST_TIMEOUT_SECONDS",
@@ -160,6 +169,27 @@ def _env_interval_seconds(
     if seconds < minimum_seconds:
         raise ValueError(f"{prefix} interval must be >= {minimum_seconds} seconds")
     return seconds
+
+
+def _env_summary_hours() -> list[int] | None:
+    raw = os.getenv("SUMMARY_REFRESH_HOURS")
+    if raw is None or raw.strip() == "":
+        return None
+    hours: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            hour = int(part)
+        except ValueError as exc:
+            raise ValueError(f"SUMMARY_REFRESH_HOURS must be comma-separated hours (0-23), got '{part}'") from exc
+        if not 0 <= hour <= 23:
+            raise ValueError(f"SUMMARY_REFRESH_HOURS hour must be 0-23, got {hour}")
+        hours.append(hour)
+    if not hours:
+        raise ValueError("SUMMARY_REFRESH_HOURS is set but no valid hours found")
+    return sorted(hours)
 
 
 def _env_timeout_seconds(name: str, *, default: int, minimum: int) -> int:
