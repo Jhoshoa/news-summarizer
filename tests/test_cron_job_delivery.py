@@ -34,6 +34,9 @@ def test_cron_settings_defaults_keep_summary_and_delivery_separate(monkeypatch):
 @pytest.mark.asyncio
 async def test_cron_summary_refresh_uses_summary_endpoint(monkeypatch):
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         summary_time_of_day="night",
         summary_trigger_path="/trigger/summary",
         summary_request_timeout_seconds=30,
@@ -56,6 +59,9 @@ async def test_cron_summary_refresh_uses_summary_endpoint(monkeypatch):
 @pytest.mark.asyncio
 async def test_cron_delivery_window_uses_delivery_endpoint(monkeypatch):
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         delivery_trigger_path="/trigger/delivery",
         delivery_request_timeout_seconds=45,
     )
@@ -77,6 +83,9 @@ async def test_cron_delivery_window_uses_delivery_endpoint(monkeypatch):
 @pytest.mark.asyncio
 async def test_backend_client_turns_backend_down_into_controlled_error():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         backend_base_url="http://backend:8000",
         api_auth_key="test-api-auth-key-value",
         request_retries=0,

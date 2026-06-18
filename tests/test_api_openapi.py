@@ -90,6 +90,11 @@ def test_preferences_endpoints_are_documented():
 
 
 def test_articles_today_falls_back_when_timezone_is_invalid():
-    app_instance = SimpleNamespace(settings=SimpleNamespace(schedule_timezone="Invalid/Zone"))
+    app_instance = SimpleNamespace(settings=SimpleNamespace(
+        schedule_timezone="Invalid/Zone",
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
+        summary_candidates_per_category=8,
+    ))
 
     assert isinstance(_today_for_app(app_instance), date)

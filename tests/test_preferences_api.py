@@ -41,6 +41,9 @@ def fake_app_instance():
     main_module.app_instance = SimpleNamespace(
         db=db,
         settings=SimpleNamespace(
+            summary_candidates_per_category=8,
+            summary_candidates_extended_limit=8,
+            summary_candidates_extended_categories="politica, economia",
             telegram_bot_token=None,
             twilio_account_sid=None,
             email_enabled=False,

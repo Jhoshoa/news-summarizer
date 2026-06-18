@@ -81,6 +81,15 @@ class Settings(BaseSettings):
     default_categories: str = Field(
         default="economia,politica,deportes", alias="DEFAULT_CATEGORIES"
     )
+    summary_candidates_per_category: int = Field(
+        default=5, alias="SUMMARY_CANDIDATES_PER_CATEGORY"
+    )
+    summary_candidates_extended_limit: int = Field(
+        default=8, alias="SUMMARY_CANDIDATES_EXTENDED_LIMIT"
+    )
+    summary_candidates_extended_categories: str = Field(
+        default="politica, economia", alias="SUMMARY_CANDIDATES_EXTENDED_CATEGORIES"
+    )
 
     @property
     def is_production(self) -> bool:

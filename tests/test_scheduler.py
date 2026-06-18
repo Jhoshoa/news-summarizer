@@ -35,6 +35,9 @@ class FakeScheduler:
 
 def test_scheduler_registers_three_summary_windows():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         schedule_timezone="America/La_Paz",
         schedule_summary_morning="09:00",
         schedule_summary_afternoon="16:00",
@@ -62,6 +65,9 @@ def test_scheduler_registers_three_summary_windows():
 
 def test_scheduler_keeps_legacy_evening_job_when_configured():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         schedule_timezone="America/La_Paz",
         schedule_summary_morning=None,
         schedule_summary_afternoon=None,
@@ -89,6 +95,9 @@ async def test_scheduler_window_uses_cached_delivery():
         raise AssertionError("Scheduler windows should not generate summaries")
 
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         schedule_timezone="America/La_Paz",
         schedule_summary_morning=None,
         schedule_summary_afternoon=None,

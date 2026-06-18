@@ -34,7 +34,12 @@ def fake_summary_app_instance():
         }
 
     main_module.app_instance = SimpleNamespace(
-        settings=SimpleNamespace(api_auth_key=API_AUTH_KEY),
+        settings=SimpleNamespace(
+            api_auth_key=API_AUTH_KEY,
+            summary_candidates_extended_limit=8,
+            summary_candidates_extended_categories="politica, economia",
+            summary_candidates_per_category=8,
+        ),
         send_summaries=send_summaries,
         deliver_cached_summaries=deliver_cached_summaries,
     )
@@ -78,7 +83,13 @@ def fake_economic_app_instance(monkeypatch):
 
     main_module.app_instance = SimpleNamespace(
         db=SimpleNamespace(session_maker=object()),
-        settings=SimpleNamespace(api_auth_key=API_AUTH_KEY, scraper_timeout=30),
+        settings=SimpleNamespace(
+            api_auth_key=API_AUTH_KEY,
+            summary_candidates_extended_limit=8,
+            summary_candidates_extended_categories="politica, economia",
+            scraper_timeout=30,
+            summary_candidates_per_category=8,
+        ),
     )
     try:
         yield

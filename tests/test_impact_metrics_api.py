@@ -49,7 +49,12 @@ def fake_app_instance():
     db = FakeImpactDatabase()
     main_module.app_instance = SimpleNamespace(
         db=db,
-        settings=SimpleNamespace(schedule_timezone="America/Caracas"),
+        settings=SimpleNamespace(
+            schedule_timezone="America/Caracas",
+            summary_candidates_extended_limit=8,
+            summary_candidates_extended_categories="politica, economia",
+            summary_candidates_per_category=8,
+        ),
     )
     try:
         yield db

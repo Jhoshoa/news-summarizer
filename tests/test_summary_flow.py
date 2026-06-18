@@ -119,6 +119,9 @@ class FakeEmail:
 @pytest.mark.asyncio
 async def test_fresh_collection_is_classified_persisted_and_summarized():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -171,6 +174,9 @@ async def test_fresh_collection_is_classified_persisted_and_summarized():
 @pytest.mark.asyncio
 async def test_refresh_collects_fresh_news_when_cache_db_read_fails():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -212,6 +218,9 @@ async def test_refresh_collects_fresh_news_when_cache_db_read_fails():
 @pytest.mark.asyncio
 async def test_fresh_collection_skips_title_only_articles():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -259,6 +268,9 @@ async def test_fresh_collection_skips_title_only_articles():
 
 def test_summary_candidates_are_diversified_by_source_within_category():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -281,11 +293,15 @@ def test_summary_candidates_are_diversified_by_source_within_category():
         "RedUno 1",
         "RadioFides 1",
         "Unitel 3",
+        "Unitel 4",
     ]
 
 
 def test_summary_candidates_do_not_drop_articles_when_only_one_source_exists():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -304,11 +320,15 @@ def test_summary_candidates_do_not_drop_articles_when_only_one_source_exists():
         "Unitel 3",
         "Unitel 4",
         "Unitel 5",
+        "Unitel 6",
     ]
 
 
 def test_summary_candidates_exclude_historical_duplicates_and_repeated_clusters():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -353,6 +373,9 @@ def test_summary_candidates_exclude_historical_duplicates_and_repeated_clusters(
 
 def test_delivery_summaries_are_deduplicated_by_normalized_title():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["deportes"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -386,6 +409,9 @@ def test_delivery_summaries_are_deduplicated_by_normalized_title():
 
 def test_summaries_are_deduplicated_by_story_cluster_for_storage_and_delivery():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -425,6 +451,9 @@ def test_summaries_are_deduplicated_by_story_cluster_for_storage_and_delivery():
 @pytest.mark.asyncio
 async def test_morning_delivery_respects_preferred_time():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -482,6 +511,9 @@ async def test_morning_delivery_respects_preferred_time():
 @pytest.mark.asyncio
 async def test_weekly_frequency_only_sends_on_monday():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -521,6 +553,9 @@ async def test_weekly_frequency_only_sends_on_monday():
 @pytest.mark.asyncio
 async def test_manual_delivery_ignores_frequency_and_preferred_time_for_demo():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -554,6 +589,9 @@ async def test_manual_delivery_ignores_frequency_and_preferred_time_for_demo():
 @pytest.mark.asyncio
 async def test_email_delivery_sends_plain_text_brief():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -613,6 +651,9 @@ async def test_email_delivery_sends_plain_text_brief():
 @pytest.mark.asyncio
 async def test_cached_delivery_does_not_collect_or_generate_news():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -652,6 +693,9 @@ async def test_cached_delivery_does_not_collect_or_generate_news():
 @pytest.mark.asyncio
 async def test_summary_refresh_can_skip_delivery():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
@@ -685,6 +729,9 @@ async def test_summary_refresh_can_skip_delivery():
 @pytest.mark.asyncio
 async def test_afternoon_and_night_windows_match_exact_preferred_time():
     settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
         categories_list=["politica"],
         news_cache_ttl_minutes=60,
         news_min_articles=20,
