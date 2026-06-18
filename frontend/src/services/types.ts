@@ -76,6 +76,8 @@ export type ImpactMetricsRun = {
   briefs_count?: number;
   inserted_count?: number;
   updated_count?: number;
+  duplicate_dropped_count?: number;
+  ranked_count?: number;
   pipeline: ImpactPipelineStep[];
 };
 

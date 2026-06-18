@@ -1,9 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { SummaryCard } from "../components/news/SummaryCard";
 import { SummaryCardSkeleton } from "../components/ui/Skeleton";
 import { useGetImpactMetricsQuery, useGetSummariesQuery } from "../services/api";
-import type { ImpactMetricsResponse } from "../services/types";
+import type { ImpactMetricsResponse, ImpactMetricsRun } from "../services/types";
 import { formatPublishedDate } from "../utils/date";
 import { getImpactPipelineRows } from "../utils/impact";
 
@@ -22,6 +22,27 @@ const formatImpactDate = (value?: string | null) => {
   }
 
   return formatPublishedDate(`${value}T00:00:00`);
+};
+
+const formatRunDateTime = (startedAt: string | null, fallbackTime: string): string => {
+  if (startedAt) {
+    const d = new Date(startedAt);
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat("es-BO", {
+        day: "2-digit",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "America/La_Paz",
+      }).format(d);
+    }
+  }
+  const [h, m] = fallbackTime.split(":");
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${m} ${ampm}`;
 };
 
 const SkeletonLine = ({ className = "" }: { className?: string }) => (
@@ -93,25 +114,20 @@ const DESC = {
   Briefs: "",
 };
 
-const PipelineFlowSVG = ({ metrics }: { metrics: ImpactMetricsResponse }) => {
-  const isPipelineRun = metrics.data_source === "pipeline_run";
-  const lastRun = isPipelineRun && metrics.runs && metrics.runs.length > 0
-    ? metrics.runs[metrics.runs.length - 1]
-    : null;
-
-  const total = lastRun ? (lastRun.pipeline[0]?.value ?? metrics.collected_articles) : metrics.collected_articles;
+const PipelineFlowSVG = ({ metrics, selectedRun }: { metrics: ImpactMetricsResponse; selectedRun?: ImpactMetricsRun | null }) => {
+  const run = selectedRun ?? null;
+  const total = run ? (run.pipeline[0]?.value ?? metrics.collected_articles) : metrics.collected_articles;
   const fmt = (n: number) => formatNumber(n);
   const pctStr = (n: number) => (total > 0 ? `${((n / total) * 100).toFixed(0)}%` : "—");
   const modelLabel = metrics.llm_model && metrics.llm_provider
     ? `Generados con ${metrics.llm_model} vía ${metrics.llm_provider}`
     : "Resumidos con IA (Groq)";
 
-  const usable = lastRun ? (lastRun.pipeline[1]?.value ?? metrics.usable_articles ?? 0) : (metrics.usable_articles ?? 0);
-  const unicas = lastRun ? (lastRun.inserted_count ?? lastRun.pipeline[2]?.value ?? metrics.unique_articles) : metrics.unique_articles;
-  const candidatas = lastRun ? (lastRun.pipeline[3]?.value ?? metrics.summary_candidates ?? 0) : (metrics.summary_candidates ?? 0);
-  const ranked = lastRun ? (metrics.ranked_articles ?? 0) : (metrics.ranked_articles ?? 0);
-  const lastRunBriefs = lastRun ? (lastRun.briefs_count ?? metrics.summaries) : metrics.summaries;
-  const summaries = lastRun ? lastRunBriefs : metrics.summaries;
+  const usable = run ? (run.pipeline[1]?.value ?? metrics.usable_articles ?? 0) : (metrics.usable_articles ?? 0);
+  const unicas = run ? (run.inserted_count ?? run.pipeline[2]?.value ?? metrics.unique_articles) : metrics.unique_articles;
+  const candidatas = run ? (run.pipeline[3]?.value ?? metrics.summary_candidates ?? 0) : (metrics.summary_candidates ?? 0);
+  const ranked = run ? (run.ranked_count ?? unicas) : (metrics.ranked_articles ?? 0);
+  const summaries = run ? (run.briefs_count ?? metrics.summaries) : metrics.summaries;
 
   const stages: StageDef[] = [
     { label: "Recolectadas", count: total, color: "#6b7280", icon: "📥" },
@@ -329,27 +345,35 @@ export const ImpactPage = () => {
     fallback_to_latest: true,
     page_size: 3,
   });
-  const pipelineRows = useMemo(() => {
-    if (!metrics) return [];
-    const isPipelineRun = metrics.data_source === "pipeline_run";
-    const lastRun = isPipelineRun && metrics.runs && metrics.runs.length > 0
-      ? metrics.runs[metrics.runs.length - 1]
-      : null;
+  const [selectedRunIdx, setSelectedRunIdx] = useState<number | null>(null);
 
-    if (lastRun) {
-      const briefsStep = lastRun.pipeline.find(s => s.label === "Briefs");
-      return [
-        { label: "Recolectadas", value: lastRun.pipeline[0]?.value ?? metrics.collected_articles },
-        { label: "Utiles", value: lastRun.pipeline[1]?.value ?? metrics.usable_articles },
-        { label: "Unicas", value: lastRun.inserted_count ?? lastRun.pipeline[2]?.value ?? metrics.unique_articles },
-        { label: "Candidatas", value: lastRun.pipeline[3]?.value ?? metrics.summary_candidates ?? 0 },
-        { label: "Briefs", value: lastRun.briefs_count ?? briefsStep?.value ?? metrics.summaries },
+  const pipelineData = useMemo(() => {
+    const result: { rows: { label: string; value: number }[]; activeRun: ImpactMetricsRun | null } = { rows: [], activeRun: null };
+    if (!metrics) return result;
+    const isPipelineRun = metrics.data_source === "pipeline_run";
+    const runs = isPipelineRun && metrics.runs ? metrics.runs : [];
+
+    const selectedRun = selectedRunIdx !== null && selectedRunIdx >= 0 && selectedRunIdx < runs.length
+      ? runs[selectedRunIdx]
+      : null;
+    result.activeRun = selectedRun;
+
+    if (selectedRun) {
+      const briefsStep = selectedRun.pipeline.find(s => s.label === "Briefs");
+      result.rows = [
+        { label: "Recolectadas", value: selectedRun.pipeline[0]?.value ?? metrics.collected_articles },
+        { label: "Utiles", value: selectedRun.pipeline[1]?.value ?? metrics.usable_articles },
+        { label: "Unicas", value: selectedRun.inserted_count ?? selectedRun.pipeline[2]?.value ?? metrics.unique_articles },
+        { label: "Candidatas", value: selectedRun.pipeline[3]?.value ?? metrics.summary_candidates ?? 0 },
+        { label: "Briefs", value: selectedRun.briefs_count ?? briefsStep?.value ?? metrics.summaries },
       ];
+      return result;
     }
 
     const rows = getImpactPipelineRows(metrics);
-    return rows.filter((row) => ["Recolectadas", "Utiles", "Unicas", "Candidatas", "Briefs"].includes(row.label));
-  }, [metrics]);
+    result.rows = rows.filter((row) => ["Recolectadas", "Utiles", "Unicas", "Candidatas", "Briefs"].includes(row.label));
+    return result;
+  }, [metrics, selectedRunIdx]);
   const summaries = summariesData?.items ?? [];
 
   if (isFetching && !metrics) {
@@ -363,6 +387,19 @@ export const ImpactPage = () => {
   if (!metrics || !metrics.has_data) {
     return <ImpactEmptyState />;
   }
+
+  const activeRun = pipelineData.activeRun;
+  const formulaCollected = activeRun
+    ? (activeRun.pipeline[0]?.value ?? metrics.collected_articles)
+    : metrics.collected_articles;
+  const formulaBriefs = activeRun
+    ? (activeRun.briefs_count ?? metrics.summaries)
+    : metrics.summaries;
+  const formulaPagesAvoided = Math.max(formulaCollected - formulaBriefs, 0);
+  const formulaReductionRate = formulaCollected > 0
+    ? Math.round((1 - formulaBriefs / formulaCollected) * 1000) / 10
+    : 0;
+  const formulaMinutesSaved = Math.round(formulaPagesAvoided * 0.5 * 10) / 10;
 
   return (
     <section className="impact-page">
@@ -380,21 +417,39 @@ export const ImpactPage = () => {
           <section className="data-panel impact-flow-panel">
             <div className="panel-heading">
               <span className="panel-title">Flujo del pipeline</span>
-              <p>De {formatNumber(metrics.collected_articles)} noticias recolectadas a {formatNumber(metrics.summaries)} briefs.</p>
+              {metrics.runs && metrics.runs.length > 0 && (
+                <select
+                  value={selectedRunIdx ?? -1}
+                  onChange={(e) => setSelectedRunIdx(e.target.value === "-1" ? null : Number(e.target.value))}
+                  style={{ fontSize: "0.75rem", marginLeft: "0.5rem", padding: "0.15rem 0.3rem", borderRadius: 4, border: "1px solid var(--color-border)", backgroundColor: "var(--color-surface)", color: "var(--color-muted)", cursor: "pointer" }}
+                >
+                  <option value={-1}>Global (acumulado)</option>
+                  {metrics.runs.map((run, i) => (
+                    <option key={i} value={i}>{formatRunDateTime(run.started_at, run.time)}</option>
+                  ))}
+                </select>
+              )}
+              <p>De {formatNumber(formulaCollected)} noticias recolectadas a {formatNumber(formulaBriefs)} briefs.</p>
             </div>
             <div className="pipeline-layout" style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", flexWrap: "wrap" }}>
               <div className="pipeline-donut">
-                <PipelineDonut pct={metrics.collected_articles > 0 ? metrics.summaries / metrics.collected_articles : 0} />
+                <PipelineDonut pct={formulaCollected > 0 ? formulaBriefs / formulaCollected : 0} />
               </div>
               <div className="pipeline-steps-vertical">
-                {pipelineRows.map((row, i) => {
-                  const total = metrics.collected_articles;
+                {pipelineData.rows.map((row, i) => {
+                  const total = formulaCollected;
                   const pctStr = total > 0 ? `${((row.value / total) * 100).toFixed(0)}%` : "—";
+                  const activeRun = pipelineData.activeRun;
+                  const isUnicas = row.label === "Unicas" && activeRun;
+                  const annotation = isUnicas
+                    ? ` (${activeRun!.updated_count} existentes, ${activeRun!.duplicate_dropped_count} duplicado)`
+                    : "";
                   return (
                     <div key={row.label} className="pipeline-step-row"
                       style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
                       <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: PIPELINE_COLORS[i % PIPELINE_COLORS.length], flexShrink: 0 }} />
                       <span style={{ fontSize: "0.85rem", color: "#374151" }}>{row.label}</span>
+                      {annotation && <span style={{ fontSize: "0.7rem", color: "var(--color-muted)", marginLeft: "0.25rem" }}>{annotation}</span>}
                       <span style={{ fontSize: "0.75rem", color: "#6b7280", marginLeft: "auto" }}>{pctStr}</span>
                       <strong style={{ fontSize: "0.95rem", minWidth: "2.2rem", textAlign: "right" }}>{formatNumber(row.value)}</strong>
                     </div>
@@ -406,11 +461,11 @@ export const ImpactPage = () => {
                   <strong style={{ fontSize: "0.85rem" }}>Paginas evitadas</strong>
                   <div className="pipeline-formula-row">
                     <div className="pipeline-formula-expression">
-                      <div>{formatNumber(metrics.collected_articles)} − {formatNumber(metrics.summaries)} = {formatNumber(metrics.estimated_pages_avoided)}</div>
+                      <div>{formatNumber(formulaCollected)} − {formatNumber(formulaBriefs)} = {formatNumber(formulaPagesAvoided)}</div>
                       <code style={{ fontSize: "0.75rem", color: "#6b7280" }}>recolectadas − briefs</code>
                     </div>
                     <strong className="pipeline-formula-result" style={{ color: "#006d77" }}>
-                      {formatNumber(metrics.estimated_pages_avoided)} paginas evitadas
+                      {formatNumber(formulaPagesAvoided)} paginas evitadas
                     </strong>
                   </div>
                 </div>
@@ -418,11 +473,11 @@ export const ImpactPage = () => {
                   <strong style={{ fontSize: "0.85rem" }}>Reduccion estimada</strong>
                   <div className="pipeline-formula-row">
                     <div className="pipeline-formula-expression">
-                      <div>1 − {formatNumber(metrics.summaries)} / {formatNumber(metrics.collected_articles)} = {formatNumber(metrics.reduction_rate * 100)}%</div>
+                      <div>1 − {formatNumber(formulaBriefs)} / {formatNumber(formulaCollected)} = {formatNumber(formulaReductionRate)}%</div>
                       <code style={{ fontSize: "0.75rem", color: "#6b7280" }}>1 − briefs / recolectadas</code>
                     </div>
                     <strong className="pipeline-formula-result" style={{ color: "#006d77" }}>
-                      {formatNumber(metrics.reduction_rate * 100)}% paginas descartadas
+                      {formatNumber(formulaReductionRate)}% paginas descartadas
                     </strong>
                   </div>
                 </div>
@@ -430,18 +485,18 @@ export const ImpactPage = () => {
                   <strong style={{ fontSize: "0.85rem" }}>Minutos estimados</strong>
                   <div className="pipeline-formula-row">
                     <div className="pipeline-formula-expression">
-                      <div>{formatNumber(metrics.estimated_pages_avoided)} × 0.5 <span style={{ color: "#6b7280" }}>(30s c/u)</span> = {formatNumber(metrics.estimated_minutes_saved)}</div>
+                      <div>{formatNumber(formulaPagesAvoided)} × 0.5 <span style={{ color: "#6b7280" }}>(30s c/u)</span> = {formatNumber(formulaMinutesSaved)}</div>
                       <code style={{ fontSize: "0.75rem", color: "#6b7280" }}>paginas evitadas × 30s</code>
                     </div>
                     <strong className="pipeline-formula-result" style={{ color: "#006d77" }}>
-                      {formatNumber(metrics.estimated_minutes_saved)} min de lectura evitada
+                      {formatNumber(formulaMinutesSaved)} min de lectura evitada
                     </strong>
                   </div>
                 </div>
               </div>
             </div>
             <div className="pipeline-svg-flow">
-              <PipelineFlowSVG metrics={metrics} />
+              <PipelineFlowSVG metrics={metrics} selectedRun={pipelineData.activeRun} />
             </div>
           </section>
 

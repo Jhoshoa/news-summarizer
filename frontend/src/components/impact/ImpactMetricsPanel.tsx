@@ -44,6 +44,42 @@ const formatContentDate = (value?: string | null) => {
   }).format(date);
 };
 
+const formatTimeAMPM = (startedAt: string | null, fallbackTime: string): string => {
+  if (startedAt) {
+    const d = new Date(startedAt);
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat("es-BO", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "America/La_Paz",
+      }).format(d);
+    }
+  }
+  const [h, m] = fallbackTime.split(":");
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${hour12}:${m} ${ampm}`;
+};
+
+const formatRunDateTime = (startedAt: string | null, fallbackTime: string): string => {
+  if (startedAt) {
+    const d = new Date(startedAt);
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat("es-BO", {
+        day: "2-digit",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: "America/La_Paz",
+      }).format(d);
+    }
+  }
+  return formatTimeAMPM(null, fallbackTime);
+};
+
 export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }: ImpactMetricsPanelProps) => {
   const [runsOpen, setRunsOpen] = useState(false);
   const runsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,10 +154,16 @@ export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }:
   const effectiveDate = formatContentDate(data.date);
   const requestedDate = formatContentDate(data.requested_date);
   const hasPipelineMetrics = data.data_source === "pipeline_run";
-  const flowLabel = hasPipelineMetrics ? "Flujo real (ultima corrida)" : "Flujo estimado";
   const lastRun = hasPipelineMetrics && data.runs && data.runs.length > 0 ? data.runs[data.runs.length - 1] : null;
+  const flowLabel = hasPipelineMetrics && lastRun
+    ? `Flujo real (${formatRunDateTime(lastRun.started_at, lastRun.time)})`
+    : "Flujo estimado";
   const existingArticles = lastRun ? (lastRun.updated_count ?? 0) : 0;
   const cumulativeBriefs = lastRun ? lastRun.pipeline.find(s => s.label === "Briefs")?.value ?? data.summaries : data.summaries;
+  const stripCollected = lastRun ? (lastRun.pipeline[0]?.value ?? data.collected_articles) : data.collected_articles;
+  const stripBriefs = cumulativeBriefs;
+  const stripPagesAvoided = Math.max(stripCollected - stripBriefs, 0);
+  const stripMinutesSaved = Math.round(stripPagesAvoided * (data.methodology?.minutes_per_article ?? 0.5) * 10) / 10;
   const flowParts = hasPipelineMetrics && lastRun
     ? [
         { label: "recolectadas", value: lastRun.pipeline[0]?.value ?? data.collected_articles },
@@ -144,16 +186,16 @@ export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }:
         </div>
         <div className="impact-metric-strip">
           <span>
-            <b>{formatNumber(data.collected_articles)}</b> procesadas
+            <b>{formatNumber(stripCollected)}</b> procesadas
           </span>
           <span>
-            <b>{formatNumber(data.summaries)}</b> briefs
+            <b>{formatNumber(stripBriefs)}</b> briefs
           </span>
           <span>
-            <b>{formatNumber(data.estimated_pages_avoided)}</b> paginas evitadas
+            <b>{formatNumber(stripPagesAvoided)}</b> paginas evitadas
           </span>
           <span>
-            <b>{formatNumber(data.estimated_minutes_saved)}</b> min estimados
+            <b>{formatNumber(stripMinutesSaved)}</b> min estimados
           </span>
         </div>
       </div>
@@ -166,7 +208,7 @@ export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }:
               {index > 0 && " -> "}
               <b>{formatNumber(item.value)}</b> {item.label}
               {item.label === "unicas" && existingArticles > 0 && (
-                <span className="impact-run-acumulado"> ({formatNumber(existingArticles)} existentes)</span>
+                <span className="impact-run-acumulado"> ({formatNumber(existingArticles)} existentes{lastRun?.duplicate_dropped_count ? `, ${formatNumber(lastRun.duplicate_dropped_count)} duplicado` : ""})</span>
               )}
               {item.label === "briefs" && lastRun && lastRun.briefs_count != null && cumulativeBriefs !== lastRun.briefs_count && (
                 <span className="impact-run-acumulado"> ({formatNumber(cumulativeBriefs)} acum)</span>
@@ -193,7 +235,7 @@ export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }:
             onClick={(e) => e.stopPropagation()}
           >
             <div className="impact-runs-overlay-header">
-              <span className="impact-runs-overlay-title">Corridas del dia</span>
+              <span className="impact-runs-overlay-title">Corridas del dia <small style={{ fontWeight: 400, color: "var(--color-muted)" }}>{effectiveDate}</small></span>
               <button className="impact-runs-overlay-close" onClick={closeRuns} type="button" aria-label="Cerrar detalle">
                 ▴
               </button>
@@ -201,15 +243,19 @@ export const ImpactMetricsPanel = ({ data, isError = false, isLoading = false }:
             <div className="impact-runs-overlay-body">
               {data.runs.map((run) => (
                 <div className="impact-run-row" key={run.started_at ?? run.time}>
-                  <span className="impact-run-time">{run.time}</span>
+                  <span className="impact-run-time">{formatTimeAMPM(run.started_at, run.time)}</span>
                   <span className="impact-run-pipeline">
                     {run.pipeline.map((step, index) => (
                       <span key={step.label}>
                         {index > 0 && " → "}
                         {step.label === "Briefs" && run.briefs_count != null ? (
                           <><b>{formatNumber(run.briefs_count)}</b> {step.label.toLowerCase()} <span className="impact-run-acumulado">({formatNumber(step.value)} acum)</span></>
-                        ) : step.label === "Unicas" && run.updated_count != null && run.updated_count > 0 ? (
-                          <><b>{formatNumber(step.value)}</b> {step.label.toLowerCase()} <span className="impact-run-acumulado">({formatNumber(run.updated_count)} existentes)</span></>
+                        ) : step.label === "Unicas" ? (
+                          <><b>{formatNumber(step.value)}</b> {step.label.toLowerCase()}
+                            {run.updated_count != null && run.updated_count > 0 && (
+                              <span className="impact-run-acumulado"> ({formatNumber(run.updated_count)} existentes{run.duplicate_dropped_count ? `, ${formatNumber(run.duplicate_dropped_count)} duplicado` : ""})</span>
+                            )}
+                          </>
                         ) : (
                           <><b>{formatNumber(step.value)}</b> {step.label.toLowerCase()}</>
                         )}

@@ -514,6 +514,7 @@ class Database:
             ranked_articles=counts["ranked_articles"],
             inserted_articles=counts.get("inserted_articles", 0),
             updated_articles=counts.get("updated_articles", 0),
+            duplicate_dropped_articles=counts.get("duplicate_dropped_articles", 0),
         )
         payload["runs"] = runs_data
         return payload
@@ -568,11 +569,21 @@ class Database:
         }
 
         if latest_run:
-            pipeline_collected = self._safe_int(latest_run.raw_collected_count)
-            pipeline_usable = self._safe_int(latest_run.usable_count)
-            pipeline_ranked = self._safe_int(latest_run.ranked_count)
-            pipeline_quality_dropped = self._safe_int(latest_run.quality_dropped_count)
-
+            cumulative_collected = sum(
+                self._safe_int(r.raw_collected_count) for r in runs_with_metrics
+            )
+            cumulative_usable = sum(
+                self._safe_int(r.usable_count) for r in runs_with_metrics
+            )
+            cumulative_quality_dropped = sum(
+                self._safe_int(r.quality_dropped_count) for r in runs_with_metrics
+            )
+            cumulative_ranked = sum(
+                self._safe_int(r.ranked_count) for r in runs_with_metrics
+            )
+            cumulative_duplicate_dropped = sum(
+                self._safe_int(r.duplicate_dropped_count) for r in runs_with_metrics
+            )
             cumulative_summaries = sum(
                 self._safe_int(r.summaries_count) for r in runs_with_metrics
             )
@@ -586,7 +597,9 @@ class Database:
                 self._safe_int(r.summary_candidates_count) for r in runs_with_metrics
             )
 
-            pipe_collected = pipeline_collected or collected_articles
+            pipe_collected = cumulative_collected or collected_articles
+            pipe_usable = cumulative_usable or pipe_collected
+            pipe_ranked = cumulative_ranked or pipe_collected
             pipe_unique = cumulative_inserted or unique_articles
             pipe_summaries = cumulative_summaries or summaries
             pipe_candidates = cumulative_candidates or pipe_unique
@@ -596,13 +609,14 @@ class Database:
                 "collected_articles": pipe_collected,
                 "unique_articles": pipe_unique,
                 "summaries": pipe_summaries,
-                "quality_dropped_articles": pipeline_quality_dropped,
+                "quality_dropped_articles": cumulative_quality_dropped,
                 "duplicate_articles": max(pipe_collected - pipe_unique, 0),
                 "summary_candidates": pipe_candidates,
-                "usable_articles": pipeline_usable or pipe_collected,
-                "ranked_articles": pipeline_ranked or pipe_unique,
+                "usable_articles": pipe_usable,
+                "ranked_articles": pipe_ranked,
                 "inserted_articles": cumulative_inserted,
                 "updated_articles": cumulative_updated,
+                "duplicate_dropped_articles": cumulative_duplicate_dropped,
                 "has_data": pipe_collected > 0 or pipe_summaries > 0,
                 "cache_reused": bool(
                     latest_run.used_cached_articles or latest_run.used_cached_summaries
@@ -638,6 +652,8 @@ class Database:
                 "briefs_count": run_briefs,
                 "inserted_count": self._safe_int(run.inserted_count),
                 "updated_count": self._safe_int(run.updated_count),
+                "duplicate_dropped_count": self._safe_int(run.duplicate_dropped_count),
+                "ranked_count": self._safe_int(run.ranked_count),
                 "pipeline": [
                     {"label": "Recolectadas", "value": self._safe_int(run.raw_collected_count)},
                     {"label": "Utiles", "value": self._safe_int(run.usable_count)},
@@ -754,6 +770,7 @@ class Database:
         ranked_articles: int = 0,
         inserted_articles: int = 0,
         updated_articles: int = 0,
+        duplicate_dropped_articles: int = 0,
     ) -> dict[str, Any]:
         collected_articles = max(int(collected_articles), 0)
         unique_articles = max(int(unique_articles), 0)
@@ -790,6 +807,7 @@ class Database:
             "ranked_articles": max(int(ranked_articles), 0),
             "inserted_articles": max(int(inserted_articles), 0),
             "updated_articles": max(int(updated_articles), 0),
+            "duplicate_dropped_articles": max(int(duplicate_dropped_articles), 0),
             "duplicate_articles_estimated": duplicate_articles_estimated,
             "reduction_rate": max(min(reduction_rate, 1.0), 0.0),
             "estimated_pages_avoided": estimated_pages_avoided,
