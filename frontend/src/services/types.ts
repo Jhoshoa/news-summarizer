@@ -68,6 +68,17 @@ export type ImpactMethodology = {
   note: string;
 };
 
+export type ImpactMetricsRun = {
+  started_at: string | null;
+  finished_at: string | null;
+  time: string;
+  cache_reused: boolean;
+  briefs_count?: number;
+  inserted_count?: number;
+  updated_count?: number;
+  pipeline: ImpactPipelineStep[];
+};
+
 export type ImpactMetricsResponse = {
   date: string;
   requested_date: string;
@@ -82,6 +93,8 @@ export type ImpactMetricsResponse = {
   summary_candidates?: number;
   usable_articles?: number;
   ranked_articles?: number;
+  inserted_articles?: number;
+  updated_articles?: number;
   duplicate_articles_estimated: number;
   reduction_rate: number;
   estimated_pages_avoided: number;
@@ -93,6 +106,7 @@ export type ImpactMetricsResponse = {
   llm_model?: string | null;
   pipeline: ImpactPipelineStep[];
   methodology: ImpactMethodology;
+  runs?: ImpactMetricsRun[];
 };
 
 export type PreferenceOption = {

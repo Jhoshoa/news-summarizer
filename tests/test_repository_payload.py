@@ -231,6 +231,7 @@ def test_build_impact_metrics_payload_calculates_transparent_estimates():
         {"label": "Recolectadas", "value": 86},
         {"label": "Utiles", "value": 0},
         {"label": "Unicas", "value": 42},
+        {"label": "Candidatas", "value": 0},
         {"label": "Briefs", "value": 18},
     ]
     assert "articulos evitados" in response["methodology"]["note"]
@@ -264,6 +265,8 @@ def test_build_impact_metrics_payload_includes_real_pipeline_fields():
     assert response["usable_articles"] == 10
     assert response["ranked_articles"] == 8
     assert response["cache_reused"] is True
+    assert response["inserted_articles"] == 0
+    assert response["updated_articles"] == 0
 
 
 def test_impact_summary_count_prefers_stored_daily_total_over_latest_run_count():

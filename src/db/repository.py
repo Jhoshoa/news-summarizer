@@ -495,7 +495,9 @@ class Database:
                     effective_date = latest_date
                     counts = await self._impact_counts_for_date(session, effective_date)
 
-        return self._build_impact_metrics_payload(
+            runs_data = await self._build_runs_payload(session, effective_date)
+
+        payload = self._build_impact_metrics_payload(
             effective_date=effective_date,
             requested_date=requested_date,
             is_fallback=effective_date != requested_date,
@@ -510,7 +512,11 @@ class Database:
             summary_candidates=counts["summary_candidates"],
             usable_articles=counts["usable_articles"],
             ranked_articles=counts["ranked_articles"],
+            inserted_articles=counts.get("inserted_articles", 0),
+            updated_articles=counts.get("updated_articles", 0),
         )
+        payload["runs"] = runs_data
+        return payload
 
     async def _impact_counts_for_date(
         self,
@@ -544,8 +550,9 @@ class Database:
             )
             or 0
         )
-        latest_run = await self._latest_collection_run_for_date(session, metrics_date)
-        run_has_pipeline_metrics = self._collection_run_has_pipeline_metrics(latest_run)
+        runs = await self._collection_runs_for_date(session, metrics_date)
+        runs_with_metrics = [r for r in runs if self._collection_run_has_pipeline_metrics(r)]
+        latest_run = runs_with_metrics[-1] if runs_with_metrics else None
 
         duplicate_articles = max(collected_articles - unique_articles, 0)
         derived = {
@@ -560,16 +567,86 @@ class Database:
             "has_data": collected_articles > 0 or unique_articles > 0 or summaries > 0,
         }
 
-        if latest_run and run_has_pipeline_metrics:
+        if latest_run:
+            pipeline_collected = self._safe_int(latest_run.raw_collected_count)
+            pipeline_usable = self._safe_int(latest_run.usable_count)
+            pipeline_ranked = self._safe_int(latest_run.ranked_count)
+            pipeline_quality_dropped = self._safe_int(latest_run.quality_dropped_count)
+
+            cumulative_summaries = sum(
+                self._safe_int(r.summaries_count) for r in runs_with_metrics
+            )
+            cumulative_inserted = sum(
+                self._safe_int(r.inserted_count) for r in runs_with_metrics
+            )
+            cumulative_updated = sum(
+                self._safe_int(r.updated_count) for r in runs_with_metrics
+            )
+            cumulative_candidates = sum(
+                self._safe_int(r.summary_candidates_count) for r in runs_with_metrics
+            )
+
+            pipe_collected = pipeline_collected or collected_articles
+            pipe_unique = cumulative_inserted or unique_articles
+            pipe_summaries = cumulative_summaries or summaries
+            pipe_candidates = cumulative_candidates or pipe_unique
+
             return {
                 "data_source": "pipeline_run",
-                **derived,
+                "collected_articles": pipe_collected,
+                "unique_articles": pipe_unique,
+                "summaries": pipe_summaries,
+                "quality_dropped_articles": pipeline_quality_dropped,
+                "duplicate_articles": max(pipe_collected - pipe_unique, 0),
+                "summary_candidates": pipe_candidates,
+                "usable_articles": pipeline_usable or pipe_collected,
+                "ranked_articles": pipeline_ranked or pipe_unique,
+                "inserted_articles": cumulative_inserted,
+                "updated_articles": cumulative_updated,
+                "has_data": pipe_collected > 0 or pipe_summaries > 0,
                 "cache_reused": bool(
                     latest_run.used_cached_articles or latest_run.used_cached_summaries
                 ),
             }
 
         return {"data_source": "derived" if collected_articles > 0 or summaries > 0 else "empty", **derived, "cache_reused": False}
+
+    async def _build_runs_payload(
+        self,
+        session: AsyncSession,
+        metrics_date: date,
+    ) -> list[dict[str, Any]]:
+        runs = await self._collection_runs_for_date(session, metrics_date)
+        if not runs:
+            return []
+
+        result: list[dict[str, Any]] = []
+        cumulative_briefs = 0
+        for run in runs:
+            if not any(
+                self._safe_int(getattr(run, field, 0)) > 0
+                for field in ("raw_collected_count", "usable_count", "inserted_count", "summaries_count")
+            ):
+                continue
+            run_briefs = self._safe_int(run.summaries_count)
+            cumulative_briefs += run_briefs
+            result.append({
+                "started_at": run.started_at.isoformat() if run.started_at else None,
+                "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+                "time": run.started_at.strftime("%H:%M") if run.started_at else "",
+                "cache_reused": bool(run.used_cached_articles or run.used_cached_summaries),
+                "briefs_count": run_briefs,
+                "inserted_count": self._safe_int(run.inserted_count),
+                "updated_count": self._safe_int(run.updated_count),
+                "pipeline": [
+                    {"label": "Recolectadas", "value": self._safe_int(run.raw_collected_count)},
+                    {"label": "Utiles", "value": self._safe_int(run.usable_count)},
+                    {"label": "Unicas", "value": self._safe_int(run.inserted_count)},
+                    {"label": "Candidatas", "value": self._safe_int(run.summary_candidates_count)},
+                    {"label": "Briefs", "value": cumulative_briefs},
+                ],
+            })
+        return result
 
     def _collection_run_has_pipeline_metrics(self, run: CollectionRun | None) -> bool:
         if not run:
@@ -613,6 +690,20 @@ class Database:
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def _collection_runs_for_date(
+        self,
+        session: AsyncSession,
+        metrics_date: date,
+    ) -> list[CollectionRun]:
+        start_at, end_at = self._day_bounds(metrics_date)
+        stmt = (
+            select(CollectionRun)
+            .where(CollectionRun.started_at >= start_at, CollectionRun.started_at < end_at)
+            .order_by(CollectionRun.started_at.asc())
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
 
     async def _latest_impact_date(
         self,
@@ -661,6 +752,8 @@ class Database:
         summary_candidates: int = 0,
         usable_articles: int = 0,
         ranked_articles: int = 0,
+        inserted_articles: int = 0,
+        updated_articles: int = 0,
     ) -> dict[str, Any]:
         collected_articles = max(int(collected_articles), 0)
         unique_articles = max(int(unique_articles), 0)
@@ -695,6 +788,8 @@ class Database:
             "summary_candidates": max(int(summary_candidates), 0),
             "usable_articles": max(int(usable_articles), 0),
             "ranked_articles": max(int(ranked_articles), 0),
+            "inserted_articles": max(int(inserted_articles), 0),
+            "updated_articles": max(int(updated_articles), 0),
             "duplicate_articles_estimated": duplicate_articles_estimated,
             "reduction_rate": max(min(reduction_rate, 1.0), 0.0),
             "estimated_pages_avoided": estimated_pages_avoided,
@@ -705,7 +800,8 @@ class Database:
             "pipeline": [
                 {"label": "Recolectadas", "value": collected_articles},
                 {"label": "Utiles", "value": max(int(usable_articles), 0)},
-                {"label": "Unicas", "value": unique_articles},
+                {"label": "Unicas", "value": max(int(unique_articles), 0)},
+                {"label": "Candidatas", "value": max(int(summary_candidates), 0)},
                 {"label": "Briefs", "value": summaries},
             ],
             "methodology": {

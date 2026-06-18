@@ -88,23 +88,30 @@ type DropDef = { fromIdx: number; count: number; label: string };
 const DESC = {
   Recolectadas: "Artículos de scrapers + NewsAPI de 6 fuentes bolivianas (Unitel, RedUno, El Deber, Los Tiempos, Red Bolivisión, Radio Fides)",
   Útiles: "Filtro de calidad: se descartan artículos sin título, sin imagen o con contenido insuficiente",
-  Únicas: "Deduplicación por URL duplicada, contenido similar y cluster de historia",
-  Rankeadas: "Todas las únicas noticias se puntúan con 7 criterios — actualidad (15%), relevancia local Bolivia (20%), impacto informativo (20%), calidad contenido (17%), fuente (10%), corroboración (10%) y confianza categoría (8%)",
+  Únicas: "Artículos nuevos insertados en base de datos (no existían previamente)",
+  Candidatas: "Selección diversa por categoría para generar resúmenes (top 5 por categoría, máx 2 por fuente)",
   Briefs: "",
 };
 
 const PipelineFlowSVG = ({ metrics }: { metrics: ImpactMetricsResponse }) => {
-  const total = metrics.collected_articles;
+  const isPipelineRun = metrics.data_source === "pipeline_run";
+  const lastRun = isPipelineRun && metrics.runs && metrics.runs.length > 0
+    ? metrics.runs[metrics.runs.length - 1]
+    : null;
+
+  const total = lastRun ? (lastRun.pipeline[0]?.value ?? metrics.collected_articles) : metrics.collected_articles;
   const fmt = (n: number) => formatNumber(n);
   const pctStr = (n: number) => (total > 0 ? `${((n / total) * 100).toFixed(0)}%` : "—");
   const modelLabel = metrics.llm_model && metrics.llm_provider
     ? `Generados con ${metrics.llm_model} vía ${metrics.llm_provider}`
     : "Resumidos con IA (Groq)";
 
-  const usable = metrics.usable_articles ?? 0;
-  const unicas = metrics.unique_articles;
-  const ranked = metrics.ranked_articles ?? 0;
-  const summaries = metrics.summaries;
+  const usable = lastRun ? (lastRun.pipeline[1]?.value ?? metrics.usable_articles ?? 0) : (metrics.usable_articles ?? 0);
+  const unicas = lastRun ? (lastRun.inserted_count ?? lastRun.pipeline[2]?.value ?? metrics.unique_articles) : metrics.unique_articles;
+  const candidatas = lastRun ? (lastRun.pipeline[3]?.value ?? metrics.summary_candidates ?? 0) : (metrics.summary_candidates ?? 0);
+  const ranked = lastRun ? (metrics.ranked_articles ?? 0) : (metrics.ranked_articles ?? 0);
+  const lastRunBriefs = lastRun ? (lastRun.briefs_count ?? metrics.summaries) : metrics.summaries;
+  const summaries = lastRun ? lastRunBriefs : metrics.summaries;
 
   const stages: StageDef[] = [
     { label: "Recolectadas", count: total, color: "#6b7280", icon: "📥" },
@@ -118,6 +125,10 @@ const PipelineFlowSVG = ({ metrics }: { metrics: ImpactMetricsResponse }) => {
 
   if (ranked > 0) {
     stages.push({ label: "Rankeadas", count: ranked, color: "#16a34a", icon: "⭐" });
+  }
+
+  if (candidatas > 0 && candidatas !== (stages[stages.length - 1]?.count ?? 0)) {
+    stages.push({ label: "Candidatas", count: candidatas, color: "#7c3aed", icon: "📋" });
   }
 
   if (summaries > 0 && summaries !== (stages[stages.length - 1]?.count ?? 0)) {
@@ -135,6 +146,7 @@ const PipelineFlowSVG = ({ metrics }: { metrics: ImpactMetricsResponse }) => {
     if (i === 0) label = "baja calidad";
     else if (i === 1 && stages[i].label === "Útiles") label = "duplicados";
     else if (stages[i].label === "Únicas" && stages[i + 1].label === "Rankeadas") label = "no priorizadas";
+    else if (stages[i].label === "Rankeadas" && stages[i + 1].label === "Candidatas") label = "no candidatas";
     else if (stages[i + 1].label === "Briefs") label = "no resumidas";
     drops.push({ fromIdx: i, count: diff, label });
   }
@@ -318,8 +330,25 @@ export const ImpactPage = () => {
     page_size: 3,
   });
   const pipelineRows = useMemo(() => {
+    if (!metrics) return [];
+    const isPipelineRun = metrics.data_source === "pipeline_run";
+    const lastRun = isPipelineRun && metrics.runs && metrics.runs.length > 0
+      ? metrics.runs[metrics.runs.length - 1]
+      : null;
+
+    if (lastRun) {
+      const briefsStep = lastRun.pipeline.find(s => s.label === "Briefs");
+      return [
+        { label: "Recolectadas", value: lastRun.pipeline[0]?.value ?? metrics.collected_articles },
+        { label: "Utiles", value: lastRun.pipeline[1]?.value ?? metrics.usable_articles },
+        { label: "Unicas", value: lastRun.inserted_count ?? lastRun.pipeline[2]?.value ?? metrics.unique_articles },
+        { label: "Candidatas", value: lastRun.pipeline[3]?.value ?? metrics.summary_candidates ?? 0 },
+        { label: "Briefs", value: lastRun.briefs_count ?? briefsStep?.value ?? metrics.summaries },
+      ];
+    }
+
     const rows = getImpactPipelineRows(metrics);
-    return rows.filter((row) => ["Recolectadas", "Utiles", "Unicas", "Briefs"].includes(row.label));
+    return rows.filter((row) => ["Recolectadas", "Utiles", "Unicas", "Candidatas", "Briefs"].includes(row.label));
   }, [metrics]);
   const summaries = summariesData?.items ?? [];
 
