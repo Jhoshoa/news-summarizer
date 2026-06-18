@@ -344,14 +344,29 @@ class NewsSummarizerApp:
                     summarized_ids = await self.db.get_article_ids_with_summaries(article_ids)
                     if summarized_ids:
                         before = len(news)
+                        already_summarized = [n for n in news if n.get("id") in summarized_ids]
                         news = [n for n in news if n.get("id") not in summarized_ids]
                         already_summarized_removed = before - len(news)
+                        for a in already_summarized[:10]:
+                            logger.info(
+                                "  ya resumida  | id={:<5} cat={:<14} score={:<6} title={}",
+                                a.get("id"), a.get("category",""), a.get("score",""),
+                                (a.get("title","") or "")[:100],
+                            )
+                        if len(already_summarized) > 10:
+                            logger.info("  ... y {} mas ya resumidas", len(already_summarized) - 10)
                         logger.info(f"Filtradas {already_summarized_removed} noticias ya resumidas")
                 except Exception as e:
                     logger.warning(f"Error al filtrar noticias ya resumidas: {e}")
 
             summary_candidates = self._select_summary_candidates(news, categories)
             pipeline_metrics["summary_candidates_count"] = len(summary_candidates)
+            for a in summary_candidates:
+                logger.info(
+                    "  candidato       | id={:<5} cat={:<14} score={:<6} source={:<12} title={}",
+                    a.get("id"), a.get("category",""), a.get("score",""),
+                    a.get("source","")[:12], (a.get("title","") or "")[:100],
+                )
             logger.info(f"Candidatos a resumir: {len(summary_candidates)}")
 
             llm_dedup_removed = 0
@@ -362,9 +377,24 @@ class NewsSummarizerApp:
                     cat_articles = [a for a in summary_candidates if a.get("category") == cat]
                     if cat_articles:
                         cat_existing = [s for s in summaries if s.get("category") == cat]
-                        deduped.extend(
-                            await story_deduplicator.deduplicate(cat_articles, existing_summaries=cat_existing)
-                        )
+                        before_cat = len(cat_articles)
+                        cat_deduped = await story_deduplicator.deduplicate(cat_articles, existing_summaries=cat_existing)
+                        cat_removed = before_cat - len(cat_deduped)
+                        if cat_removed:
+                            removed_titles = {
+                                (a.get("id"), (a.get("title","") or "")[:80])
+                                for a in cat_articles
+                                if a not in cat_deduped
+                            }
+                            for rid, rtitle in removed_titles:
+                                logger.info("  AI dedup descarta | id={:<5} cat={:<14} title={}", rid, cat, rtitle)
+                            kept_titles = {
+                                (a.get("id"), (a.get("title","") or "")[:80])
+                                for a in cat_deduped
+                            }
+                            for kid, ktitle in kept_titles:
+                                logger.info("  AI dedup conserva | id={:<5} cat={:<14} title={}", kid, cat, ktitle)
+                        deduped.extend(cat_deduped)
                 llm_dedup_removed = len(summary_candidates) - len(deduped)
                 summary_candidates = deduped
                 pipeline_metrics["ai_dedup_count"] = len(summary_candidates)
@@ -658,19 +688,45 @@ class NewsSummarizerApp:
             category_news = [n for n in news if n.get("category") == category]
             if not category_news:
                 continue
+            cat_limit = self._per_category_limit(category)
+            to_summarize = category_news[:cat_limit]
+            if len(category_news) > 5:
+                        logger.info(
+                            "  categoria {:<14} | {} candidatos, limitado a {} (descarta {} con menor score)",
+                            category, len(category_news), cat_limit, len(category_news) - cat_limit,
+                        )
+            for a in to_summarize:
+                logger.info(
+                    "  a resumir       | id={:<5} cat={:<14} score={:<6} title={}",
+                    a.get("id"), a.get("category",""), a.get("score",""),
+                    (a.get("title","") or "")[:100],
+                )
             try:
-                cat_summaries = await summarizer.summarize(category_news[:5], category)
+                cat_summaries = await summarizer.summarize(to_summarize, category)
+                logger.info(
+                    "  categoria {:<14} | {} enviados, {} resumenes generados",
+                    category, len(to_summarize), len(cat_summaries),
+                )
                 summaries.extend(cat_summaries)
             except Exception as e:
                 logger.error(f"Error resumiendo {category}: {e}")
 
         return summaries
 
+    def _per_category_limit(self, category: str) -> int:
+        extended = [
+            c.strip().lower()
+            for c in self.settings.summary_candidates_extended_categories.split(",")
+        ]
+        if category.strip().lower() in extended:
+            return self.settings.summary_candidates_extended_limit
+        return self.settings.summary_candidates_per_category
+
     def _select_summary_candidates(
         self,
         news: list[dict],
         categories: list[str],
-        per_category_limit: int = 5,
+        per_category_limit: int | None = None,
         max_per_source: int = 2,
     ) -> list[dict]:
         selected: list[dict] = []
@@ -680,9 +736,10 @@ class NewsSummarizerApp:
         for category in categories:
             category_news = [article for article in news if article.get("category") == category]
             category_news.sort(key=lambda a: a.get("score", 0) or 0, reverse=True)
+            cat_limit = per_category_limit if per_category_limit is not None else self._per_category_limit(category)
             category_selection = self._select_diverse_articles(
                 category_news,
-                limit=per_category_limit,
+                limit=cat_limit,
                 max_per_source=max_per_source,
             )
             for article in category_selection:
