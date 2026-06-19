@@ -189,8 +189,8 @@ async def test_classify_batch_async_uses_llm_for_low_confidence_rule():
     classifier = NewsClassifier(llm_provider=llm)
     articles = [
         {
-            "title": "Presidente del club habla de elecciones y futbol",
-            "description": "El candidato y jugador anuncio ley y gol.",
+            "title": "Comision de penal y memoria del sistema",
+            "description": "La autoridad reporto perdida de datos",
             "content": "",
             "category": "general",
         }
@@ -230,8 +230,8 @@ async def test_classify_batch_async_keeps_rules_when_llm_returns_invalid_categor
     classifier = NewsClassifier(llm_provider=llm)
     articles = [
         {
-            "title": "Presidente del club habla de elecciones y futbol",
-            "description": "El candidato y jugador anuncio ley y gol.",
+            "title": "Comision de penal y memoria del sistema",
+            "description": "La autoridad reporto perdida de datos",
             "content": "",
             "category": "general",
         }
@@ -252,8 +252,8 @@ async def test_classify_batch_async_parses_llm_json_inside_markdown_fence():
     classifier = NewsClassifier(llm_provider=llm)
     articles = [
         {
-            "title": "Presidente del club habla de elecciones y futbol",
-            "description": "El candidato y jugador anuncio ley y gol.",
+            "title": "Comision de penal y memoria del sistema",
+            "description": "La autoridad reporto perdida de datos",
             "content": "",
             "category": "general",
         }

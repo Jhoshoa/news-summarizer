@@ -50,6 +50,7 @@ DEFAULT_CATEGORIES = {
     "deportes": "Deportes",
     "tecnologia": "Tecnologia",
     "entretenimiento": "Entretenimiento",
+    "policiales": "Policiales",
     "general": "General",
 }
 

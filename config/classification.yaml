@@ -13,8 +13,8 @@ categories:
       - { term: "importacion", weight: 2 }
       - { term: "combustible", weight: 3 }
       - { term: "hidrocarburos", weight: 3 }
-      - { term: "precio", weight: 1.5 }
-      - { term: "mercado", weight: 1.5 }
+      - { term: "precio", weight: 2 }
+      - { term: "mercado", weight: 2 }
       - { term: "banco", weight: 2 }
       - { term: "credito", weight: 2 }
       - { term: "deuda", weight: 2 }
@@ -34,13 +34,13 @@ categories:
       - { term: "salario", weight: 2 }
       - { term: "sueldo", weight: 2 }
       - { term: "ganancia", weight: 2 }
-      - { term: "perdida", weight: 1.5 }
-      - { term: "ingreso", weight: 1.5 }
+      - { term: "perdida", weight: 2 }
+      - { term: "ingreso", weight: 2 }
       - { term: "ahorro", weight: 2 }
       - { term: "prestamo", weight: 2 }
       - { term: "moneda", weight: 2 }
       - { term: "cotizacion", weight: 3 }
-      - { term: "proveedor", weight: 1.5 }
+      - { term: "proveedor", weight: 2 }
       - { term: "consumo", weight: 2 }
       - { term: "produccion", weight: 2 }
       - { term: "industrial", weight: 2 }
@@ -50,19 +50,53 @@ categories:
       - { term: "gas", weight: 3 }
       - { term: "petroleo", weight: 3 }
       - { term: "energia electrica", weight: 2 }
-      - { term: "factura", weight: 1.5 }
+      - { term: "factura", weight: 2 }
       - { term: "canon", weight: 2 }
       - { term: "regalias", weight: 3 }
       - { term: "financiero", weight: 2 }
       - { term: "bursatil", weight: 3 }
       - { term: "bolsa de valores", weight: 4 }
       - { term: "tasa de interes", weight: 3 }
+      - { term: "yacimiento", weight: 3 }
+      - { term: "inversion extranjera", weight: 3 }
+      - { term: "arancel", weight: 3 }
+      - { term: "remesa", weight: 2 }
+      - { term: "desempleo", weight: 3 }
+      - { term: "empleo", weight: 2 }
+      - { term: "poder adquisitivo", weight: 3 }
+      - { term: "canasta familiar", weight: 3 }
+      - { term: "ipc", weight: 3 }
+      - { term: "indice de precios", weight: 3 }
+      - { term: "costo de vida", weight: 3 }
+      - { term: "pobreza", weight: 2 }
+      - { term: "desigualdad", weight: 2 }
+      - { term: "recaudacion tributaria", weight: 3 }
+      - { term: "evasion", weight: 2 }
+      - { term: "contrabando", weight: 2 }
+      - { term: "soja", weight: 2 }
+      - { term: "quinua", weight: 2 }
+      - { term: "agropecuario", weight: 2 }
+      - { term: "ganadero", weight: 2 }
+      - { term: "cafe", weight: 2 }
+      - { term: "cacao", weight: 2 }
+      - { term: "turismo", weight: 2 }
+      - { term: "transporte", weight: 2 }
+      - { term: "logistica", weight: 2 }
+      - { term: "quiebra", weight: 2 }
+      - { term: "bancarrota", weight: 2 }
+      - { term: "embargo economico", weight: 3 }
+      - { term: "catastro", weight: 2 }
+      - { term: "tributo", weight: 3 }
+      - { term: "patrimonio", weight: 2 }
+      - { term: "producto interno", weight: 3 }
+      - { term: "paro forzoso", weight: 2 }
     negative:
       - { term: "club", weight: 2 }
       - { term: "gol", weight: 2 }
+      - { term: "arquero", weight: 2 }
 
   politica:
-    description: "Gobierno, elecciones, partidos politicos, Asamblea, leyes, candidatos y autoridades."
+    description: "Gobierno, elecciones, partidos politicos, Asamblea, leyes, candidatos, relaciones exteriores y autoridades."
     positive:
       - { term: "gobierno", weight: 2 }
       - { term: "presidente", weight: 3 }
@@ -92,7 +126,7 @@ categories:
       - { term: "dirigente", weight: 2 }
       - { term: "vocero", weight: 2 }
       - { term: "portavoz", weight: 2 }
-      - { term: "comision", weight: 1.5 }
+      - { term: "comision", weight: 2 }
       - { term: "constitucion", weight: 3 }
       - { term: "reforma", weight: 2 }
       - { term: "voto", weight: 3 }
@@ -102,11 +136,11 @@ categories:
       - { term: "debate", weight: 2 }
       - { term: "oposicion", weight: 3 }
       - { term: "oficialismo", weight: 3 }
-      - { term: "autoridad", weight: 1.5 }
+      - { term: "autoridad", weight: 2 }
       - { term: "municipal", weight: 2 }
       - { term: "departamental", weight: 2 }
       - { term: "legislacion", weight: 3 }
-      - { term: "resolucion", weight: 1.5 }
+      - { term: "resolucion", weight: 2 }
       - { term: "ordenanza", weight: 2 }
       - { term: "pliego petitorio", weight: 3 }
       - { term: "paro", weight: 2 }
@@ -116,11 +150,46 @@ categories:
       - { term: "manifestacion", weight: 2 }
       - { term: "protesta", weight: 2 }
       - { term: "conflicto social", weight: 3 }
+      - { term: "soberania", weight: 3 }
+      - { term: "embajada", weight: 2 }
+      - { term: "tratado", weight: 2 }
+      - { term: "relacion bilateral", weight: 3 }
+      - { term: "cancilleria", weight: 3 }
+      - { term: "canciller", weight: 3 }
+      - { term: "asamblea constituyente", weight: 3 }
+      - { term: "referendo", weight: 3 }
+      - { term: "cidh", weight: 3 }
+      - { term: "corte internacional", weight: 3 }
+      - { term: "onu", weight: 2 }
+      - { term: "oea", weight: 2 }
+      - { term: "alegato", weight: 2 }
+      - { term: "demanda maritima", weight: 4 }
+      - { term: "silala", weight: 3 }
+      - { term: "laudo", weight: 3 }
+      - { term: "fallo", weight: 2 }
+      - { term: "sentencia internacional", weight: 3 }
+      - { term: "democracia", weight: 2 }
+      - { term: "transparencia", weight: 2 }
+      - { term: "corrupcion", weight: 2 }
+      - { term: "fideicomiso", weight: 2 }
+      - { term: "interpelacion", weight: 3 }
+      - { term: "censura", weight: 2 }
+      - { term: "investidura", weight: 2 }
+      - { term: "posesion", weight: 2 }
+      - { term: "juramentacion", weight: 2 }
+      - { term: "negociacion", weight: 2 }
+      - { term: "dialogo", weight: 2 }
+      - { term: "coalicion", weight: 2 }
+      - { term: "alianza politica", weight: 3 }
+      - { term: "frente politico", weight: 2 }
+      - { term: "plurinacional", weight: 3 }
     negative:
       - { term: "partido de futbol", weight: 5 }
       - { term: "liga profesional", weight: 4 }
       - { term: "gol", weight: 3 }
       - { term: "club", weight: 2 }
+      - { term: "arquero", weight: 2 }
+      - { term: "delantero", weight: 2 }
 
   deportes:
     description: "Futbol, clubes, torneos, seleccion, resultados y deportistas."
@@ -144,30 +213,30 @@ categories:
       - { term: "the strongest", weight: 3 }
       - { term: "oriente petrolero", weight: 3 }
       - { term: "wilstermann", weight: 3 }
-      - { term: "equipo", weight: 1.5 }
+      - { term: "equipo", weight: 2 }
       - { term: "cancha", weight: 2 }
       - { term: "estadio", weight: 2 }
       - { term: "arbitro", weight: 2 }
       - { term: "penal", weight: 2 }
       - { term: "arquero", weight: 2 }
       - { term: "portero", weight: 2 }
-      - { term: "defensa", weight: 1.5 }
+      - { term: "defensa", weight: 2 }
       - { term: "delantero", weight: 2 }
       - { term: "mediocampista", weight: 2 }
       - { term: "volante", weight: 2 }
-      - { term: "titular", weight: 1 }
-      - { term: "suplente", weight: 1.5 }
-      - { term: "lesion", weight: 1 }
+      - { term: "titular", weight: 2 }
+      - { term: "suplente", weight: 2 }
+      - { term: "lesion", weight: 2 }
       - { term: "clasificacion", weight: 2 }
       - { term: "ascenso", weight: 2 }
       - { term: "descenso", weight: 2 }
-      - { term: "final", weight: 1.5 }
+      - { term: "final", weight: 2 }
       - { term: "semifinal", weight: 2 }
       - { term: "cuartos de final", weight: 2 }
-      - { term: "victoria", weight: 1.5 }
-      - { term: "derrota", weight: 1.5 }
+      - { term: "victoria", weight: 2 }
+      - { term: "derrota", weight: 2 }
       - { term: "empate", weight: 2 }
-      - { term: "triunfo", weight: 1.5 }
+      - { term: "triunfo", weight: 2 }
       - { term: "tabla de posiciones", weight: 3 }
       - { term: "goleador", weight: 2 }
       - { term: "basquet", weight: 4 }
@@ -181,11 +250,69 @@ categories:
       - { term: "natacion", weight: 3 }
       - { term: "artes marciales", weight: 3 }
       - { term: "ajedrez", weight: 2 }
+      - { term: "automovilismo", weight: 3 }
+      - { term: "formula 1", weight: 3 }
+      - { term: "motociclismo", weight: 3 }
+      - { term: "surf", weight: 3 }
+      - { term: "gimnasia", weight: 3 }
+      - { term: "halterofilia", weight: 3 }
+      - { term: "pesas", weight: 2 }
+      - { term: "judo", weight: 3 }
+      - { term: "taekwondo", weight: 3 }
+      - { term: "karate", weight: 3 }
+      - { term: "esgrima", weight: 3 }
+      - { term: "tiro deportivo", weight: 3 }
+      - { term: "equitacion", weight: 3 }
+      - { term: "remo", weight: 3 }
+      - { term: "kayak", weight: 3 }
+      - { term: "vela", weight: 3 }
+      - { term: "triatlon", weight: 3 }
+      - { term: "maraton", weight: 3 }
+      - { term: "medio maraton", weight: 3 }
+      - { term: "carrera pedestre", weight: 2 }
+      - { term: "crossfit", weight: 2 }
+      - { term: "rugby", weight: 3 }
+      - { term: "handball", weight: 3 }
+      - { term: "balonmano", weight: 3 }
+      - { term: "hockey", weight: 3 }
+      - { term: "beisbol", weight: 3 }
+      - { term: "softball", weight: 3 }
+      - { term: "cricket", weight: 3 }
+      - { term: "golf", weight: 3 }
+      - { term: "squash", weight: 3 }
+      - { term: "badminton", weight: 3 }
+      - { term: "tenis de mesa", weight: 3 }
+      - { term: "billar", weight: 2 }
+      - { term: "deporte extremo", weight: 3 }
+      - { term: "parapente", weight: 3 }
+      - { term: "montanismo", weight: 3 }
+      - { term: "andinismo", weight: 3 }
+      - { term: "senderismo", weight: 2 }
+      - { term: "trekking", weight: 2 }
+      - { term: "rally", weight: 3 }
+      - { term: "futbolista", weight: 2 }
+      - { term: "basquetbolista", weight: 2 }
+      - { term: "nadador", weight: 2 }
+      - { term: "velocista", weight: 2 }
+      - { term: "raqueta", weight: 2 }
+      - { term: "circuito", weight: 2 }
+      - { term: "gran premio", weight: 2 }
+      - { term: "deportista", weight: 2 }
+      - { term: "olimpico", weight: 2 }
+      - { term: "olimpiada", weight: 2 }
+      - { term: "paralimpico", weight: 2 }
+      - { term: "llave", weight: 1 }
+      - { term: "serie", weight: 1 }
     negative:
       - { term: "partido politico", weight: 5 }
       - { term: "candidato", weight: 3 }
       - { term: "elecciones", weight: 3 }
       - { term: "asamblea legislativa", weight: 3 }
+      - { term: "presidente", weight: 2 }
+      - { term: "gobierno", weight: 2 }
+      - { term: "ley", weight: 2 }
+      - { term: "diputado", weight: 3 }
+      - { term: "senador", weight: 3 }
 
   tecnologia:
     description: "Tecnologia, internet, software, ciberseguridad, inteligencia artificial y telecomunicaciones."
@@ -214,7 +341,7 @@ categories:
       - { term: "celular", weight: 2 }
       - { term: "smartphone", weight: 3 }
       - { term: "computadora", weight: 2 }
-      - { term: "pantalla", weight: 1.5 }
+      - { term: "pantalla", weight: 2 }
       - { term: "hardware", weight: 3 }
       - { term: "innovacion", weight: 2 }
       - { term: "electronico", weight: 2 }
@@ -240,9 +367,59 @@ categories:
       - { term: "base de datos", weight: 3 }
       - { term: "computo", weight: 2 }
       - { term: "procesador", weight: 2 }
-      - { term: "memoria", weight: 1.5 }
+      - { term: "memoria", weight: 2 }
       - { term: "disco duro", weight: 2 }
       - { term: "gadget", weight: 2 }
+      - { term: "inteligencia", weight: 2 }
+      - { term: "chatbot", weight: 3 }
+      - { term: "gpt", weight: 2 }
+      - { term: "openai", weight: 3 }
+      - { term: "google", weight: 2 }
+      - { term: "microsoft", weight: 2 }
+      - { term: "apple", weight: 2 }
+      - { term: "samsung", weight: 2 }
+      - { term: "android", weight: 3 }
+      - { term: "ios", weight: 3 }
+      - { term: "windows", weight: 2 }
+      - { term: "linux", weight: 2 }
+      - { term: "macos", weight: 2 }
+      - { term: "tiktok", weight: 2 }
+      - { term: "instagram", weight: 2 }
+      - { term: "facebook", weight: 2 }
+      - { term: "twitter", weight: 2 }
+      - { term: "youtube", weight: 2 }
+      - { term: "whatsapp", weight: 2 }
+      - { term: "telegram", weight: 2 }
+      - { term: "metaverso", weight: 3 }
+      - { term: "nft", weight: 3 }
+      - { term: "token", weight: 2 }
+      - { term: "ethereum", weight: 2 }
+      - { term: "5g", weight: 2 }
+      - { term: "dron", weight: 2 }
+      - { term: "vehiculo electrico", weight: 2 }
+      - { term: "realidad aumentada", weight: 4 }
+      - { term: "computacion cuantica", weight: 4 }
+      - { term: "big data", weight: 3 }
+      - { term: "data science", weight: 2 }
+      - { term: "cloud computing", weight: 3 }
+      - { term: "desarrollo web", weight: 2 }
+      - { term: "api", weight: 2 }
+      - { term: "docker", weight: 2 }
+      - { term: "cifrado", weight: 2 }
+      - { term: "encriptacion", weight: 2 }
+      - { term: "biometria", weight: 3 }
+      - { term: "reconocimiento facial", weight: 3 }
+      - { term: "huella digital", weight: 2 }
+      - { term: "asistente virtual", weight: 3 }
+      - { term: "inteligente", weight: 2 }
+      - { term: "automatizar", weight: 2 }
+      - { term: "pixel", weight: 2 }
+      - { term: "gigafactor", weight: 2 }
+      - { term: "ia generativa", weight: 4 }
+      - { term: "tecnologico", weight: 2 }
+      - { term: "ciberataque", weight: 3 }
+      - { term: "ciberdelincuencia", weight: 3 }
+      - { term: "ransomware", weight: 3 }
     negative: []
 
   entretenimiento:
@@ -277,9 +454,8 @@ categories:
       - { term: "grupo musical", weight: 3 }
       - { term: "disco", weight: 2 }
       - { term: "album", weight: 3 }
-      - { term: "lanzamiento", weight: 1.5 }
+      - { term: "lanzamiento", weight: 2 }
       - { term: "gira", weight: 2 }
-      - { term: "concierto", weight: 3 }
       - { term: "bailar", weight: 2 }
       - { term: "baile", weight: 2 }
       - { term: "danza", weight: 2 }
@@ -289,13 +465,188 @@ categories:
       - { term: "novela", weight: 2 }
       - { term: "entretenimiento", weight: 3 }
       - { term: "ocio", weight: 2 }
-      - { term: "funcion", weight: 1.5 }
+      - { term: "funcion", weight: 2 }
       - { term: "cartelera", weight: 2 }
       - { term: "exito de taquilla", weight: 3 }
       - { term: "videojuego", weight: 3 }
+      - { term: "cantautor", weight: 2 }
+      - { term: "compositor", weight: 2 }
+      - { term: "vocalista", weight: 2 }
+      - { term: "baterista", weight: 2 }
+      - { term: "guitarrista", weight: 2 }
+      - { term: "productor musical", weight: 3 }
+      - { term: "estudio de grabacion", weight: 2 }
+      - { term: "spotify", weight: 2 }
+      - { term: "netflix", weight: 2 }
+      - { term: "disney", weight: 2 }
+      - { term: "hbo", weight: 2 }
+      - { term: "amazon prime", weight: 2 }
+      - { term: "plataforma de streaming", weight: 3 }
+      - { term: "festival de cine", weight: 3 }
+      - { term: "festival de musica", weight: 3 }
+      - { term: "alfombra roja", weight: 2 }
+      - { term: "celebridad", weight: 2 }
+      - { term: "estrella", weight: 2 }
+      - { term: "influencer", weight: 2 }
+      - { term: "tiktoker", weight: 2 }
+      - { term: "youtuber", weight: 2 }
+      - { term: "streamer", weight: 2 }
+      - { term: "k-pop", weight: 2 }
+      - { term: "pop", weight: 2 }
+      - { term: "reggaeton", weight: 2 }
+      - { term: "rock", weight: 2 }
+      - { term: "jazz", weight: 2 }
+      - { term: "blues", weight: 2 }
+      - { term: "salsa", weight: 2 }
+      - { term: "bachata", weight: 2 }
+      - { term: "merengue", weight: 2 }
+      - { term: "cumbia", weight: 2 }
+      - { term: "folklore", weight: 2 }
+      - { term: "tipico", weight: 2 }
+      - { term: "coreografia", weight: 2 }
+      - { term: "obra de teatro", weight: 2 }
+      - { term: "musical", weight: 2 }
+      - { term: "circo", weight: 2 }
+      - { term: "magia", weight: 2 }
+      - { term: "comedia stand up", weight: 2 }
+      - { term: "exposicion", weight: 2 }
+      - { term: "museo", weight: 2 }
+      - { term: "galeria", weight: 2 }
+      - { term: "literatura", weight: 2 }
+      - { term: "libro", weight: 2 }
+      - { term: "escritor", weight: 2 }
+      - { term: "poeta", weight: 2 }
+      - { term: "bestseller", weight: 2 }
+      - { term: "blockbuster", weight: 2 }
+      - { term: "animacion", weight: 2 }
+      - { term: "dibujo animado", weight: 2 }
+      - { term: "anime", weight: 2 }
+      - { term: "manga", weight: 2 }
+      - { term: "cosplay", weight: 2 }
+      - { term: "gaming", weight: 2 }
+      - { term: "e-sports", weight: 2 }
+      - { term: "playstation", weight: 2 }
+      - { term: "xbox", weight: 2 }
+      - { term: "nintendo", weight: 2 }
+      - { term: "cantante famoso", weight: 3 }
+      - { term: "cuento", weight: 2 }
+      - { term: "poesia", weight: 2 }
     negative:
       - { term: "tribunal supremo electoral", weight: 4 }
       - { term: "banco central", weight: 4 }
+      - { term: "ministro", weight: 3 }
+      - { term: "presidente", weight: 2 }
+
+  policiales:
+    description: "Delitos, crimen, violencia, accidentes, investigaciones, seguridad ciudadana y sucesos."
+    positive:
+      - { term: "policia", weight: 3 }
+      - { term: "delincuencia", weight: 3 }
+      - { term: "robo", weight: 3 }
+      - { term: "asesinato", weight: 4 }
+      - { term: "muerte violenta", weight: 3 }
+      - { term: "homicidio", weight: 4 }
+      - { term: "balacera", weight: 3 }
+      - { term: "tiroteo", weight: 3 }
+      - { term: "atraco", weight: 3 }
+      - { term: "hurto", weight: 3 }
+      - { term: "secuestro", weight: 4 }
+      - { term: "violacion", weight: 4 }
+      - { term: "estafa", weight: 3 }
+      - { term: "crimen", weight: 3 }
+      - { term: "delito", weight: 2 }
+      - { term: "banda criminal", weight: 4 }
+      - { term: "detenido", weight: 2 }
+      - { term: "capturado", weight: 2 }
+      - { term: "fiscal", weight: 2 }
+      - { term: "allanamiento", weight: 3 }
+      - { term: "droga", weight: 3 }
+      - { term: "narcotrafico", weight: 4 }
+      - { term: "arma", weight: 2 }
+      - { term: "violencia", weight: 2 }
+      - { term: "accidente", weight: 2 }
+      - { term: "choque", weight: 2 }
+      - { term: "incendio", weight: 2 }
+      - { term: "rescate", weight: 2 }
+      - { term: "emergencia", weight: 2 }
+      - { term: "siniestro", weight: 2 }
+      - { term: "asalto", weight: 3 }
+      - { term: "sicariato", weight: 4 }
+      - { term: "extorsion", weight: 3 }
+      - { term: "fraude", weight: 2 }
+      - { term: "pandillero", weight: 3 }
+      - { term: "pandilla", weight: 2 }
+      - { term: "decomiso", weight: 2 }
+      - { term: "captura", weight: 2 }
+      - { term: "prision", weight: 2 }
+      - { term: "carcel", weight: 2 }
+      - { term: "penitenciaria", weight: 2 }
+      - { term: "reo", weight: 2 }
+      - { term: "preso", weight: 2 }
+      - { term: "sentencia", weight: 2 }
+      - { term: "imputado", weight: 2 }
+      - { term: "investigacion penal", weight: 3 }
+      - { term: "arresto", weight: 2 }
+      - { term: "apunalado", weight: 3 }
+      - { term: "apuñalado", weight: 3 }
+      - { term: "baleado", weight: 3 }
+      - { term: "herido de bala", weight: 3 }
+      - { term: "cuerpo sin vida", weight: 3 }
+      - { term: "cadaver", weight: 3 }
+      - { term: "feminicidio", weight: 4 }
+      - { term: "violencia domestica", weight: 3 }
+      - { term: "maltrato", weight: 2 }
+      - { term: "abuso", weight: 2 }
+      - { term: "secuestrador", weight: 3 }
+      - { term: "narcotraficante", weight: 3 }
+      - { term: "microtrafico", weight: 3 }
+      - { term: "sustancia controlada", weight: 3 }
+      - { term: "narcotrafico", weight: 4 }
+      - { term: "laboratorio de droga", weight: 3 }
+      - { term: "cocaina", weight: 4 }
+      - { term: "marihuana", weight: 3 }
+      - { term: "pesquisa", weight: 2 }
+      - { term: "indagacion", weight: 2 }
+      - { term: "investigacion fiscal", weight: 3 }
+      - { term: "orden de aprehension", weight: 3 }
+      - { term: "mandamiento de captura", weight: 3 }
+      - { term: "fuga", weight: 2 }
+      - { term: "evasion", weight: 2 }
+      - { term: "motin", weight: 2 }
+      - { term: "caleta", weight: 2 }
+      - { term: "clan familiar", weight: 2 }
+      - { term: "organizacion criminal", weight: 3 }
+      - { term: "delincuente", weight: 3 }
+      - { term: "ladron", weight: 3 }
+      - { term: "asaltante", weight: 3 }
+      - { term: "atracador", weight: 3 }
+      - { term: "chuto", weight: 2 }
+      - { term: "vehiculo robado", weight: 2 }
+      - { term: "asalto a mano armada", weight: 4 }
+      - { term: "violador", weight: 3 }
+      - { term: "asesino", weight: 3 }
+      - { term: "asesina", weight: 3 }
+      - { term: "victima", weight: 2 }
+      - { term: "fallecido en", weight: 2 }
+      - { term: "vuelco", weight: 2 }
+      - { term: "volcadura", weight: 2 }
+      - { term: "deslizamiento", weight: 2 }
+      - { term: "derrrumbe", weight: 2 }
+      - { term: "explosion", weight: 2 }
+      - { term: "fuga de gas", weight: 2 }
+      - { term: "intoxicacion", weight: 2 }
+      - { term: "envenenamiento", weight: 2 }
+      - { term: "suicidio", weight: 3 }
+      - { term: "ahogamiento", weight: 2 }
+      - { term: "rescate de", weight: 2 }
+      - { term: "bomberos", weight: 2 }
+      - { term: "defensa civil", weight: 2 }
+    negative:
+      - { term: "partido de futbol", weight: 3 }
+      - { term: "gol", weight: 2 }
+      - { term: "club deportivo", weight: 2 }
+      - { term: "tasa de interes", weight: 2 }
+      - { term: "presupuesto", weight: 2 }
 
 field_weights:
   title: 3.0
@@ -323,6 +674,13 @@ source_category_mappings:
     espectáculos: entretenimiento
     entretenimiento: entretenimiento
     cultura: entretenimiento
+    seguridad: policiales
+    policial: policiales
+    policiales: policiales
+    crimen: policiales
+    judicial: policiales
+    sucesos: policiales
+    accidentes: policiales
     general: general
 
   reduno:
@@ -338,7 +696,7 @@ source_category_mappings:
     espectáculos: entretenimiento
     tecnologia: tecnologia
     tecnología: tecnologia
-    seguridad: general
+    seguridad: policiales
 
   unitel:
     politica: politica
@@ -350,7 +708,7 @@ source_category_mappings:
     tecnología: tecnologia
     farandula: entretenimiento
     farándula: entretenimiento
-    seguridad: general
+    seguridad: policiales
     sociedad: general
 
   radiofides:
@@ -371,7 +729,7 @@ source_category_mappings:
     deportes: deportes
     farandula: entretenimiento
     farándula: entretenimiento
-    seguridad: general
+    seguridad: policiales
     nacional: politica
     noticias: general
 

@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     )
 
     default_categories: str = Field(
-        default="economia,politica,deportes,tecnologia,entretenimiento",
+        default="economia,politica,deportes,tecnologia,entretenimiento,policiales",
         alias="DEFAULT_CATEGORIES",
     )
     summary_candidates_per_category: int = Field(

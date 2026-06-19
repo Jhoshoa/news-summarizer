@@ -35,7 +35,7 @@ services:
       SCHEDULE_SUMMARY_MORNING: 10:00
       SCHEDULE_SUMMARY_AFTERNOON: 16:00
       SCHEDULE_SUMMARY_NIGHT: 20:00
-      DEFAULT_CATEGORIES: ${DEFAULT_CATEGORIES:-economia,politica,deportes,tecnologia,entretenimiento}
+      DEFAULT_CATEGORIES: ${DEFAULT_CATEGORIES:-economia,politica,deportes,tecnologia,entretenimiento,policiales}
       CORS_ORIGINS: http://2.25.206.70:5173,https://ecobriefbolivia.online,https://briefs.ecobriefbolivia.online
       API_AUTH_KEY: ${API_AUTH_KEY:-change-me-local-api-auth-key}
     depends_on:

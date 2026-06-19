@@ -137,7 +137,6 @@ export const ArticleDetailPage = () => {
     <>
       <section className="detail-layout">
         <aside className="related-briefs-sidebar" aria-label="Briefs EcoBrief relacionados">
-          <div className="section-label">Briefs EcoBrief</div>
           <div className="related-briefs-list">
             {isFetchingLatestSummaries
               ? Array.from({ length: 3 }, (_, index) => <PanelSkeleton key={index} />)
