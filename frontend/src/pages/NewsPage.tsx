@@ -26,6 +26,7 @@ const categoryTabs: Array<{ label: string; value?: string }> = [
   { label: "politica", value: "politica" },
   { label: "deportes", value: "deportes" },
   { label: "tecnologia", value: "tecnologia" },
+  { label: "entretenimiento", value: "entretenimiento" },
 ];
 
 export const NewsPage = () => {
