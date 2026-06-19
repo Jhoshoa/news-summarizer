@@ -6,6 +6,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+CONTENT_EXCERPT_LIMIT = 500
+DEDUP_TEMPERATURE = 0.2
+
 
 class AIStoryDeduplicator:
     """Uses AI to detect articles covering the same story/event but with
@@ -30,7 +33,7 @@ class AIStoryDeduplicator:
             result = await self._llm.chat(
                 prompt=prompt,
                 quality="fast",
-                temperature=0.1,
+                temperature=DEDUP_TEMPERATURE,
                 max_tokens=1000,
             )
             discard_indices = self._parse_indices(result, len(articles))
@@ -49,7 +52,7 @@ class AIStoryDeduplicator:
             result = await self._llm.chat(
                 prompt=prompt,
                 quality="fast",
-                temperature=0.1,
+                temperature=DEDUP_TEMPERATURE,
                 max_tokens=1000,
             )
             discard_indices = self._parse_indices(result, len(articles))
@@ -70,28 +73,52 @@ class AIStoryDeduplicator:
             "A continuacion se muestran resumenes YA EXISTENTES de noticias de hoy.",
             "Luego, una lista de NUEVOS articulos candidatos a resumir.",
             "",
+            "Objetivo: evitar duplicados reales sin perder hechos nuevos.",
+            "Se conservan los articulos cuando exista duda razonable.",
+            "Prioriza falsos negativos sobre falsos positivos: es preferible conservar",
+            "un articulo algo parecido antes que descartar una actualizacion real.",
+            "",
             "Reglas:",
-            "- Un nuevo articulo es REDUNDANTE si cubre el mismo evento especifico",
-            "  que algun resumen ya existente (mismo sujeto/objeto y cifras).",
+            "- Un nuevo articulo es REDUNDANTE SOLO si cubre el mismo hecho verificable",
+            "  que algun resumen ya existente: misma accion principal, mismas entidades",
+            "  clave y mismos detalles decisivos (fecha, lugar, monto, resultado o medida).",
             "  EJ: 'BCB sube tasa de interes a 7.5%' y 'Banco Central incrementa tasa a 7.5%'",
-            "- Tambien es REDUNDANTE si involucra a las mismas personas u organizaciones",
-            "  haciendo la misma accion principal, aunque los verbos sean diferentes.",
+            "      son redundantes porque describen la misma decision y la misma cifra.",
+            "- Tambien es REDUNDANTE si cambia la redaccion pero no cambia el hecho central.",
             "  EJ: 'Shakira y Manuel Garcia-Rulfo fueron vistos juntos y desatan rumores'",
             "      y 'Shakira y Manuel Garcia encienden las redes y desatan rumores'",
             "      hablan del MISMO rumor de romance (mismas personas, mismo hecho).",
-            "- Tambien es REDUNDANTE si reporta el mismo evento con las mismas",
-            "  entidades, horario y lugar, redactado de forma distinta.",
+            "- Tambien es REDUNDANTE si reporta la misma reunion, operativo, audiencia,",
+            "  partido, anuncio o accidente con la misma hora/lugar/resultado.",
             "  EJ: 'Dialogo Gobierno-COB se reprograma para las 16:00 en el BCB'",
             "      y 'Gobierno y COB instalaran el dialogo a las 16:00 en el Banco Central'",
             "      cubren la MISMA reunion (mismos actores, misma hora, mismo lugar).",
-            "- NO es redundante si solo comparte el tema general",
-            "  (ej: 'Gobierno anuncia nuevo bono' vs 'Gobierno evalua eliminar bono').",
+            "",
+            "NO descartes un articulo por coincidencia de palabras, categoria, lugar o entidades.",
+            "- NO es redundante si solo comparte el tema general.",
+            "  EJ: 'Gobierno anuncia nuevo bono' vs 'Gobierno evalua eliminar bono'",
+            "      son hechos distintos aunque ambos traten de bonos.",
+            "- NO es redundante si las mismas personas u organizaciones aparecen en",
+            "  acciones diferentes, decisiones opuestas, etapas distintas o consecuencias nuevas.",
+            "  EJ: 'Ministro anuncia dialogo con la COB' vs 'COB rechaza propuesta del Gobierno'",
+            "      NO son redundantes: mismos actores, acciones y resultado distintos.",
+            "  EJ: 'Alcalde niega renuncia' vs 'Concejo acepta renuncia del alcalde'",
+            "      NO son redundantes: misma persona, hecho institucional distinto.",
+            "- NO es redundante si un articulo agrega una novedad concreta posterior:",
+            "  nueva cifra, nuevo detenido, nueva medida, nueva fecha, nueva declaracion",
+            "  relevante, cambio de estado, resultado o consecuencia.",
+            "- NO es redundante si pertenece a un tema en desarrollo pero informa una",
+            "  etapa nueva: respuesta oficial, denuncia, allanamiento, audiencia, protesta,",
+            "  normalizacion, incumplimiento, carta, convocatoria o decision posterior.",
             "- TAMPOCO es redundante si habla de las mismas organizaciones pero con",
             "  un enfoque o angulo noticioso diferente (opiniones, reacciones, contexto)",
             "  y no del mismo evento concreto.",
             "  EJ: 'Unos respaldan la negociacion con la COB y otros exigen desbloquear'",
             "      NO es el mismo evento que 'Dialogo Gobierno-COB se reprograma a las 16:00'",
             "      aunque ambos mencionen COB y Gobierno (uno son reacciones, otro es un hecho concreto).",
+            "",
+            "Criterio de decision: descarta solo cuando el articulo nuevo no aportaria",
+            "un hecho noticioso distinto frente al resumen existente.",
             "- Indica SOLO los indices de los articulos NUEVOS que deberian DESCARTARSE",
             "  por ser redundantes con resumenes existentes.",
             "",
@@ -107,67 +134,79 @@ class AIStoryDeduplicator:
             category = summary.get("category", "") or ""
             lines.append(f"\n[R{i}] Titulo: {title}")
             if summary_text:
-                lines.append(f"    Resumen: {summary_text[:200]}")
+                lines.append(f"    Resumen: {summary_text[:CONTENT_EXCERPT_LIMIT]}")
             lines.append(f"    Categoria: {category}")
 
         lines.append("")
         lines.append("=== NUEVOS ARTICULOS CANDIDATOS ===")
-        for i, article in enumerate(articles):
-            title = article.get("title", "") or ""
-            source = article.get("source") or article.get("source_name") or ""
-            category = article.get("category", "") or ""
-            content = (
-                article.get("content_excerpt")
-                or article.get("description")
-                or article.get("summary")
-                or ""
-            )
-            if len(content) > 200:
-                content = content[:200] + "..."
-            lines.append(f"\n[{i}] Titulo: {title}")
-            lines.append(f"    Fuente: {source}")
-            lines.append(f"    Categoria: {category}")
-            lines.append(f"    Extracto: {content}")
+        self._append_article_lines(lines, articles)
         return "\n".join(lines)
 
     def _build_prompt(self, articles: Sequence[dict]) -> str:
         lines = [
             "Eres un asistente que identifica noticias que cubren el MISMO evento o historia.",
-            "Dada una lista de artículos con índice, título, fuente y categoría, determina cuáles",
-            "hablan del mismo hecho noticioso específico (no solo del mismo tema general).",
+            "Dada una lista de articulos con indice, titulo, fuente y categoria, determina cuales",
+            "hablan del mismo hecho noticioso especifico (no solo del mismo tema general).",
+            "",
+            "Objetivo: evitar duplicados reales sin perder hechos nuevos.",
+            "Se conservan los articulos cuando exista duda razonable.",
+            "Prioriza falsos negativos sobre falsos positivos: es preferible conservar",
+            "un articulo algo parecido antes que descartar una actualizacion real.",
             "",
             "Reglas:",
-            "- Dos artículos son la MISMA HISTORIA si reportan el mismo evento específico",
-            "  con el mismo sujeto/objeto y cifras.",
+            "- Dos articulos son la MISMA HISTORIA SOLO si reportan el mismo hecho verificable:",
+            "  misma accion principal, mismas entidades clave y mismos detalles decisivos",
+            "  (fecha, lugar, monto, resultado o medida).",
             "  EJ: 'BCB sube tasa de interes a 7.5%' y 'Banco Central incrementa tasa a 7.5%'",
-            "- Tambien son la MISMA HISTORIA si involucran a las mismas personas u",
-            "  organizaciones haciendo la misma accion principal, aunque usen verbos distintos.",
+            "      son la misma historia porque describen la misma decision y la misma cifra.",
+            "- Tambien son la MISMA HISTORIA si cambia la redaccion pero no cambia el hecho central.",
             "  EJ: 'Shakira y Manuel Garcia-Rulfo fueron vistos juntos y desatan rumores'",
             "      y 'Shakira y Manuel Garcia encienden las redes y desatan rumores'",
             "      hablan del MISMO rumor (mismas personas, mismo hecho).",
-            "- Tambien son la MISMA HISTORIA si reportan el mismo evento con las mismas",
-            "  entidades, horario y lugar pero redactado de forma distinta.",
+            "- Tambien son la MISMA HISTORIA si reportan la misma reunion, operativo, audiencia,",
+            "  partido, anuncio o accidente con la misma hora/lugar/resultado.",
             "  EJ: 'Dialogo Gobierno-COB se reprograma para las 16:00 en el BCB'",
             "      y 'Gobierno y COB instalaran el dialogo a las 16:00 en el Banco Central'",
             "      cubren la MISMA reunion (mismos actores, misma hora, mismo lugar).",
+            "",
+            "NO descartes un articulo por coincidencia de palabras, categoria, lugar o entidades.",
             "- NO son la misma historia si solo comparten el tema general",
-            "  (ej: 'Gobierno anuncia nuevo bono' vs 'Gobierno evalúa eliminar bono'",
+            "  (ej: 'Gobierno anuncia nuevo bono' vs 'Gobierno evalua eliminar bono'",
             "  son historias distintas aunque ambas sean sobre bonos).",
+            "- NO son la misma historia si las mismas personas u organizaciones aparecen en",
+            "  acciones diferentes, decisiones opuestas, etapas distintas o consecuencias nuevas.",
+            "  EJ: 'Ministro anuncia dialogo con la COB' vs 'COB rechaza propuesta del Gobierno'",
+            "      NO son redundantes: mismos actores, acciones y resultado distintos.",
+            "  EJ: 'Alcalde niega renuncia' vs 'Concejo acepta renuncia del alcalde'",
+            "      NO son redundantes: misma persona, hecho institucional distinto.",
+            "- NO son la misma historia si un articulo agrega una novedad concreta posterior:",
+            "  nueva cifra, nuevo detenido, nueva medida, nueva fecha, nueva declaracion",
+            "  relevante, cambio de estado, resultado o consecuencia.",
+            "- NO son la misma historia si pertenecen a un tema en desarrollo pero informan",
+            "  etapas nuevas: respuesta oficial, denuncia, allanamiento, audiencia, protesta,",
+            "  normalizacion, incumplimiento, carta, convocatoria o decision posterior.",
             "- TAMPOCO son la misma historia si hablan de las mismas organizaciones pero",
             "  con un enfoque o angulo noticioso diferente (opiniones, reacciones, contexto)",
             "  y no del mismo evento concreto.",
             "  EJ: 'Unos respaldan la negociacion con la COB y otros exigen desbloquear'",
             "      NO es el mismo evento que 'Dialogo Gobierno-COB se reprograma a las 16:00'",
             "      aunque ambos mencionen COB y Gobierno.",
-            "- Para cada grupo de artículos que cubran la misma historia, indica los índices",
-            "  de los artículos que deberían DESCARTARSE (los redundantes).",
             "",
-            "Formato de respuesta: SOLO un array JSON de índices a descartar, nada más.",
+            "Criterio de decision: descarta solo cuando el articulo no aportaria",
+            "un hecho noticioso distinto frente a otro candidato.",
+            "- Para cada grupo de articulos que cubran la misma historia, indica los indices",
+            "  de los articulos que deberian DESCARTARSE (los redundantes).",
+            "",
+            "Formato de respuesta: SOLO un array JSON de indices a descartar, nada mas.",
             "Ejemplo: [0, 3]",
-            "Si todos son historias únicas, responde: []",
+            "Si todos son historias unicas, responde: []",
             "",
-            "Artículos:",
+            "Articulos:",
         ]
+        self._append_article_lines(lines, articles)
+        return "\n".join(lines)
+
+    def _append_article_lines(self, lines: list[str], articles: Sequence[dict]) -> None:
         for i, article in enumerate(articles):
             title = article.get("title", "") or ""
             source = article.get("source") or article.get("source_name") or ""
@@ -178,13 +217,12 @@ class AIStoryDeduplicator:
                 or article.get("summary")
                 or ""
             )
-            if len(content) > 200:
-                content = content[:200] + "..."
+            if len(content) > CONTENT_EXCERPT_LIMIT:
+                content = content[:CONTENT_EXCERPT_LIMIT] + "..."
             lines.append(f"\n[{i}] Titulo: {title}")
             lines.append(f"    Fuente: {source}")
             lines.append(f"    Categoria: {category}")
             lines.append(f"    Extracto: {content}")
-        return "\n".join(lines)
 
     def _parse_indices(self, response: str, total: int) -> set[int]:
         if not response or not response.strip():

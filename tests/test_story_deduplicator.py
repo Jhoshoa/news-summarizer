@@ -194,10 +194,35 @@ def test_build_prompt_includes_article_details():
 
 def test_build_prompt_truncates_long_content():
     dedup = AIStoryDeduplicator(object())
-    long_desc = "x" * 500
+    long_desc = "x" * 600
     articles = [{"title": "Test", "source": "Src", "category": "gen", "description": long_desc}]
     prompt = dedup._build_prompt(articles)
     assert "..." in prompt
+    assert "x" * 500 in prompt
+
+
+def test_build_prompt_warns_against_keyword_only_deduplication():
+    dedup = AIStoryDeduplicator(object())
+    prompt = dedup._build_prompt([ARTICULO_DEUDA_A, ARTICULO_INFLACION])
+
+    assert "NO descartes un articulo por coincidencia de palabras" in prompt
+    assert "acciones diferentes, decisiones opuestas" in prompt
+    assert "COB rechaza propuesta del Gobierno" in prompt
+    assert "Prioriza falsos negativos sobre falsos positivos" in prompt
+    assert "tema en desarrollo" in prompt
+
+
+def test_build_against_summaries_prompt_includes_conservative_rules():
+    dedup = AIStoryDeduplicator(object())
+    prompt = dedup._build_dedup_against_summaries_prompt(
+        [ARTICULO_DEUDA_A],
+        [{"title": "Resumen previo", "summary": "Gobierno anuncia dialogo con la COB"}],
+    )
+
+    assert "REDUNDANTE SOLO si cubre el mismo hecho verificable" in prompt
+    assert "Se conservan los articulos cuando exista duda razonable" in prompt
+    assert "novedad concreta posterior" in prompt
+    assert "descartar una actualizacion real" in prompt
 
 
 @pytest.mark.asyncio
@@ -207,7 +232,7 @@ async def test_deduplicate_passes_correct_kwargs():
     await dedup.deduplicate([ARTICULO_DEUDA_A, ARTICULO_INFLACION])
     assert llm.last_kwargs is not None
     assert llm.last_kwargs.get("quality") == "fast"
-    assert llm.last_kwargs.get("temperature") == 0.1
+    assert llm.last_kwargs.get("temperature") == 0.2
     assert llm.last_kwargs.get("max_tokens") == 1000
 
 
