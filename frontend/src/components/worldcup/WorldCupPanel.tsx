@@ -38,6 +38,11 @@ export const WorldCupPanel = () => {
   }
 
   const todayMatches = allMatches.filter((m) => m.match_date === today);
+
+  if (todayMatches.length === 0) {
+    return null;
+  }
+
   const upcoming = allMatches.filter((m) => m.match_date > today);
 
   const visible = todayMatches.length >= MAX_VISIBLE
