@@ -4,16 +4,16 @@ services:
     image: postgres:15-alpine
     container_name: news-summarizer-new-db
     environment:
-      POSTGRES_USER: news_user
-      POSTGRES_PASSWORD: news_password
-      POSTGRES_DB: news_summarizer
+      POSTGRES_USER: ${POSTGRES_USER:-news_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-news_password}
+      POSTGRES_DB: ${POSTGRES_DB:-news_summarizer}
       TZ: America/La_Paz
     ports:
       - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U news_user -d news_summarizer"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-news_user} -d ${POSTGRES_DB:-news_summarizer}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,7 +31,7 @@ services:
       DEBUG: "false"
       LOG_LEVEL: INFO
       TZ: America/La_Paz
-      DATABASE_URL: postgresql+asyncpg://news_user:news_password@postgres:5432/news_summarizer
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_summarizer}
       SCHEDULE_SUMMARY_MORNING: 10:00
       SCHEDULE_SUMMARY_AFTERNOON: 16:00
       SCHEDULE_SUMMARY_NIGHT: 20:00
