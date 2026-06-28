@@ -7,6 +7,7 @@ const groupLabels: Record<string, string> = {
   A: "Grupo A", B: "Grupo B", C: "Grupo C", D: "Grupo D",
   E: "Grupo E", F: "Grupo F", G: "Grupo G", H: "Grupo H",
   I: "Grupo I", J: "Grupo J", K: "Grupo K", L: "Grupo L",
+  KO: "16avos de final",
 };
 
 const formatMatchTime = (time: string) => {

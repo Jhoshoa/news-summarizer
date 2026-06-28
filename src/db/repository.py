@@ -1758,7 +1758,49 @@ class Database:
                 venue=venue,
                 stage="group",
             ))
-        logger.info(f"Semilladas {len(raw)} jornadas de la Copa Mundial 2026")
+        logger.info(f"Semillados {len(raw)} partidos de fase de grupos")
+
+        # Round of 32 (16avos de final)
+        # (gmt_date, gmt_time, group, home, away, home_flag, away_flag, venue)
+        raw_r32: list[tuple[date, time, str, str, str, str, str, str]] = [
+            # Dom 28 jun
+            (date(2026, 6, 28), time(19, 0), "KO", "Sudáfrica", "Canadá", "🇿🇦", "🇨🇦", "Los Angeles Stadium"),
+            # Lun 29 jun
+            (date(2026, 6, 29), time(17, 0), "KO", "Brasil", "Japón", "🇧🇷", "🇯🇵", "Houston Stadium"),
+            (date(2026, 6, 29), time(20, 30), "KO", "Alemania", "Paraguay", "🇩🇪", "🇵🇾", "Boston Stadium"),
+            (date(2026, 6, 30), time(1, 0), "KO", "Países Bajos", "Marruecos", "🇳🇱", "🇲🇦", "Estadio Monterrey"),
+            # Mar 30 jun
+            (date(2026, 6, 30), time(17, 0), "KO", "Costa de Marfil", "Noruega", "🇨🇮", "🇳🇴", "Dallas Stadium"),
+            (date(2026, 6, 30), time(21, 0), "KO", "Francia", "Suecia", "🇫🇷", "🇸🇪", "New York New Jersey Stadium"),
+            (date(2026, 7, 1), time(1, 0), "KO", "México", "Ecuador", "🇲🇽", "🇪🇨", "Estadio Ciudad de México"),
+            # Mié 1 jul
+            (date(2026, 7, 1), time(16, 0), "KO", "Inglaterra", "RD Congo", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇨🇩", "Atlanta Stadium"),
+            (date(2026, 7, 1), time(20, 0), "KO", "Bélgica", "Senegal", "🇧🇪", "🇸🇳", "Seattle Stadium"),
+            (date(2026, 7, 2), time(0, 0), "KO", "Estados Unidos", "Bosnia y Herzegovina", "🇺🇸", "🇧🇦", "San Francisco Bay Area Stadium"),
+            # Jue 2 jul
+            (date(2026, 7, 2), time(19, 0), "KO", "España", "Austria", "🇪🇸", "🇦🇹", "Los Angeles Stadium"),
+            (date(2026, 7, 2), time(23, 0), "KO", "Portugal", "Croacia", "🇵🇹", "🇭🇷", "Toronto Stadium"),
+            (date(2026, 7, 3), time(3, 0), "KO", "Suiza", "Argelia", "🇨🇭", "🇩🇿", "BC Place Vancouver"),
+            # Vie 3 jul
+            (date(2026, 7, 3), time(18, 0), "KO", "Australia", "Egipto", "🇦🇺", "🇪🇬", "Dallas Stadium"),
+            (date(2026, 7, 3), time(22, 0), "KO", "Argentina", "Cabo Verde", "🇦🇷", "🇨🇻", "Miami Stadium"),
+            (date(2026, 7, 4), time(1, 30), "KO", "Colombia", "Ghana", "🇨🇴", "🇬🇭", "Kansas City Stadium"),
+        ]
+
+        for gmt_date, gmt_time, group, home, away, hf, af, venue in raw_r32:
+            bolivia_date, bolivia_time = self._gmt_to_bolivia(gmt_date, gmt_time)
+            session.add(WorldCupMatch(
+                match_date=bolivia_date,
+                match_time=bolivia_time,
+                group_name=group,
+                home_team=home,
+                away_team=away,
+                home_flag=hf,
+                away_flag=af,
+                venue=venue,
+                stage="round_32",
+            ))
+        logger.info(f"Semillados {len(raw_r32)} partidos de 16avos de final")
 
     async def _seed_categories(self, session: AsyncSession) -> None:
         for name, display_name in DEFAULT_CATEGORIES.items():
