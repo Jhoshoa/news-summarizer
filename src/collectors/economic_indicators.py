@@ -52,6 +52,7 @@ class EconomicIndicator:
 
 class EconomicIndicatorCollector:
     BCB_URL = "https://www.bcb.gob.bo/"
+    BCB_TC_TABLE_URL = "https://www.bcb.gob.bo/librerias/indicadores/dolar/tabla.php"
     BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
@@ -111,6 +112,8 @@ class EconomicIndicatorCollector:
 
         indicators = []
         for card in section.select(".bcb-kpi2-card"):
+            if card.select_one(".bcb-tco-amount"):
+                continue
             indicators.extend(
                 self._parse_bcb_card(
                     card,
@@ -118,6 +121,14 @@ class EconomicIndicatorCollector:
                     collected_at=collected_at,
                 )
             )
+
+        indicators.extend(
+            await self._fetch_tc_compra_venta(
+                client,
+                snapshot_key=snapshot_key,
+                collected_at=collected_at,
+            )
+        )
 
         return indicators
 
@@ -176,6 +187,83 @@ class EconomicIndicatorCollector:
             )
 
         return indicators
+
+    async def _fetch_tc_compra_venta(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        snapshot_key: str | None = None,
+        collected_at: datetime | None = None,
+    ) -> list[EconomicIndicator]:
+        today = date.today()
+        params_template = {
+            "sdd": str(today.day),
+            "smm": str(today.month),
+            "saa": str(today.year),
+            "edd": str(today.day),
+            "emm": str(today.month),
+            "eaa": str(today.year),
+            "qlist": "1",
+            "mk": "2",
+            "range": "USD",
+        }
+        sides = [
+            ("Compra", "buy", "34"),
+            ("Venta", "sell", "35"),
+        ]
+        indicators = []
+        for side_label, side, moneda in sides:
+            params = {**params_template, "moneda": moneda}
+            try:
+                resp = await client.get(self.BCB_TC_TABLE_URL, params=params)
+                resp.raise_for_status()
+                soup = BeautifulSoup(resp.text, "lxml")
+                value_text = self._parse_tc_table_value(soup)
+                value = self._parse_decimal(value_text)
+                if value is None:
+                    logger.warning(f"Could not parse {side_label} value from TC table")
+                    continue
+            except Exception:
+                logger.exception(f"Failed to fetch BCB {side_label} rate")
+                continue
+
+            indicators.append(
+                EconomicIndicator(
+                    source="bcb",
+                    indicator_code=f"bcb_tipo_de_cambio_{side_label.lower()}",
+                    indicator_name=side_label,
+                    indicator_group="Tipo de cambio",
+                    value=value,
+                    unit="BOB per USD",
+                    currency="BOB",
+                    asset="USD",
+                    side=side,
+                    observed_at=today,
+                    collected_at=collected_at or datetime.now(TZ_BOLIVIA).replace(tzinfo=None),
+                    snapshot_key=snapshot_key,
+                    raw_payload={
+                        "side": side_label,
+                        "moneda": moneda,
+                        "value_text": value_text,
+                        "fetched_at": str(today),
+                    },
+                )
+            )
+        return indicators
+
+    def _parse_tc_table_value(self, soup: BeautifulSoup) -> str | None:
+        table = soup.select_one(".tablaborde")
+        if not table:
+            return None
+        rows = table.select("tr.listas-fila1, tr.listas-fila2")
+        for row in rows:
+            cells = row.select("td")
+            if len(cells) >= 3:
+                value_cell = cells[2]
+                text = self._clean_text(value_cell)
+                if text:
+                    return text.split()[0] if " " in text else text
+        return None
 
     def _parse_bcb_card(
         self,

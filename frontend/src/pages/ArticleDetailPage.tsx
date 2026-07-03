@@ -80,14 +80,6 @@ export const ArticleDetailPage = () => {
   );
   const officialBuy = findByExactCode(indicators, "bcb_tipo_de_cambio_compra")?.value;
   const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
-  const referenceBuy = findByExactCode(
-    indicators,
-    "bcb_valor_referencial_del_dolar_estadounidense_compra",
-  )?.value;
-  const referenceSell = findByExactCode(
-    indicators,
-    "bcb_valor_referencial_del_dolar_estadounidense_venta",
-  )?.value;
   const p2pBuy = findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value;
   const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
   const ufv = findUfvIndicator(indicators);
@@ -206,12 +198,6 @@ export const ArticleDetailPage = () => {
                     <dt>Oficial C/V</dt>
                     <dd>
                       {formatNumber(officialBuy)} / {formatNumber(officialSell)}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Referencial C/V</dt>
-                    <dd>
-                      {formatNumber(referenceBuy)} / {formatNumber(referenceSell)}
                     </dd>
                   </div>
                   <div>

@@ -30,12 +30,7 @@ const formatMetric = (value: unknown, suffix = "", digits = 1) => {
 const CurrencySpread = ({ indicators }: { indicators: EconomicIndicator[] }) => {
   const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
   const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
-  const referenceSell = findByExactCode(
-    indicators,
-    "bcb_valor_referencial_del_dolar_estadounidense_venta",
-  )?.value;
   const spread = p2pSell && officialSell ? p2pSell - officialSell : null;
-  const referenceSpread = referenceSell && officialSell ? referenceSell - officialSell : null;
 
   return (
     <section className="data-panel">
@@ -45,10 +40,6 @@ const CurrencySpread = ({ indicators }: { indicators: EconomicIndicator[] }) => 
         <span>P2P venta menos oficial venta</span>
       </div>
       <div className="metric-list">
-        <div>
-          <span>Referencial vs oficial</span>
-          <strong>Bs {formatNumber(referenceSpread, 2)}</strong>
-        </div>
         <div>
           <span>Oficial venta</span>
           <strong>Bs {formatNumber(officialSell, 2)}</strong>
