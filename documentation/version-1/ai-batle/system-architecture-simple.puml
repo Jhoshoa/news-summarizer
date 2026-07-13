@@ -1,0 +1,72 @@
+@startuml
+title EcoBrief Bolivia - Arquitectura simplificada
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam package {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #1e3a5f
+}
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+skinparam database {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+skinparam cloud {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+
+actor "Usuario" as user
+actor "Scheduler" as scheduler
+
+cloud "Fuentes externas\nmedios, NewsAPI,\nBCB, clima" as sources
+cloud "IA\nGroq / OpenAI /\nGitHub Models" as llm
+database "PostgreSQL" as db
+cloud "Canales\nEmail / Telegram /\nWhatsApp" as channels
+
+package "Frontend\nReact + Vite" as frontend {
+  component "Web App\nHome, Noticias,\nDatos, Impacto,\nSuscripcion" as web
+}
+
+package "Backend\nFastAPI" as backend {
+  component "API REST" as api
+  component "Collectors" as collectors
+  component "Pipeline\nfiltrar, deduplicar,\nclasificar, rankear" as pipeline
+  component "LLM Router" as router
+  component "Distributors" as distributors
+}
+
+user --> web
+web --> api : consume API
+scheduler --> api : dispara jobs
+
+api --> collectors
+collectors --> sources : recolecta datos
+collectors --> pipeline : articulos crudos
+pipeline --> db : guarda articulos\nmetricas y preferencias
+pipeline --> router : solo candidatos\nrelevantes
+router --> llm : resumen IA
+router --> pipeline : briefs
+api --> db : consulta datos
+api --> distributors : entrega briefs
+distributors --> channels
+channels --> user
+
+note bottom of pipeline
+La IA no inicia el proceso.
+Primero se reduce ruido.
+end note
+
+@enduml

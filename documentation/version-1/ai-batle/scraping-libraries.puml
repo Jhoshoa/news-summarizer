@@ -1,0 +1,53 @@
+@startuml
+title EcoBrief Bolivia - Librerias usadas en scraping
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam rectangle {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+skinparam note {
+  BackgroundColor #F8FAFC
+  BorderColor #16a34a
+  FontColor #334155
+}
+
+rectangle "config/sources.yaml\nfuentes + selectores CSS" as config
+rectangle "PyYAML\ncarga configuracion" as pyyaml
+rectangle "httpx\nrequests async" as httpx
+rectangle "BeautifulSoup4\nparseo HTML" as bs4
+rectangle "lxml\nparser HTML" as lxml
+rectangle "python-dateutil\nparseo de fechas" as dateutil
+rectangle "stdlib\nhashlib, re, urllib.parse,\njson, difflib, unicodedata" as stdlib
+
+rectangle "NewsScraper\nsrc/collectors/scraper.py" as scraper
+rectangle "Articulos normalizados\nlistos para pipeline" as output
+
+config --> pyyaml : yaml.safe_load()
+pyyaml --> scraper : fuentes habilitadas
+httpx --> scraper : descarga listados y detalle
+bs4 --> scraper : selectores y extraccion
+lxml --> bs4 : BeautifulSoup(html, "lxml")
+dateutil --> scraper : fechas publicadas
+stdlib --> scraper : URLs, hashes,\nlimpieza y similitud
+scraper --> output
+
+note right of pyyaml
+Si se usa:
+src/collectors/scraper.py
+import yaml
+yaml.safe_load(...)
+end note
+
+note bottom of scraper
+Dependencias presentes pero no usadas
+directamente en el scraper actual:
+aiohttp, feedparser
+end note
+
+@enduml

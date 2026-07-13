@@ -1,0 +1,38 @@
+@startuml
+title Como explicarlo en una diapositiva
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam component {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+
+actor "Usuario" as user
+component "Frontend React\ninterfaz de usuario" as frontend
+component "Vite\nherramienta de build" as vite
+component "Backend FastAPI\nAPI REST" as api
+database "PostgreSQL" as db
+
+user --> frontend : navega
+vite ..> frontend : construye y sirve
+frontend --> api : requests HTTP
+api --> db : consulta datos
+
+note bottom of frontend
+En la presentacion:
+"Frontend React"
+end note
+
+note bottom of vite
+En detalle tecnico:
+"usa Vite para desarrollo
+y compilacion"
+end note
+
+@enduml

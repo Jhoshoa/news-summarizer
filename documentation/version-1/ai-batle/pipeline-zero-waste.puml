@@ -1,0 +1,60 @@
+@startuml
+title EcoBrief Bolivia - Pipeline antes de IA
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+  DiamondBackgroundColor #F8FAFC
+  DiamondBorderColor #1e3a5f
+  StartColor #16a34a
+  EndColor #16a34a
+}
+skinparam note {
+  BackgroundColor #F8FAFC
+  BorderColor #16a34a
+  FontColor #334155
+}
+
+start
+
+:Fuentes de noticias\nmedios bolivianos;
+:Scraping\nextrae titulo, URL, fecha,\nimagen y contenido;
+
+partition "Procesamiento deterministico" {
+  :Filtro de calidad\ndescarta articulos sin\ncontenido suficiente;
+  :Deduplicacion\nURL hash + titulo normalizado\n+ huella historica;
+  :Clasificacion\nreglas ponderadas por categoria;
+  :Ranking\nscore 0-100 por relevancia;
+  :Seleccion de candidatos\nlimites por categoria y diversidad;
+}
+
+note right
+Hasta aqui no se resume con IA.
+Se reduce ruido antes de usar tokens.
+end note
+
+if (Candidato ya resumido\no historia duplicada?) then (si)
+  :Excluir candidato;
+else (no)
+  :Enviar a IA\nsolo candidatos relevantes;
+  :Generar brief;
+endif
+
+:Guardar resumen,\nmetricas y trazabilidad;
+:Mostrar en web /\npreparar distribucion;
+
+stop
+
+legend right
+  |= Color |= Significado |
+  |<#1e3a5f>| Control de pipeline |
+  |<#16a34a>| Flujo util hacia el brief |
+endlegend
+
+@enduml

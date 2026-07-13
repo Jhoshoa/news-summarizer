@@ -1,0 +1,353 @@
+\documentclass[10pt,aspectratio=169]{beamer}
+
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+
+\definecolor{azulprofundo}{HTML}{1e3a5f}
+\definecolor{verdeecobrief}{HTML}{16a34a}
+\definecolor{gristexto}{HTML}{334155}
+\definecolor{grisclaro}{HTML}{f8fafc}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+
+\setbeamercolor{normal text}{fg=gristexto,bg=white}
+\setbeamercolor{structure}{fg=verdeecobrief}
+\setbeamercolor{frametitle}{fg=white,bg=azulprofundo}
+\setbeamercolor{title}{fg=azulprofundo}
+\setbeamercolor{subtitle}{fg=gristexto}
+\setbeamercolor{block title}{fg=white,bg=azulprofundo}
+\setbeamercolor{block body}{fg=gristexto,bg=grisclaro}
+\setbeamercolor{alerted text}{fg=verdeecobrief}
+\setbeamercolor{palette primary}{fg=white,bg=azulprofundo}
+\setbeamercolor{palette secondary}{fg=white,bg=azulprofundo}
+\setbeamercolor{palette tertiary}{fg=white,bg=azulprofundo}
+\setbeamercolor{palette quaternary}{fg=white,bg=azulprofundo}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize item}{\color{verdeecobrief}\small$\blacktriangleright$}
+\setbeamertemplate{itemize subitem}{\color{verdeecobrief}\scriptsize$\blacktriangleright$}
+\setbeamertemplate{enumerate item}{\color{verdeecobrief}\insertenumlabel.}
+\setbeamertemplate{footline}[frame number]
+
+\newcommand{\headline}[1]{%
+    \begin{center}
+    {\Large\bfseries\color{azulprofundo} #1}
+    \end{center}
+}
+
+\newcommand{\keymessage}[1]{%
+    \begin{center}
+    \fbox{\begin{minipage}{0.86\textwidth}
+    \centering\Large\bfseries\color{verdeecobrief} #1
+    \end{minipage}}
+    \end{center}
+}
+
+\title{EcoBrief Bolivia}
+\subtitle{IA responsable para reducir el desperdicio digital informativo}
+\author{Josoe Ichuta}
+\institute{AI Battle}
+\date{2026}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+    \vspace{-0.2cm}
+    \keymessage{Menos ruido. Mas informacion esencial.}
+\end{frame}
+
+\begin{frame}{SITUATION}
+    \headline{Queremos estar informados}
+    \vspace{0.2cm}
+    \begin{columns}[T]
+        \column{0.48\textwidth}
+        \begin{block}{Fuentes habituales}
+            \begin{itemize}
+                \item TV y noticieros
+                \item Radio
+                \item Sitios web
+                \item Redes sociales
+                \item Multiples titulares
+            \end{itemize}
+        \end{block}
+        \column{0.48\textwidth}
+        \begin{block}{Efecto}
+            \Large
+            Informarse toma tiempo porque el flujo esta fragmentado.
+        \end{block}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{SITUATION}
+    \headline{El costo oculto de informarse}
+    \vspace{0.2cm}
+    \begin{table}
+        \centering
+        \begin{tabular}{ll}
+            \toprule
+            \textbf{Desperdicio} & \textbf{Ejemplo} \\
+            \midrule
+            Tiempo & Comparar titulares repetidos \\
+            Datos & Cargar paginas completas \\
+            Atencion & Scrollear sin fin \\
+            Confianza & Contenido sin fuente clara \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{0.2cm}
+    \keymessage{No solo consumimos noticias: consumimos tiempo, datos y atencion.}
+\end{frame}
+
+\begin{frame}{SITUATION}
+    \headline{La pregunta}
+    \vspace{0.5cm}
+    \keymessage{Como reducimos el ruido sin dejar de informarnos?}
+    \vspace{0.5cm}
+    \begin{center}
+        \large Una solucion util no debe crear mas contenido.\\
+        Debe reducir el contenido innecesario.
+    \end{center}
+\end{frame}
+
+\begin{frame}{TASK}
+    \headline{Cuatro piezas necesarias}
+    \begin{enumerate}
+        \item Recolectar noticias desde fuentes bolivianas.
+        \item Filtrar, deduplicar, clasificar y rankear.
+        \item Presentar briefs relevantes al usuario.
+        \item Ejecutar el proceso varias veces al dia.
+    \end{enumerate}
+    \vspace{0.4cm}
+    \keymessage{La IA es el ultimo paso, no el primero.}
+\end{frame}
+
+\begin{frame}{ACTION}
+    \headline{Arquitectura del sistema}
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.9cm and 1.2cm,
+        box/.style={rectangle, rounded corners, draw=azulprofundo, thick, fill=grisclaro, minimum width=2.8cm, minimum height=0.8cm, align=center},
+        arrow/.style={-{Latex}, thick, color=verdeecobrief}
+    ]
+        \node[box] (scrapers) {Scrapers};
+        \node[box, right=of scrapers] (api) {FastAPI};
+        \node[box, right=of api] (front) {React + Vite};
+        \node[box, below=of api] (db) {PostgreSQL};
+        \node[box, above=of api] (llm) {LLM Provider};
+        \node[box, above=of front] (providers) {Groq / OpenAI / GitHub};
+        \node[box, below=of front] (dist) {Email / Telegram / WhatsApp};
+
+        \draw[arrow] (scrapers) -- (api);
+        \draw[arrow] (api) -- (front);
+        \draw[arrow] (api) -- (db);
+        \draw[arrow] (api) -- (llm);
+        \draw[arrow] (llm) -- (providers);
+        \draw[arrow] (api) -- (dist);
+    \end{tikzpicture}
+    \vspace{0.2cm}
+    \begin{center}
+        Python 3.11 \quad | \quad FastAPI \quad | \quad PostgreSQL \quad | \quad React \quad | \quad Docker
+    \end{center}
+\end{frame}
+
+\begin{frame}{ACTION}
+    \headline{Pipeline antes de IA}
+    \centering
+    \begin{tikzpicture}[
+        node distance=0.45cm,
+        pbox/.style={rectangle, rounded corners, draw=azulprofundo, thick, fill=grisclaro, minimum width=6.8cm, minimum height=0.52cm, align=center},
+        arrow/.style={-{Latex}, thick, color=verdeecobrief}
+    ]
+        \node[pbox] (a) {Fuentes de noticias};
+        \node[pbox, below=of a] (b) {Scraping};
+        \node[pbox, below=of b] (c) {Filtro de calidad};
+        \node[pbox, below=of c] (d) {Deduplicacion};
+        \node[pbox, below=of d] (e) {Clasificacion};
+        \node[pbox, below=of e] (f) {Ranking};
+        \node[pbox, below=of f] (g) {Seleccion};
+        \node[pbox, below=of g] (h) {IA para resumen};
+        \draw[arrow] (a) -- (b);
+        \draw[arrow] (b) -- (c);
+        \draw[arrow] (c) -- (d);
+        \draw[arrow] (d) -- (e);
+        \draw[arrow] (e) -- (f);
+        \draw[arrow] (f) -- (g);
+        \draw[arrow] (g) -- (h);
+    \end{tikzpicture}
+    \vspace{0.15cm}
+    \keymessage{No resumimos todo. Resumimos lo mas relevante.}
+\end{frame}
+
+\begin{frame}{ACTION}
+    \headline{Menos ruido antes del modelo}
+    \begin{columns}[T]
+        \column{0.48\textwidth}
+        \begin{block}{Deduplicacion}
+            \begin{itemize}
+                \item URL hash
+                \item Titulo normalizado
+                \item Huella historica SHA-256
+            \end{itemize}
+        \end{block}
+        \column{0.48\textwidth}
+        \begin{block}{Clasificacion}
+            \begin{itemize}
+                \item Economia
+                \item Politica
+                \item Deportes
+                \item Tecnologia
+                \item Entretenimiento
+            \end{itemize}
+        \end{block}
+    \end{columns}
+    \vspace{0.25cm}
+    \begin{center}
+        \large Reglas ponderadas por titulo, descripcion, contenido y categoria de fuente.
+    \end{center}
+\end{frame}
+
+\begin{frame}{ACTION}
+    \headline{Score de prioridad}
+    \begin{table}
+        \centering
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Factor} & \textbf{Peso} \\
+            \midrule
+            Relevancia local & 20\% \\
+            Impacto informativo & 20\% \\
+            Calidad del contenido & 17\% \\
+            Actualidad & 15\% \\
+            Fuente & 10\% \\
+            Corroboracion & 10\% \\
+            Confianza de categoria & 8\% \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \keymessage{Cada noticia recibe un puntaje de 0 a 100.}
+\end{frame}
+
+\begin{frame}{ACTION}
+    \headline{IA solo cuando aporta valor}
+    \vspace{0.2cm}
+    \keymessage{Filtrado -> Deduplicado -> Rankeado -> Resumido}
+    \vspace{0.25cm}
+    \begin{columns}[T]
+        \column{0.32\textwidth}
+        \begin{block}{Groq}
+            Rapido y costo bajo
+        \end{block}
+        \column{0.32\textwidth}
+        \begin{block}{OpenAI}
+            Mayor capacidad
+        \end{block}
+        \column{0.32\textwidth}
+        \begin{block}{GitHub Models}
+            Alternativa con cuota
+        \end{block}
+    \end{columns}
+    \vspace{0.3cm}
+    \begin{center}
+        Cada articulo filtrado antes de IA es una llamada menos al modelo.
+    \end{center}
+\end{frame}
+
+\begin{frame}{RESULT}
+    \headline{Producto desplegado}
+    \begin{columns}[T]
+        \column{0.52\textwidth}
+        \begin{itemize}
+            \item Scraping real de fuentes bolivianas.
+            \item Resumenes generados con IA.
+            \item Frontend web con noticias destacadas.
+            \item Noticias recolectadas con trazabilidad.
+        \end{itemize}
+        \column{0.44\textwidth}
+        \begin{itemize}
+            \item Pagina de datos.
+            \item Panel de impacto.
+            \item Suscripcion por preferencias.
+            \item Pruebas automatizadas.
+        \end{itemize}
+    \end{columns}
+    \vspace{0.35cm}
+    \keymessage{https://briefs.ecobriefbolivia.online/}
+\end{frame}
+
+\begin{frame}{RESULT}
+    \headline{Resultado de una corrida real}
+    \begin{table}
+        \centering
+        \begin{tabular}{lr}
+            \toprule
+            \textbf{Metrica} & \textbf{Valor} \\
+            \midrule
+            Noticias recolectadas & 174 \\
+            Articulos utiles & 173 \\
+            Articulos unicos & 169 \\
+            Briefs generados & 39 \\
+            Paginas evitadas & 135 \\
+            Minutos ahorrados & 67.5 \\
+            Reduccion & 77.6\% \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \begin{center}
+        \small Corrida real: 15 de junio de 2026
+    \end{center}
+\end{frame}
+
+\begin{frame}{RESULT}
+    \headline{Recorrido del producto}
+    \begin{enumerate}
+        \item Home: briefs principales.
+        \item Noticias recolectadas: fuente, imagen y fecha.
+        \item Datos: indicadores externos.
+        \item Impacto: metricas globales y por corrida.
+        \item Suscripcion: categorias, frecuencia y canal.
+    \end{enumerate}
+    \vspace{0.35cm}
+    \keymessage{Briefs trazables, metricas visibles y preferencias por usuario.}
+\end{frame}
+
+\begin{frame}{RESULT}
+    \headline{Distribucion personalizada}
+    \begin{table}
+        \centering
+        \begin{tabular}{ll}
+            \toprule
+            \textbf{Canal} & \textbf{Estado} \\
+            \midrule
+            Email & Funcional, pausado por cuenta personal \\
+            Telegram & En integracion \\
+            WhatsApp & Planteado con Twilio, pausado por costo \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{0.25cm}
+    \begin{center}
+        Corto plazo: metricas y analiticas \quad | \quad Mediano plazo: canales en produccion
+    \end{center}
+\end{frame}
+
+\begin{frame}{CIERRE}
+    \headline{Menos ruido. Mas informacion esencial.}
+    \begin{itemize}
+        \item Menos paginas abiertas.
+        \item Menos duplicidad.
+        \item Menos llamadas innecesarias a IA.
+        \item Mas informacion trazable.
+    \end{itemize}
+    \vspace{0.5cm}
+    \keymessage{EcoBrief Bolivia usa IA no para producir mas ruido, sino para reducirlo.}
+\end{frame}
+
+\end{document}
+

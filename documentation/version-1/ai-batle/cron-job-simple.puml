@@ -1,0 +1,59 @@
+@startuml
+title EcoBrief Bolivia - Cron Job simplificado
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam sequence {
+  ArrowColor #16a34a
+  LifeLineBorderColor #1e3a5f
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1e3a5f
+  ParticipantBackgroundColor #F8FAFC
+  ParticipantFontColor #334155
+  BoxBorderColor #1e3a5f
+  BoxBackgroundColor #F8FAFC
+}
+
+participant "Cron Job\nnews_cron" as cron
+participant "Backend FastAPI" as backend
+participant "Pipeline EcoBrief" as pipeline
+participant "Indicadores economicos" as econ
+participant "Distribucion" as delivery
+participant "Horarios\nconfigurados" as schedule
+
+cron -> schedule : lee ventanas horarias\nmanana / tarde / noche
+cron -> backend : POST /api/economic-indicators/refresh\nX-API-Key
+backend -> econ : actualiza indicadores
+econ --> backend : collected / inserted / skipped
+
+cron -> backend : POST /trigger/summary\nX-API-Key
+backend -> pipeline : refresh summaries
+pipeline --> backend : briefs + metricas
+
+alt run_once = false
+  loop cada ventana programada
+    cron -> backend : POST /trigger/delivery\nX-API-Key
+    backend -> delivery : envia briefs
+    delivery --> backend : resultado
+    backend --> cron : confirmar envio
+  end
+  cron -> schedule : calcula siguiente ejecucion
+else run_once = true
+  cron -> backend : ejecuta una sola vez
+end
+
+note over cron
+El cron job no procesa noticias por si mismo.
+Solo dispara al backend y reprograma.
+end note
+
+note right of backend
+Triggers clave:
+/trigger/summary
+/trigger/delivery
+end note
+
+@enduml

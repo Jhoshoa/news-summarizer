@@ -1,0 +1,48 @@
+@startuml
+title Fase 1 - Recoleccion
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+  DiamondBackgroundColor #F8FAFC
+  DiamondBorderColor #1e3a5f
+  StartColor #16a34a
+  EndColor #16a34a
+}
+
+start
+
+:Inicio de corrida;
+
+if (Activacion?) then (manual)
+  :Trigger manual\n/trigger/summary;
+else (scheduler)
+  :Programador horario\nscheduler / cron;
+endif
+
+:Verificar cache\nde resumenes recientes;
+
+if (Cache valido?) then (si)
+  :Reutilizar resumenes\nsin ejecutar pipeline completo;
+  stop
+else (no)
+  :Cargar fuentes configuradas\nconfig/sources.yaml;
+  :Ejecutar scraping\nmedios bolivianos;
+  :Recolectar noticias crudas\ntitulo, URL, fecha,\nimagen y contenido;
+endif
+
+stop
+
+note right
+Objetivo:
+evitar trabajo innecesario
+si ya existen briefs recientes.
+end note
+
+@enduml

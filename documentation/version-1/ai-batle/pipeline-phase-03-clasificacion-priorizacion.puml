@@ -1,0 +1,44 @@
+@startuml
+title Fase 3 - Clasificacion y priorizacion
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+  StartColor #16a34a
+  EndColor #16a34a
+}
+
+start
+
+:Articulos utiles y unicos;
+:Clasificacion por categoria;
+
+note right
+Categorias:
+economia, politica,
+deportes, tecnologia,
+entretenimiento.
+end note
+
+:Ranking de relevancia\nscore 0-100;
+
+note right
+Criterios:
+actualidad, relevancia local,
+Impacto informativo, fuente
+calidad, impacto nacional.
+end note
+
+:Persistir articulos\nen PostgreSQL;
+:Calcular huella historica\nfingerprint SHA-256;
+:Detectar duplicados\nentre corridas;
+
+stop
+
+@enduml

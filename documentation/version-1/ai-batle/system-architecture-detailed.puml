@@ -1,0 +1,179 @@
+@startuml
+title EcoBrief Bolivia - Arquitectura detallada del sistema
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam package {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #1e3a5f
+}
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+skinparam database {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+skinparam cloud {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+skinparam actor {
+  BorderColor #1e3a5f
+  FontColor #334155
+}
+
+actor "Usuario web" as user
+actor "Suscriptor" as subscriber
+actor "Admin / Cron" as admin
+
+cloud "Medios bolivianos\nRadioFides, Unitel,\nRedUno, RedBolivision" as local_sources
+cloud "NewsAPI" as newsapi_service
+cloud "BCB" as bcb
+cloud "Binance P2P" as binance
+cloud "Open-Meteo" as openmeteo
+cloud "LLM Providers\nGroq / OpenAI / GitHub Models" as llm_providers
+cloud "SMTP Gmail" as smtp
+cloud "Telegram Bot API" as telegram_api
+cloud "Twilio WhatsApp" as twilio
+
+database "PostgreSQL" as postgres
+
+package "Frontend React + Vite" as frontend {
+  component "Home" as fe_home
+  component "Noticias" as fe_news
+  component "Detalle" as fe_detail
+  component "Datos" as fe_data
+  component "Impacto" as fe_impact
+  component "Suscripcion" as fe_subscribe
+}
+
+package "Backend FastAPI" as backend {
+  component "API Routes" as api
+  component "App Orchestrator\nsrc/main.py" as app
+  component "Security\nX-API-Key" as security
+
+  package "Collectors" as collectors {
+    component "NewsScraper\nhttpx + BS4 + lxml" as scraper
+    component "NewsAPICollector" as newsapi
+    component "EconomicIndicatorCollector" as indicators
+    component "OpenMeteoWeatherCollector" as weather
+  }
+
+  package "Processors" as processors {
+    component "Quality Filter" as quality
+    component "Deduplicator\nURL + title" as dedupe
+    component "Story Fingerprint\nSHA-256" as fingerprint
+    component "Classifier\nrules + fallback" as classifier
+    component "Ranker\nscore 0-100" as ranker
+    component "Story Deduplicator\nsemantic check" as story_dedupe
+    component "Summarizer" as summarizer
+    component "Rewriter" as rewriter
+  }
+
+  package "LLM Layer" as llm_layer {
+    component "LLMRouter\nfallback by provider" as llm_router
+    component "LLMProvider\nunified chat API" as llm_provider
+  }
+
+  package "Persistence" as persistence {
+    component "Database Repository" as repository
+    component "EconomicIndicatorRepository" as indicator_repo
+  }
+
+  package "Distribution" as distribution {
+    component "EmailHandler" as email
+    component "TelegramHandler" as telegram
+    component "WhatsAppHandler" as whatsapp
+  }
+
+  package "Scheduling" as scheduling {
+    component "NewsScheduler\nAPScheduler" as scheduler
+    component "Cron Job Container\n/trigger endpoints" as cron_container
+  }
+}
+
+user --> fe_home
+user --> fe_news
+user --> fe_detail
+user --> fe_data
+user --> fe_impact
+user --> fe_subscribe
+
+fe_home --> api : REST
+fe_news --> api : REST
+fe_detail --> api : REST
+fe_data --> api : REST
+fe_impact --> api : REST
+fe_subscribe --> api : REST
+
+api --> app
+api --> security : protected triggers
+admin --> api : /trigger/summary\n/trigger/delivery
+cron_container --> api : scheduled HTTP calls
+scheduler --> app : scheduled delivery
+
+app --> scraper
+app --> newsapi
+app --> quality
+app --> dedupe
+app --> classifier
+app --> ranker
+app --> fingerprint
+app --> story_dedupe
+app --> summarizer
+app --> rewriter
+app --> repository
+app --> email
+app --> telegram
+app --> whatsapp
+
+scraper --> local_sources : scrape HTML
+newsapi --> newsapi_service : fetch API
+indicators --> bcb : scrape indicators
+indicators --> binance : fetch P2P prices
+weather --> openmeteo : fetch weather
+
+classifier --> llm_router : fallback only
+story_dedupe --> llm_router : semantic dedupe
+summarizer --> llm_router : generate briefs
+rewriter --> llm_router : normalize style
+llm_router --> llm_provider
+llm_provider --> llm_providers : chat completions
+
+repository --> postgres
+indicator_repo --> postgres
+api --> repository : read summaries,\narticles, metrics,\npreferences
+api --> indicator_repo : read/write indicators
+api --> weather : weather endpoint
+api --> indicators : refresh indicators
+
+email --> smtp
+telegram --> telegram_api
+whatsapp --> twilio
+email --> subscriber
+telegram --> subscriber
+whatsapp --> subscriber
+subscriber --> fe_subscribe : preferences
+
+note right of app
+Pipeline principal:
+collect -> filter -> dedupe -> classify
+-> rank -> select -> summarize -> store
+end note
+
+note bottom of llm_router
+La IA se usa despues de filtrar,
+deduplicar y rankear.
+end note
+
+@enduml

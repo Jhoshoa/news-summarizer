@@ -1,0 +1,31 @@
+@startuml
+title Frontend - Flujo de produccion
+
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontColor #334155
+skinparam ArrowColor #16a34a
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #1e3a5f
+  FontColor #334155
+  StartColor #16a34a
+  EndColor #16a34a
+}
+
+start
+:Codigo fuente\nReact + TypeScript;
+:Vite build\ngenera archivos estaticos;
+:HTML + JS + CSS\noptimizados;
+:Servidor / VPS\npublica frontend;
+:Usuario abre\nEcoBrief Bolivia;
+stop
+
+note right
+React define la interfaz.
+Vite prepara la version
+lista para produccion.
+end note
+
+@enduml
