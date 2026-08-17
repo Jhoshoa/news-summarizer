@@ -58,7 +58,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(getImpactPipelineRows(metrics))), [
 
 const formulaRows = getImpactFormulaRows(metrics);
 assert.equal(formulaRows[0].value, "133 - 23 = 110");
-assert.equal(formulaRows[1].value, "1 - 23 / 133");
+assert.equal(formulaRows[1].value, "1 - 23 / 133 = 83%");
 assert.equal(formulaRows[2].value, "110 * 0.5 = 55");
 assert.equal(formulaRows[3].value, "110 * 0.8 = 88 MB");
 
