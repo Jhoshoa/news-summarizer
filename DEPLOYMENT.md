@@ -63,6 +63,10 @@ POSTGRES_PASSWORD=...
 
 `VITE_API_BASE_URL` is a frontend build argument. If you change it in Dokploy, rebuild the frontend image.
 
+Database migrations run automatically during backend startup. Before deploying schema changes,
+take a database backup from the VPS provider or Postgres volume. Migration rules are documented
+in `migrations/README.md`.
+
 The cron container uses Docker's internal network:
 
 ```env

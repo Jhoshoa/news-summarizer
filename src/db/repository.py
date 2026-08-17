@@ -29,6 +29,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
+from src.db.migrations import apply_sql_migrations
 from src.processors.story_fingerprint import (
     build_canonical_key,
     build_content_fingerprint,
@@ -221,6 +222,8 @@ class WorldCupMatch(Base):
 class Database:
     """Repositorio de base de datos."""
 
+    INIT_LOCK_SQL = "SELECT pg_advisory_lock(hashtext('news_summarizer_db_init'))"
+    INIT_UNLOCK_SQL = "SELECT pg_advisory_unlock(hashtext('news_summarizer_db_init'))"
     IMPACT_MINUTES_PER_ARTICLE = 0.5
     IMPACT_MB_PER_PAGE = 0.8
     STORY_LOOKBACK_DAYS = 3
@@ -247,17 +250,24 @@ class Database:
     async def init_db(self):
         """Crea las tablas y semillas de referencia."""
 
-        async with self.engine.begin() as conn:
-            for table in Base.metadata.sorted_tables:
-                try:
-                    await conn.run_sync(table.create, checkfirst=True)
-                except IntegrityError:
-                    logger.warning(f"Tabla {table.name} ya existe, omitiendo")
+        async with self.engine.connect() as lock_conn:
+            await lock_conn.exec_driver_sql(self.INIT_LOCK_SQL)
+            try:
+                async with self.engine.begin() as conn:
+                    for table in Base.metadata.sorted_tables:
+                        try:
+                            await conn.run_sync(table.create, checkfirst=True)
+                        except IntegrityError:
+                            logger.warning(f"Tabla {table.name} ya existe, omitiendo")
 
-        async with self.session_maker() as session:
-            await self._seed_categories(session)
-            await self._seed_worldcup_matches(session)
-            await session.commit()
+                await apply_sql_migrations(self.engine)
+
+                async with self.session_maker() as session:
+                    await self._seed_categories(session)
+                    await self._seed_worldcup_matches(session)
+                    await session.commit()
+            finally:
+                await lock_conn.exec_driver_sql(self.INIT_UNLOCK_SQL)
 
         logger.info("Base de datos inicializada")
 
@@ -1652,11 +1662,6 @@ class Database:
         return dt.date(), dt.time()
 
     async def _seed_worldcup_matches(self, session: AsyncSession) -> None:
-        stmt = select(func.count(WorldCupMatch.id))
-        result = await session.execute(stmt)
-        if result.scalar() > 0:
-            return
-
         # (gmt_date, gmt_time, group, home, away, home_flag, away_flag, venue)
         raw: list[tuple[date, time, str, str, str, str, str, str]] = [
             # Group A
@@ -1734,7 +1739,7 @@ class Database:
             (date(2026, 6, 18), time(2, 0), "K", "Uzbekistán", "Colombia", "🇺🇿", "🇨🇴", "Mexico City Stadium"),
             (date(2026, 6, 23), time(17, 0), "K", "Portugal", "Uzbekistán", "🇵🇹", "🇺🇿", "Houston Stadium"),
             (date(2026, 6, 24), time(2, 0), "K", "Colombia", "RD Congo", "🇨🇴", "🇨🇩", "Estadio Guadalajara"),
-            (date(2026, 6, 27), time(23, 30), "K", "Colombia", "Portugal", "🇵🇹", "Miami Stadium"),
+            (date(2026, 6, 27), time(23, 30), "K", "Colombia", "Portugal", "🇨🇴", "🇵🇹", "Miami Stadium"),
             (date(2026, 6, 27), time(23, 30), "K", "RD Congo", "Uzbekistán", "🇨🇩", "🇺🇿", "Atlanta Stadium"),
             # Group L
             (date(2026, 6, 17), time(20, 0), "L", "Inglaterra", "Croacia", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇭🇷", "Dallas Stadium"),
@@ -1745,8 +1750,19 @@ class Database:
             (date(2026, 6, 27), time(21, 0), "L", "Croacia", "Ghana", "🇭🇷", "🇬🇭", "Philadelphia Stadium"),
         ]
 
+        inserted_group_matches = 0
         for gmt_date, gmt_time, group, home, away, hf, af, venue in raw:
             bolivia_date, bolivia_time = self._gmt_to_bolivia(gmt_date, gmt_time)
+            if await self._worldcup_match_exists(
+                session,
+                bolivia_date,
+                bolivia_time,
+                home,
+                away,
+                "group",
+            ):
+                continue
+
             session.add(WorldCupMatch(
                 match_date=bolivia_date,
                 match_time=bolivia_time,
@@ -1758,7 +1774,9 @@ class Database:
                 venue=venue,
                 stage="group",
             ))
-        logger.info(f"Semillados {len(raw)} partidos de fase de grupos")
+            inserted_group_matches += 1
+        if inserted_group_matches:
+            logger.info(f"Semillados {inserted_group_matches} partidos de fase de grupos")
 
         # Round of 32 (16avos de final)
         # (gmt_date, gmt_time, group, home, away, home_flag, away_flag, venue)
@@ -1787,8 +1805,19 @@ class Database:
             (date(2026, 7, 4), time(1, 30), "KO", "Colombia", "Ghana", "🇨🇴", "🇬🇭", "Kansas City Stadium"),
         ]
 
+        inserted_round_32_matches = 0
         for gmt_date, gmt_time, group, home, away, hf, af, venue in raw_r32:
             bolivia_date, bolivia_time = self._gmt_to_bolivia(gmt_date, gmt_time)
+            if await self._worldcup_match_exists(
+                session,
+                bolivia_date,
+                bolivia_time,
+                home,
+                away,
+                "round_32",
+            ):
+                continue
+
             session.add(WorldCupMatch(
                 match_date=bolivia_date,
                 match_time=bolivia_time,
@@ -1800,7 +1829,29 @@ class Database:
                 venue=venue,
                 stage="round_32",
             ))
-        logger.info(f"Semillados {len(raw_r32)} partidos de 16avos de final")
+            inserted_round_32_matches += 1
+        if inserted_round_32_matches:
+            logger.info(f"Semillados {inserted_round_32_matches} partidos de 16avos de final")
+
+    async def _worldcup_match_exists(
+        self,
+        session: AsyncSession,
+        match_date: date,
+        match_time: time,
+        home_team: str,
+        away_team: str,
+        stage: str,
+    ) -> bool:
+        stmt = select(
+            exists().where(
+                WorldCupMatch.match_date == match_date,
+                WorldCupMatch.match_time == match_time,
+                WorldCupMatch.home_team == home_team,
+                WorldCupMatch.away_team == away_team,
+                WorldCupMatch.stage == stage,
+            )
+        )
+        return bool(await session.scalar(stmt))
 
     async def _seed_categories(self, session: AsyncSession) -> None:
         for name, display_name in DEFAULT_CATEGORIES.items():

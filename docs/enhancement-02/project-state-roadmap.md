@@ -551,12 +551,24 @@ Objetivo:
 
 Hacer mas seguro el despliegue de cambios de schema.
 
+Estado:
+
+Implementado en el bloque `feat: Add tracked database migrations`.
+
 Trabajo:
 
-- Revisar `migrations/`.
-- Resolver numeracion duplicada.
-- Decidir Alembic vs runner SQL.
-- Documentar flujo de upgrade.
+- Revisar `migrations/`. Hecho.
+- Resolver numeracion duplicada. Hecho.
+- Decidir Alembic vs runner SQL. Se eligio runner SQL propio para minimizar cambios.
+- Documentar flujo de upgrade. Hecho en `migrations/README.md` y `DEPLOYMENT.md`.
+
+Mitigaciones aplicadas:
+
+- Las migraciones quedan registradas en `schema_migrations`.
+- El startup del backend serializa inicializacion DB con advisory lock para evitar carreras
+  entre workers de Gunicorn.
+- Las semillas del Mundial son idempotentes por fecha, hora, equipos y etapa.
+- La migracion de datos de round of 32 evita insertar duplicados con `WHERE NOT EXISTS`.
 
 ### Paso 6 - Endpoint asincrono para refresh manual
 

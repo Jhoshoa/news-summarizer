@@ -1,5 +1,25 @@
-INSERT INTO worldcup_matches (match_date, match_time, group_name, home_team, away_team, home_flag, away_flag, stage, venue)
-VALUES
+INSERT INTO worldcup_matches (
+    match_date,
+    match_time,
+    group_name,
+    home_team,
+    away_team,
+    home_flag,
+    away_flag,
+    stage,
+    venue
+)
+SELECT
+    v.match_date::date,
+    v.match_time::time,
+    v.group_name,
+    v.home_team,
+    v.away_team,
+    v.home_flag,
+    v.away_flag,
+    v.stage,
+    v.venue
+FROM (VALUES
 -- Dom 28 jun
 ('2026-06-28', '15:00', 'KO', 'Sudáfrica', 'Canadá',       '🇿🇦', '🇨🇦', 'round_32', 'Los Angeles Stadium'),
 -- Lun 29 jun
@@ -21,4 +41,24 @@ VALUES
 -- Vie 3 jul
 ('2026-07-03', '14:00', 'KO', 'Australia',  'Egipto',   '🇦🇺', '🇪🇬', 'round_32', 'Dallas Stadium'),
 ('2026-07-03', '18:00', 'KO', 'Argentina',  'Cabo Verde', '🇦🇷', '🇨🇻', 'round_32', 'Miami Stadium'),
-('2026-07-03', '21:30', 'KO', 'Colombia',   'Ghana',    '🇨🇴', '🇬🇭', 'round_32', 'Kansas City Stadium');
+('2026-07-03', '21:30', 'KO', 'Colombia',   'Ghana',    '🇨🇴', '🇬🇭', 'round_32', 'Kansas City Stadium')
+) AS v(
+    match_date,
+    match_time,
+    group_name,
+    home_team,
+    away_team,
+    home_flag,
+    away_flag,
+    stage,
+    venue
+)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM worldcup_matches existing
+    WHERE existing.match_date = v.match_date::date
+      AND existing.match_time = v.match_time::time
+      AND existing.home_team = v.home_team
+      AND existing.away_team = v.away_team
+      AND existing.stage = v.stage
+);
