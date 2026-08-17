@@ -1026,7 +1026,7 @@ class NewsScraper:
             timestamp = timestamp / 1000
 
         try:
-            return datetime.fromtimestamp(timestamp)
+            return datetime.fromtimestamp(timestamp, self._tz).replace(tzinfo=None)
         except (OSError, OverflowError, ValueError):
             return None
 
