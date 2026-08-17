@@ -36,18 +36,22 @@ export const NewsPage = () => {
   const view = getNewsView(location.search);
   const selectedDate = getSelectedDate(location.search);
   const validationMessage = getDateValidationMessage(location.search, selectedDate);
+  const today = getTodayDate();
+  const allowLatestFallback = selectedDate === today;
   const articlesQuery = useGetArticlesQuery({
     page,
     page_size: 12,
     category,
     date: selectedDate,
     exclude_summarized: true,
+    fallback_to_latest: allowLatestFallback,
   });
   const summariesQuery = useGetSummariesQuery({
     page,
     page_size: 12,
     category,
     date: selectedDate,
+    fallback_to_latest: allowLatestFallback,
   });
   const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
   const activeData = view === "resumenes" ? summariesQuery.data : articlesQuery.data;
@@ -59,9 +63,10 @@ export const NewsPage = () => {
   const totalPages = activeData?.total_pages ?? 1;
   const hasPrevious = page > 1;
   const hasNext = page < totalPages;
-  const today = getTodayDate();
   const normalizedHref = buildNewsHref(page, selectedDate, category, view);
   const showNewsSkeleton = isFetching;
+  const isFallback = Boolean(activeData?.is_fallback && activeData.date);
+  const effectiveDate = activeData?.date ?? selectedDate;
 
   useEffect(() => {
     if (`${location.pathname}${location.search}` !== normalizedHref) {
@@ -97,6 +102,11 @@ export const NewsPage = () => {
         </div>
 
         {validationMessage && <p className="form-notice">{validationMessage}</p>}
+        {isFallback && (
+          <p className="form-notice">
+            No hay datos para {selectedDate}. Mostrando ultimas noticias disponibles del {effectiveDate}.
+          </p>
+        )}
 
         <div className="news-view-toolbar">
           <div className="view-tabs" aria-label="Tipo de contenido">
@@ -128,7 +138,7 @@ export const NewsPage = () => {
             <span className="news-count">
               {showNewsSkeleton
                 ? "Cargando"
-                : `${activeData?.total ?? 0} ${view === "resumenes" ? "briefs" : "noticias"} para ${selectedDate}`}
+                : `${activeData?.total ?? 0} ${view === "resumenes" ? "briefs" : "noticias"} para ${effectiveDate}`}
             </span>
           </div>
         </div>
