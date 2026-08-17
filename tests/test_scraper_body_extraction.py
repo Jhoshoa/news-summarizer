@@ -432,6 +432,25 @@ def test_reduno_date_parser_accepts_millisecond_timestamp():
     assert parsed == datetime(2026, 6, 10, 22, 0, 20, 992000)
 
 
+def test_numeric_timestamp_parser_respects_configured_timezone():
+    bolivia_scraper = NewsScraper(sources=[], timezone="America/La_Paz")
+    utc_scraper = NewsScraper(sources=[], timezone="UTC")
+
+    bolivia_date = bolivia_scraper._parse_date("1781143220992")
+    utc_date = utc_scraper._parse_date("1781143220992")
+
+    assert bolivia_date == datetime(2026, 6, 10, 22, 0, 20, 992000)
+    assert utc_date == datetime(2026, 6, 11, 2, 0, 20, 992000)
+
+
+def test_numeric_timestamp_parser_accepts_seconds_timestamp_in_bolivia_timezone():
+    scraper = NewsScraper(sources=[], timezone="America/La_Paz")
+
+    parsed = scraper._parse_date("1781143220")
+
+    assert parsed == datetime(2026, 6, 10, 22, 0, 20)
+
+
 def test_spanish_month_date_parser_does_not_shift_month_and_day():
     scraper = NewsScraper(sources=[])
 
