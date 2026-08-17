@@ -42,10 +42,10 @@ Install development tools only when you want linting, typing, or tests:
 pip install -r requirements-dev.txt
 ```
 
-Copy the environment file:
+Copy the local environment file:
 
 ```powershell
-copy .env.example .env
+copy .env.local.example .env
 ```
 
 Then edit `.env` with your keys:
@@ -84,6 +84,15 @@ The API runs at:
 ```text
 http://localhost:8000
 ```
+
+To run the full local Docker stack:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+The local compose file points the frontend to
+`http://localhost:8000` and allows local CORS origins.
 
 ## Useful Endpoints
 
@@ -201,10 +210,11 @@ At the moment, the repository has no test files, so `pytest` may report `collect
 
 PostgreSQL is optional for local collector and LLM testing.
 
-Start it when you want subscribers, preferences, and delivery:
+Start it when you want the full Docker stack, including subscribers, preferences, cron, and
+delivery:
 
 ```powershell
-docker-compose up -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
 Without PostgreSQL:
@@ -218,6 +228,27 @@ Without PostgreSQL:
 ## Redis
 
 Redis is intentionally not part of the current setup. The app handles on-demand summary generation through FastAPI and stores subscribers in PostgreSQL, so Redis would not add value right now.
+
+## Deployment
+
+Dokploy should use `docker-compose.yml` as the compose path. That file is production-oriented.
+Local-only values live in `docker-compose.local.yml`.
+
+Use `.env.prod.example` as the reference for Hostinger/Dokploy variables. The most important
+production values are:
+
+```env
+ENVIRONMENT=production
+DEBUG=false
+CORS_ORIGINS=https://ecobriefbolivia.online,https://briefs.ecobriefbolivia.online
+VITE_API_BASE_URL=https://ecobriefbolivia.online
+GROQ_API_KEY=...
+NEWS_API_KEY=...
+API_AUTH_KEY=...
+POSTGRES_PASSWORD=...
+```
+
+More details are in `DEPLOYMENT.md`.
 
 Redis could become useful later if the app adds:
 

@@ -1,0 +1,18 @@
+services:
+  backend:
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      API_AUTH_KEY: ${API_AUTH_KEY:-change-me-local-api-auth-key}
+
+  frontend:
+    build:
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_ENABLE_MANUAL_REFRESH: ${VITE_ENABLE_MANUAL_REFRESH:-false}
+
+  cron-job:
+    environment:
+      API_AUTH_KEY: ${API_AUTH_KEY:-change-me-local-api-auth-key}

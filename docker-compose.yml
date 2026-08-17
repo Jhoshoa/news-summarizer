@@ -27,17 +27,55 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      ENVIRONMENT: production
-      DEBUG: "false"
-      LOG_LEVEL: INFO
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       TZ: America/La_Paz
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_summarizer}
-      SCHEDULE_SUMMARY_MORNING: 10:00
-      SCHEDULE_SUMMARY_AFTERNOON: 16:00
-      SCHEDULE_SUMMARY_NIGHT: 20:00
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GITHUB_API_KEY: ${GITHUB_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      LLM_FALLBACK_ORDER: ${LLM_FALLBACK_ORDER:-groq,github,nvidia,openai}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      NEWS_API_KEY: ${NEWS_API_KEY:-}
+      NEWS_API_COUNTRY: ${NEWS_API_COUNTRY:-bo}
+      NEWS_API_LANGUAGE: ${NEWS_API_LANGUAGE:-es}
+      SCRAPER_ENABLED: ${SCRAPER_ENABLED:-true}
+      SCRAPER_CONCURRENCY: ${SCRAPER_CONCURRENCY:-3}
+      SCRAPER_TIMEOUT: ${SCRAPER_TIMEOUT:-30}
+      SCRAPER_USER_AGENT: ${SCRAPER_USER_AGENT:-Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36}
+      SCRAPER_SOURCES: ${SCRAPER_SOURCES:-radiofides,unitel,reduno,redbolivision,lostiempos,eldeber}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      TWILIO_WEBHOOK_URL: ${TWILIO_WEBHOOK_URL:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-EcoBrief Bolivia}
+      EMAIL_REQUIRE_VERIFICATION: ${EMAIL_REQUIRE_VERIFICATION:-false}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW:-20}
+      NEWS_CACHE_TTL_MINUTES: ${NEWS_CACHE_TTL_MINUTES:-60}
+      NEWS_MIN_ARTICLES: ${NEWS_MIN_ARTICLES:-20}
+      NEWS_SUMMARY_RETENTION_DAYS: ${NEWS_SUMMARY_RETENTION_DAYS:-30}
+      SCHEDULE_TIMEZONE: ${SCHEDULE_TIMEZONE:-America/La_Paz}
+      SCHEDULE_SUMMARY_MORNING: ${SCHEDULE_SUMMARY_MORNING:-10:00}
+      SCHEDULE_SUMMARY_AFTERNOON: ${SCHEDULE_SUMMARY_AFTERNOON:-16:00}
+      SCHEDULE_SUMMARY_NIGHT: ${SCHEDULE_SUMMARY_NIGHT:-20:00}
       DEFAULT_CATEGORIES: ${DEFAULT_CATEGORIES:-economia,politica,deportes,tecnologia,entretenimiento,policiales}
-      CORS_ORIGINS: http://2.25.206.70:5173,https://ecobriefbolivia.online,https://briefs.ecobriefbolivia.online
-      API_AUTH_KEY: ${API_AUTH_KEY:-change-me-local-api-auth-key}
+      SUMMARY_CANDIDATES_PER_CATEGORY: ${SUMMARY_CANDIDATES_PER_CATEGORY:-5}
+      SUMMARY_CANDIDATES_EXTENDED_CATEGORIES: ${SUMMARY_CANDIDATES_EXTENDED_CATEGORIES:-politica, economia}
+      SUMMARY_CANDIDATES_EXTENDED_LIMIT: ${SUMMARY_CANDIDATES_EXTENDED_LIMIT:-8}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://ecobriefbolivia.online,https://briefs.ecobriefbolivia.online}
+      API_AUTH_KEY: ${API_AUTH_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,7 +85,8 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_ENABLE_MANUAL_REFRESH: ${VITE_ENABLE_MANUAL_REFRESH:-false}
     container_name: news-summarizer-new-frontend
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
@@ -63,8 +102,8 @@ services:
     container_name: news-summarizer-new-cron
     environment:
       TZ: America/La_Paz
-      BACKEND_BASE_URL: ${CRON_BACKEND_BASE_URL:-http://backend:8000}
-      API_AUTH_KEY: ${API_AUTH_KEY:-change-me-local-api-auth-key}
+      BACKEND_BASE_URL: http://backend:8000
+      API_AUTH_KEY: ${API_AUTH_KEY:-}
       RUN_ONCE: ${CRON_RUN_ONCE:-false}
       ECONOMIC_REFRESH_EVERY: ${CRON_ECONOMIC_REFRESH_EVERY:-30}
       ECONOMIC_REFRESH_UNIT: ${CRON_ECONOMIC_REFRESH_UNIT:-minutes}
