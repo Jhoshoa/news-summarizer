@@ -67,6 +67,14 @@ Database migrations run automatically during backend startup. Before deploying s
 take a database backup from the VPS provider or Postgres volume. Migration rules are documented
 in `migrations/README.md`.
 
+Manual summary refresh can run synchronously or asynchronously. Cron keeps using the synchronous
+default. For UI/manual operations that may hit proxy timeouts, use:
+
+```text
+POST /trigger/summary?time_of_day=manual&refresh=true&async_mode=true
+GET /trigger/summary/jobs/{job_id}
+```
+
 The cron container uses Docker's internal network:
 
 ```env

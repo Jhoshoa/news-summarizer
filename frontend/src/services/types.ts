@@ -249,9 +249,21 @@ export type WorldCupMatch = {
 export type TriggerSummaryResponse = {
   status: string;
   message: string;
-  result: {
+  job?: {
+    id: string;
+    status: string;
+    time_of_day: string;
+    refresh: boolean;
+    requested_at?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
+    result?: Record<string, unknown> | null;
+    error_message?: string | null;
+  };
+  status_url?: string;
+  result?: {
     collected: number;
-    processed: number;
+    processed?: number;
     summaries: number;
     sent: number;
     collection_stats?: {

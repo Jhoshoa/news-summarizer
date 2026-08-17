@@ -7,6 +7,7 @@ from .repository import (
     NewsSource,
     NewsSummary,
     Subscriber,
+    SummaryRefreshJob,
 )
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "NewsSource",
     "NewsSummary",
     "Subscriber",
+    "SummaryRefreshJob",
 ]

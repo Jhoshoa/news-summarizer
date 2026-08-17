@@ -8,9 +8,10 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -1156,8 +1157,10 @@ async def whatsapp_webhook(sender: str = None, body: str = None):
 
 @app.post("/trigger/summary")
 async def trigger_summary(
+    response: Response,
     time_of_day: str = "manual",
     refresh: bool = False,
+    async_mode: bool = False,
     x_api_key: str | None = Header(
         default=None,
         alias="X-API-Key",
@@ -1169,6 +1172,25 @@ async def trigger_summary(
     if not app_instance:
         raise HTTPException(status_code=500, detail="App no inicializada")
     await require_cron_key(app_instance, x_api_key)
+
+    if async_mode:
+        if not app_instance.db:
+            raise HTTPException(status_code=503, detail="DB no disponible para registrar job")
+
+        job_id = str(uuid4())
+        job = await app_instance.db.create_summary_refresh_job(
+            job_id,
+            time_of_day=time_of_day,
+            refresh=refresh,
+        )
+        asyncio.create_task(_run_summary_refresh_job(job_id, time_of_day, refresh))
+        response.status_code = 202
+        return {
+            "status": "accepted",
+            "message": "Resumen en proceso",
+            "job": job,
+            "status_url": f"/trigger/summary/jobs/{job_id}",
+        }
 
     try:
         result = await app_instance.send_summaries(
@@ -1189,6 +1211,55 @@ async def trigger_summary(
     except Exception as e:
         logger.error(f"Error-trigger: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+async def _run_summary_refresh_job(job_id: str, time_of_day: str, refresh: bool) -> None:
+    if not app_instance or not app_instance.db:
+        return
+
+    try:
+        await app_instance.db.mark_summary_refresh_job_running(job_id)
+        result = await app_instance.send_summaries(
+            time_of_day,
+            refresh=refresh,
+            deliver=False,
+        )
+        await app_instance.db.finish_summary_refresh_job(job_id, result)
+        logger.info(
+            "Async summary refresh completed: "
+            f"job_id={job_id} collected={result.get('collected')} "
+            f"summaries={result.get('summaries')}"
+        )
+    except Exception as e:
+        logger.error(f"Async summary refresh failed job_id={job_id}: {e}")
+        try:
+            await app_instance.db.fail_summary_refresh_job(job_id, str(e))
+        except Exception as update_error:
+            logger.error(f"Error updating failed summary job {job_id}: {update_error}")
+
+
+@app.get("/trigger/summary/jobs/{job_id}")
+async def get_summary_refresh_job(
+    job_id: str,
+    x_api_key: str | None = Header(
+        default=None,
+        alias="X-API-Key",
+        description="Clave privada para endpoints internos.",
+    ),
+):
+    """Consulta el estado de un refresh asincrono."""
+
+    if not app_instance:
+        raise HTTPException(status_code=500, detail="App no inicializada")
+    await require_cron_key(app_instance, x_api_key)
+    if not app_instance.db:
+        raise HTTPException(status_code=503, detail="DB no disponible")
+
+    job = await app_instance.db.get_summary_refresh_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado")
+
+    return {"status": job["status"], "job": job}
 
 
 @app.post("/trigger/delivery")

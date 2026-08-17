@@ -51,6 +51,7 @@ type GetImpactMetricsArgs = {
 };
 
 type TriggerSummaryArgs = {
+  async_mode?: boolean;
   refresh?: boolean;
   time_of_day?: string;
 };
@@ -177,6 +178,7 @@ export const newsApi = createApi({
         params: {
           time_of_day: args?.time_of_day ?? "manual",
           refresh: args?.refresh ?? true,
+          async_mode: args?.async_mode,
         },
       }),
       invalidatesTags: ["Articles", "Summaries", "ImpactMetrics"],

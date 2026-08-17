@@ -576,12 +576,23 @@ Objetivo:
 
 Evitar timeouts de `/trigger/summary`.
 
+Estado:
+
+Implementado en el bloque `feat: Add async summary refresh jobs`.
+
 Trabajo:
 
-- Crear job id para refresh.
-- Endpoint para consultar estado.
-- Mostrar estado en frontend si se habilita refresh manual.
-- Mantener cron compatible.
+- Crear job id para refresh. Hecho.
+- Endpoint para consultar estado. Hecho.
+- Mostrar estado en frontend si se habilita refresh manual. Pendiente.
+- Mantener cron compatible. Hecho: el modo sincrono sigue siendo default.
+
+Mitigaciones aplicadas:
+
+- Los jobs se guardan en PostgreSQL para que el estado sea visible entre workers.
+- El modo async es opt-in con `async_mode=true`; cron y clientes existentes conservan
+  el comportamiento sincrono.
+- El endpoint de estado mantiene proteccion con `X-API-Key`.
 
 ### Paso 7 - Uniformar documentacion
 

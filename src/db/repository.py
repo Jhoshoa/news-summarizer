@@ -200,6 +200,20 @@ class NewsSummary(Base):
     created_at = Column(DateTime, nullable=False, default=_now_bolivia)
 
 
+class SummaryRefreshJob(Base):
+    __tablename__ = "summary_refresh_jobs"
+
+    id = Column(String(36), primary_key=True)
+    status = Column(String(20), nullable=False, default="queued", index=True)
+    time_of_day = Column(String(20), nullable=False, default="manual")
+    refresh = Column(Boolean, nullable=False, default=False)
+    requested_at = Column(DateTime, nullable=False, default=_now_bolivia, index=True)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    result = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+
 class WorldCupMatch(Base):
     __tablename__ = "worldcup_matches"
 
@@ -1576,6 +1590,66 @@ class Database:
 
         return self._summary_row_to_dict(row) if row else None
 
+    async def create_summary_refresh_job(
+        self,
+        job_id: str,
+        *,
+        time_of_day: str,
+        refresh: bool,
+    ) -> dict:
+        async with self.session_maker() as session:
+            job = SummaryRefreshJob(
+                id=job_id,
+                status="queued",
+                time_of_day=time_of_day,
+                refresh=refresh,
+            )
+            session.add(job)
+            await session.commit()
+            await session.refresh(job)
+            return self._summary_refresh_job_to_dict(job)
+
+    async def mark_summary_refresh_job_running(self, job_id: str) -> None:
+        async with self.session_maker() as session:
+            stmt = (
+                sql_update(SummaryRefreshJob)
+                .where(SummaryRefreshJob.id == job_id)
+                .values(status="running", started_at=_now_bolivia())
+            )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def finish_summary_refresh_job(self, job_id: str, result: dict) -> None:
+        async with self.session_maker() as session:
+            stmt = (
+                sql_update(SummaryRefreshJob)
+                .where(SummaryRefreshJob.id == job_id)
+                .values(status="success", finished_at=_now_bolivia(), result=result)
+            )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def fail_summary_refresh_job(self, job_id: str, error_message: str) -> None:
+        async with self.session_maker() as session:
+            stmt = (
+                sql_update(SummaryRefreshJob)
+                .where(SummaryRefreshJob.id == job_id)
+                .values(
+                    status="failed",
+                    finished_at=_now_bolivia(),
+                    error_message=error_message,
+                )
+            )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def get_summary_refresh_job(self, job_id: str) -> dict | None:
+        async with self.session_maker() as session:
+            stmt = select(SummaryRefreshJob).where(SummaryRefreshJob.id == job_id)
+            result = await session.execute(stmt)
+            job = result.scalar_one_or_none()
+            return self._summary_refresh_job_to_dict(job) if job else None
+
     async def get_worldcup_matches(self, match_date: date | None = None) -> list[dict]:
         async with self.session_maker() as session:
             stmt = select(WorldCupMatch).order_by(WorldCupMatch.match_date, WorldCupMatch.match_time)
@@ -2132,6 +2206,19 @@ class Database:
             "llm_model": summary.llm_model,
             "summary_date": self._format_datetime(summary.summary_date),
             "created_at": self._format_datetime(summary.created_at),
+        }
+
+    def _summary_refresh_job_to_dict(self, job: SummaryRefreshJob) -> dict:
+        return {
+            "id": job.id,
+            "status": job.status,
+            "time_of_day": job.time_of_day,
+            "refresh": job.refresh,
+            "requested_at": self._format_datetime(job.requested_at),
+            "started_at": self._format_datetime(job.started_at),
+            "finished_at": self._format_datetime(job.finished_at),
+            "result": job.result,
+            "error_message": job.error_message,
         }
 
     def _public_image_url(self, value: str | None) -> str | None:

@@ -101,7 +101,9 @@ The local compose file points the frontend to
 | GET | `/` | App status |
 | GET | `/health` | Health check |
 | GET | `/stats` | Subscriber count; returns `0` when DB is unavailable |
-| POST | `/trigger/summary` | Collect, process, summarize, and deliver when subscribers exist; add `refresh=true` to force a new run |
+| POST | `/trigger/summary` | Collect, process, and summarize; add `refresh=true` to force a new run. Use `async_mode=true` for long manual refreshes |
+| GET | `/trigger/summary/jobs/{job_id}` | Check an async summary refresh job |
+| POST | `/trigger/delivery` | Deliver existing summaries to subscribers |
 | POST | `/webhook/whatsapp` | Twilio WhatsApp webhook |
 
 Manual summary trigger:

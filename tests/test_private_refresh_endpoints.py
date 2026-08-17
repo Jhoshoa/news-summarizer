@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 
 import httpx
@@ -10,10 +11,48 @@ from src.main import app
 API_AUTH_KEY = "test-api-auth-key-value"
 
 
+class FakeSummaryJobDatabase:
+    def __init__(self):
+        self.jobs = {}
+
+    async def create_summary_refresh_job(self, job_id, *, time_of_day, refresh):
+        job = {
+            "id": job_id,
+            "status": "queued",
+            "time_of_day": time_of_day,
+            "refresh": refresh,
+            "requested_at": "2026-08-17T10:00:00-04:00",
+            "started_at": None,
+            "finished_at": None,
+            "result": None,
+            "error_message": None,
+        }
+        self.jobs[job_id] = job
+        return job
+
+    async def mark_summary_refresh_job_running(self, job_id):
+        self.jobs[job_id]["status"] = "running"
+        self.jobs[job_id]["started_at"] = "2026-08-17T10:00:01-04:00"
+
+    async def finish_summary_refresh_job(self, job_id, result):
+        self.jobs[job_id]["status"] = "success"
+        self.jobs[job_id]["finished_at"] = "2026-08-17T10:00:02-04:00"
+        self.jobs[job_id]["result"] = result
+
+    async def fail_summary_refresh_job(self, job_id, error_message):
+        self.jobs[job_id]["status"] = "failed"
+        self.jobs[job_id]["finished_at"] = "2026-08-17T10:00:02-04:00"
+        self.jobs[job_id]["error_message"] = error_message
+
+    async def get_summary_refresh_job(self, job_id):
+        return self.jobs.get(job_id)
+
+
 @pytest.fixture
 def fake_summary_app_instance():
     original = main_module.app_instance
     calls = []
+    db = FakeSummaryJobDatabase()
 
     async def send_summaries(time_of_day="manual", refresh=False, *, deliver=True):
         calls.append((time_of_day, refresh, deliver))
@@ -40,6 +79,7 @@ def fake_summary_app_instance():
             summary_candidates_extended_categories="politica, economia",
             summary_candidates_per_category=8,
         ),
+        db=db,
         send_summaries=send_summaries,
         deliver_cached_summaries=deliver_cached_summaries,
     )
@@ -138,6 +178,50 @@ async def test_trigger_summary_ignores_delivery_query_param(fake_summary_app_ins
 
 
 @pytest.mark.asyncio
+async def test_trigger_summary_async_mode_returns_job_and_processes_in_background(
+    fake_summary_app_instance,
+):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/trigger/summary",
+            params={"refresh": "true", "time_of_day": "manual", "async_mode": "true"},
+            headers={"X-API-Key": API_AUTH_KEY},
+        )
+
+        assert response.status_code == 202
+        payload = response.json()
+        job_id = payload["job"]["id"]
+        assert payload["status"] == "accepted"
+        assert payload["status_url"] == f"/trigger/summary/jobs/{job_id}"
+
+        for _ in range(5):
+            status_response = await client.get(
+                f"/trigger/summary/jobs/{job_id}",
+                headers={"X-API-Key": API_AUTH_KEY},
+            )
+            if status_response.json()["job"]["status"] == "success":
+                break
+            await asyncio.sleep(0)
+
+    assert status_response.status_code == 200
+    assert status_response.json()["job"]["result"]["summaries"] == 2
+    assert fake_summary_app_instance == [("manual", True, False)]
+
+
+@pytest.mark.asyncio
+async def test_summary_refresh_job_status_returns_404_for_unknown_job(fake_summary_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(
+            "/trigger/summary/jobs/missing",
+            headers={"X-API-Key": API_AUTH_KEY},
+        )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_trigger_delivery_rejects_missing_cron_key(fake_summary_app_instance):
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -188,8 +272,14 @@ async def test_economic_refresh_accepts_valid_cron_key(fake_economic_app_instanc
 
 def test_private_refresh_endpoints_document_cron_header():
     schema = app.openapi()
-    for path in ("/api/economic-indicators/refresh", "/trigger/summary", "/trigger/delivery"):
-        parameters = schema["paths"][path]["post"]["parameters"]
+    operations = (
+        ("/api/economic-indicators/refresh", "post"),
+        ("/trigger/summary", "post"),
+        ("/trigger/summary/jobs/{job_id}", "get"),
+        ("/trigger/delivery", "post"),
+    )
+    for path, method in operations:
+        parameters = schema["paths"][path][method]["parameters"]
         cron_header = next(param for param in parameters if param["name"] == "X-API-Key")
         assert cron_header["in"] == "header"
         assert cron_header["required"] is False
