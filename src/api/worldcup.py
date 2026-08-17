@@ -37,7 +37,7 @@ def create_worldcup_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         try:
             result = await app_instance.db.finish_match(match_id)
         except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         if result is None:
             raise HTTPException(status_code=404, detail="Partido no encontrado")
         return result
