@@ -52,7 +52,7 @@ class EconomicIndicator:
 
 class EconomicIndicatorCollector:
     BCB_URL = "https://www.bcb.gob.bo/"
-    BCB_TC_TABLE_URL = "https://www.bcb.gob.bo/librerias/indicadores/dolar/tabla.php"
+    BCB_OFFICIAL_USD_URL = "https://www.bcb.gob.bo/tco_reporte_ultima_cotizacion.php"
     BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
@@ -112,7 +112,7 @@ class EconomicIndicatorCollector:
 
         indicators = []
         for card in section.select(".bcb-kpi2-card"):
-            if card.select_one(".bcb-tco-amount"):
+            if card.select_one(".bcb-tco-amount") or self._is_bcb_exchange_rate_card(card):
                 continue
             indicators.extend(
                 self._parse_bcb_card(
@@ -123,7 +123,7 @@ class EconomicIndicatorCollector:
             )
 
         indicators.extend(
-            await self._fetch_tc_compra_venta(
+            await self._fetch_official_usd_rate(
                 client,
                 snapshot_key=snapshot_key,
                 collected_at=collected_at,
@@ -188,82 +188,74 @@ class EconomicIndicatorCollector:
 
         return indicators
 
-    async def _fetch_tc_compra_venta(
+    async def _fetch_official_usd_rate(
         self,
         client: httpx.AsyncClient,
         *,
         snapshot_key: str | None = None,
         collected_at: datetime | None = None,
     ) -> list[EconomicIndicator]:
-        today = date.today()
-        params_template = {
-            "sdd": str(today.day),
-            "smm": str(today.month),
-            "saa": str(today.year),
-            "edd": str(today.day),
-            "emm": str(today.month),
-            "eaa": str(today.year),
-            "qlist": "1",
-            "mk": "2",
-            "range": "USD",
-        }
-        sides = [
-            ("Compra", "buy", "34"),
-            ("Venta", "sell", "35"),
-        ]
-        indicators = []
-        for side_label, side, moneda in sides:
-            params = {**params_template, "moneda": moneda}
-            try:
-                resp = await client.get(self.BCB_TC_TABLE_URL, params=params)
-                resp.raise_for_status()
-                soup = BeautifulSoup(resp.text, "lxml")
-                value_text = self._parse_tc_table_value(soup)
-                value = self._parse_decimal(value_text)
-                if value is None:
-                    logger.warning(f"Could not parse {side_label} value from TC table")
-                    continue
-            except Exception:
-                logger.exception(f"Failed to fetch BCB {side_label} rate")
-                continue
+        try:
+            response = await client.get(self.BCB_OFFICIAL_USD_URL)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "lxml")
+            value_text, observed_at, validity_label = self._parse_official_usd_report(soup)
+            value = self._parse_decimal(value_text)
+            if value is None:
+                logger.warning("Could not parse BCB official USD rate")
+                return []
+        except Exception:
+            logger.exception("Failed to fetch BCB official USD rate")
+            return []
 
-            indicators.append(
-                EconomicIndicator(
-                    source="bcb",
-                    indicator_code=f"bcb_tipo_de_cambio_{side_label.lower()}",
-                    indicator_name=side_label,
-                    indicator_group="Tipo de cambio",
-                    value=value,
-                    unit="BOB per USD",
-                    currency="BOB",
-                    asset="USD",
-                    side=side,
-                    observed_at=today,
-                    collected_at=collected_at or datetime.now(TZ_BOLIVIA).replace(tzinfo=None),
-                    snapshot_key=snapshot_key,
-                    raw_payload={
-                        "side": side_label,
-                        "moneda": moneda,
-                        "value_text": value_text,
-                        "fetched_at": str(today),
-                    },
-                )
+        return [
+            EconomicIndicator(
+                source="bcb",
+                indicator_code="bcb_tipo_de_cambio_oficial",
+                indicator_name="Dolar oficial",
+                indicator_group="Tipo de cambio oficial",
+                value=value,
+                unit="BOB per USD",
+                currency="BOB",
+                asset="USD",
+                side=None,
+                observed_at=observed_at,
+                collected_at=collected_at or datetime.now(TZ_BOLIVIA).replace(tzinfo=None),
+                snapshot_key=snapshot_key,
+                raw_payload={
+                    "value_text": value_text,
+                    "validity_label": validity_label,
+                    "source_url": self.BCB_OFFICIAL_USD_URL,
+                },
             )
-        return indicators
+        ]
 
-    def _parse_tc_table_value(self, soup: BeautifulSoup) -> str | None:
-        table = soup.select_one(".tablaborde")
-        if not table:
-            return None
-        rows = table.select("tr.listas-fila1, tr.listas-fila2")
-        for row in rows:
-            cells = row.select("td")
-            if len(cells) >= 3:
-                value_cell = cells[2]
-                text = self._clean_text(value_cell)
-                if text:
-                    return text.split()[0] if " " in text else text
-        return None
+    def _is_bcb_exchange_rate_card(self, card) -> bool:
+        title = self._clean_text(card.select_one(".bcb-kpi2-name"))
+        subtitle = self._clean_text(card.select_one(".bcb-kpi2-sub"))
+        text = self._strip_accents(f"{title} {subtitle}".lower())
+        return "tipo de cambio" in text and ("dolar" in text or "dollar" in text)
+
+    def _parse_official_usd_report(self, soup: BeautifulSoup) -> tuple[str | None, date | None, str]:
+        value_text = self._clean_text(soup.select_one(".tco-public-value"))
+        validity_label = self._clean_text(soup.select_one(".tco-public-vigencia"))
+        observed_at = self._parse_spanish_date(validity_label)
+        if value_text:
+            return value_text, observed_at, validity_label
+
+        daily_table = soup.select_one(".tco-daily-table")
+        if not daily_table:
+            return None, observed_at, validity_label
+
+        latest_date = None
+        latest_value = None
+        for row in daily_table.select("tbody tr"):
+            cells = [self._clean_text(cell) for cell in row.select("td")]
+            if len(cells) >= 2:
+                latest_date = self._parse_spanish_date(cells[0]) or latest_date
+                latest_value = cells[1]
+
+        return latest_value, observed_at or latest_date, validity_label
 
     def _parse_bcb_card(
         self,
@@ -380,7 +372,7 @@ class EconomicIndicatorCollector:
 
     def _parse_spanish_date(self, text: str) -> date | None:
         text = self._normalize_space(text.lower())
-        match = re.search(r"(\d{1,2})\s+de\s+([a-záéíóúñ]+),?\s+(\d{4})", text)
+        match = re.search(r"(\d{1,2})\s+de\s+([a-záéíóúñ]+)(?:,|\s+de)?\s+(\d{4})", text)
         if not match:
             return None
 

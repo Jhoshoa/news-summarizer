@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
 import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
-import { findByExactCode, formatNumber } from "../components/indicators/indicatorUtils";
+import { findByExactCode, findOfficialUsdIndicator, formatNumber } from "../components/indicators/indicatorUtils";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { MarketSkeletons, PanelSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
 import {
@@ -28,21 +28,21 @@ const formatMetric = (value: unknown, suffix = "", digits = 1) => {
 };
 
 const CurrencySpread = ({ indicators }: { indicators: EconomicIndicator[] }) => {
-  const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
+  const officialRate = findOfficialUsdIndicator(indicators)?.value;
   const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
-  const spread = p2pSell && officialSell ? p2pSell - officialSell : null;
+  const spread = p2pSell && officialRate ? p2pSell - officialRate : null;
 
   return (
     <section className="data-panel">
       <span className="panel-title">Brecha cambiaria</span>
       <div className="hero-metric">
         <strong>Bs {formatNumber(spread, 2)}</strong>
-        <span>P2P venta menos oficial venta</span>
+        <span>P2P venta menos dolar oficial</span>
       </div>
       <div className="metric-list">
         <div>
-          <span>Oficial venta</span>
-          <strong>Bs {formatNumber(officialSell, 2)}</strong>
+          <span>Dolar oficial</span>
+          <strong>Bs {formatNumber(officialRate, 2)}</strong>
         </div>
         <div>
           <span>P2P venta</span>

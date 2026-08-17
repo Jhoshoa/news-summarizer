@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from bs4 import BeautifulSoup
 
 from src.collectors.economic_indicators import EconomicIndicatorCollector
 from src.db.indicators import EconomicIndicatorRepository
@@ -58,12 +59,46 @@ BCB_HTML = """
 </section>
 """
 
+BCB_OFFICIAL_USD_HTML = """
+<section class="bcb-vrd-wrap" aria-label="Tipo de Cambio Oficial del Dolar Estadounidense">
+  <div class="tco-public-card" aria-label="Reporte de ultima cotizacion TCO">
+    <div class="tco-public-summary">
+      <h3>Ultima cotizacion</h3>
+      <div class="tco-public-value">Bs 11,58/$us</div>
+      <span class="tco-public-date">FECHA DE CORTE: VIERNES 14 DE AGOSTO DE 2026</span>
+      <span class="tco-public-vigencia">VIGENCIA: LUNES 17 DE AGOSTO DE 2026</span>
+    </div>
+  </div>
+  <table class="tco-daily-table">
+    <tbody>
+      <tr><td>sabado, 15 de agosto de 2026</td><td>11,58</td></tr>
+      <tr><td>domingo, 16 de agosto de 2026</td><td>11,58</td></tr>
+      <tr><td>lunes, 17 de agosto de 2026</td><td>11,58</td></tr>
+    </tbody>
+  </table>
+</section>
+"""
+
+BCB_OFFICIAL_USD_TABLE_ONLY_HTML = """
+<section class="bcb-vrd-wrap" aria-label="Tipo de Cambio Oficial del Dolar Estadounidense">
+  <table class="tco-daily-table">
+    <tbody>
+      <tr><td>jueves, 13 de agosto de 2026</td><td>11,66</td></tr>
+      <tr><td>viernes, 14 de agosto de 2026</td><td>11,62</td></tr>
+    </tbody>
+  </table>
+</section>
+"""
+
 
 @pytest.mark.asyncio
 async def test_fetch_bcb_parses_key_indicator_cards():
     def handler(request: httpx.Request) -> httpx.Response:
-        assert str(request.url) == "https://www.bcb.gob.bo/"
-        return httpx.Response(200, text=BCB_HTML)
+        if str(request.url) == "https://www.bcb.gob.bo/":
+            return httpx.Response(200, text=BCB_HTML)
+
+        assert str(request.url) == "https://www.bcb.gob.bo/tco_reporte_ultima_cotizacion.php"
+        return httpx.Response(200, text=BCB_OFFICIAL_USD_HTML)
 
     collector = EconomicIndicatorCollector()
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
@@ -71,16 +106,31 @@ async def test_fetch_bcb_parses_key_indicator_cards():
 
     by_code = {indicator.indicator_code: indicator for indicator in indicators}
 
-    assert by_code["bcb_tipo_de_cambio_compra"].value == Decimal("6.86")
-    assert by_code["bcb_tipo_de_cambio_compra"].side == "buy"
-    assert by_code["bcb_tipo_de_cambio_compra"].observed_at.isoformat() == "2026-05-10"
-    assert by_code["bcb_tipo_de_cambio_venta"].value == Decimal("6.96")
+    assert "bcb_tipo_de_cambio_compra" not in by_code
+    assert "bcb_tipo_de_cambio_venta" not in by_code
+    assert by_code["bcb_tipo_de_cambio_oficial"].value == Decimal("11.58")
+    assert by_code["bcb_tipo_de_cambio_oficial"].side is None
+    assert by_code["bcb_tipo_de_cambio_oficial"].observed_at.isoformat() == "2026-08-17"
+    assert by_code["bcb_tipo_de_cambio_oficial"].raw_payload["validity_label"] == (
+        "VIGENCIA: LUNES 17 DE AGOSTO DE 2026"
+    )
     assert by_code["bcb_tasa_de_referencia_tre_mn"].value == Decimal("3.53")
     assert by_code["bcb_tasa_de_referencia_tre_me"].unit == "%"
     assert by_code["bcb_unidad_de_fomento_a_la_vivienda_ufv"].value == Decimal("3.27232")
     assert by_code["bcb_unidad_de_fomento_a_la_vivienda_ufv"].asset == "UFV"
     assert by_code["bcb_cotizacion_internacional_del_oro_valor"].value == Decimal("4269.71")
     assert by_code["bcb_cotizacion_internacional_del_oro_valor"].asset == "GOLD"
+
+
+def test_parse_official_usd_report_uses_latest_daily_row_as_fallback():
+    collector = EconomicIndicatorCollector()
+    soup = BeautifulSoup(BCB_OFFICIAL_USD_TABLE_ONLY_HTML, "lxml")
+
+    value_text, observed_at, validity_label = collector._parse_official_usd_report(soup)
+
+    assert value_text == "11,62"
+    assert observed_at == date(2026, 8, 14)
+    assert validity_label == ""
 
 
 @pytest.mark.asyncio

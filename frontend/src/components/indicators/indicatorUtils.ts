@@ -31,6 +31,14 @@ const isTreIndicator = (item: EconomicIndicator) => {
   return text.includes("tasa_de_referencia") || text.includes("tasa de referencia") || text.includes("tre");
 };
 
+export const findOfficialUsdIndicator = (items: EconomicIndicator[]) =>
+  findByExactCode(items, "bcb_tipo_de_cambio_oficial") ??
+  findByExactCode(items, "bcb_tipo_de_cambio_venta") ??
+  items.find((item) => {
+    const text = indicatorText(item);
+    return item.source === "bcb" && item.asset === "USD" && text.includes("tipo") && text.includes("cambio");
+  });
+
 export const findUfvIndicator = (items: EconomicIndicator[]) =>
   findByExactCode(items, "bcb_unidad_de_fomento_a_la_vivienda_ufv") ??
   items.find((item) => item.source === "bcb" && item.asset === "UFV") ??

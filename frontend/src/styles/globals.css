@@ -383,12 +383,22 @@ p {
   margin-top: 8px;
 }
 
+.rate-single {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--color-surface-muted);
+}
+
 .rate-pair div {
   border-radius: 6px;
   padding: 8px;
   background: var(--color-surface-muted);
 }
 
+.rate-single em,
 .rate-pair em {
   display: block;
   color: var(--color-muted);
@@ -398,6 +408,7 @@ p {
   text-transform: uppercase;
 }
 
+.rate-single b,
 .rate-pair b {
   display: block;
   margin-top: 4px;

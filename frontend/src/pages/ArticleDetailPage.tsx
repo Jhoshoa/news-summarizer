@@ -5,6 +5,7 @@ import { useRouter } from "../app/router";
 import {
   findByExactCode,
   findGoldIndicator,
+  findOfficialUsdIndicator,
   findIndicator,
   findUfvIndicator,
   formatNumber,
@@ -78,8 +79,7 @@ export const ArticleDetailPage = () => {
         .slice(0, 3),
     [articleId, latestSummariesData?.items],
   );
-  const officialBuy = findByExactCode(indicators, "bcb_tipo_de_cambio_compra")?.value;
-  const officialSell = findByExactCode(indicators, "bcb_tipo_de_cambio_venta")?.value;
+  const officialRate = findOfficialUsdIndicator(indicators)?.value;
   const p2pBuy = findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value;
   const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
   const ufv = findUfvIndicator(indicators);
@@ -195,10 +195,8 @@ export const ArticleDetailPage = () => {
                 <div className="panel-title">Dolar hoy</div>
                 <dl className="side-values">
                   <div>
-                    <dt>Oficial C/V</dt>
-                    <dd>
-                      {formatNumber(officialBuy)} / {formatNumber(officialSell)}
-                    </dd>
+                    <dt>Dolar oficial</dt>
+                    <dd>{formatNumber(officialRate)}</dd>
                   </div>
                   <div>
                     <dt>P2P C/V</dt>
