@@ -17,7 +17,6 @@ import type {
   UnsubscribeResponse,
   WeatherLocationsResponse,
   WeatherResponse,
-  WorldCupMatch,
 } from "./types";
 
 type GetIndicatorsArgs = {
@@ -61,7 +60,7 @@ export const newsApi = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: import.meta.env.VITE_API_BASE_URL || "",
   }),
-  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics", "Preferences", "Sources", "WorldCup"],
+  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics", "Preferences", "Sources"],
   endpoints: (builder) => ({
     getEconomicIndicators: builder.query<EconomicIndicatorsResponse, GetIndicatorsArgs | void>({
       query: (args) => ({
@@ -164,13 +163,6 @@ export const newsApi = createApi({
         body,
       }),
     }),
-    getWorldCupMatches: builder.query<WorldCupMatch[], string | void>({
-      query: (matchDate) => ({
-        url: "/api/worldcup/matches",
-        params: matchDate ? { match_date: matchDate } : undefined,
-      }),
-      providesTags: ["WorldCup"],
-    }),
     triggerSummary: builder.mutation<TriggerSummaryResponse, TriggerSummaryArgs | void>({
       query: (args) => ({
         url: "/trigger/summary",
@@ -195,7 +187,6 @@ export const {
   useGetArticleByIdQuery,
   useGetSummariesQuery,
   useGetImpactMetricsQuery,
-  useGetWorldCupMatchesQuery,
   useGetPreferenceOptionsQuery,
   useGetSourcesQuery,
   usePreviewPreferencesMutation,

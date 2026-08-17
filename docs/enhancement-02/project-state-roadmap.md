@@ -528,7 +528,7 @@ Dejar lint minimo en verde.
 
 Trabajo:
 
-- Corregir `B904` en `src/api/worldcup.py`.
+- Mantener `ruff check src tests` en verde despues de remover el feature World Cup.
 - Correr `ruff check src tests`.
 
 ### Paso 4 - CI basico

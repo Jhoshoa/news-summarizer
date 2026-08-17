@@ -229,23 +229,6 @@ export type SourcesResponse = {
   items: Source[];
 };
 
-export type WorldCupMatch = {
-  id: number;
-  match_date: string;
-  match_time: string;
-  group: string;
-  home_team: string;
-  away_team: string;
-  home_flag: string | null;
-  away_flag: string | null;
-  home_score: number | null;
-  away_score: number | null;
-  is_playing: boolean;
-  is_finished: boolean;
-  stage: string;
-  venue: string | null;
-};
-
 export type TriggerSummaryResponse = {
   status: string;
   message: string;
