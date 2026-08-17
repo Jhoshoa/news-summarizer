@@ -106,6 +106,99 @@ def test_parse_json_response_extracts_array_from_extra_text_and_skips_bad_items(
     ]
 
 
+def test_parse_json_response_extracts_fenced_object_with_summaries():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        Aqui va la respuesta:
+
+        ```json
+        {
+          "summaries": [
+            {
+              "article_id": 10,
+              "title": "Titulo valido",
+              "summary": "Resumen valido de la noticia.",
+              "category": "politica"
+            }
+          ]
+        }
+        ```
+        """,
+        "politica",
+        [{"id": 10, "title": "Titulo original", "source": "ABI"}],
+    )
+
+    assert summaries[0]["article_id"] == 10
+    assert summaries[0]["title"] == "Titulo original"
+    assert summaries[0]["category"] == "politica"
+    assert summaries[0]["source"] == "ABI"
+
+
+def test_parse_json_response_uses_balanced_array_when_text_contains_brackets():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        Nota editorial [ignorar este texto].
+        [
+          {
+            "title": "Titulo valido",
+            "summary": "Resumen valido de la noticia.",
+            "category": "general"
+          }
+        ]
+        Texto final [tambien ignorar].
+        """,
+        "general",
+        [],
+    )
+
+    assert summaries[0]["title"] == "Titulo valido"
+    assert summaries[0]["category"] == "general"
+
+
+def test_parse_response_forces_requested_category_over_llm_category_drift():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "title": "Partido de la seleccion",
+            "summary": "Resumen valido de la noticia.",
+            "category": "cultura"
+          }
+        ]
+        """,
+        "deportes",
+        [],
+    )
+
+    assert summaries[0]["category"] == "deportes"
+
+
+def test_parse_response_normalizes_generated_category_when_requested_is_invalid():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "title": "Nueva norma economica",
+            "summary": "Resumen valido de la noticia.",
+            "category": "Economía"
+          }
+        ]
+        """,
+        "",
+        [],
+    )
+
+    assert summaries[0]["category"] == "economia"
+
+
 def test_parse_legacy_response_keeps_article_metadata_as_fallback():
     summarizer = NewsSummarizer(llm_provider=None)
 

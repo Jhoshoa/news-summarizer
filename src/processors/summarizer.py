@@ -1,5 +1,6 @@
 import json
 import re
+import unicodedata
 from typing import Any
 
 from loguru import logger
@@ -12,6 +13,33 @@ class NewsSummarizer:
     SUMMARY_MIN_CHARS = 120
     SUMMARY_MAX_CHARS = 360
     FACT_MAX_CHARS = 140
+    VALID_CATEGORIES = {
+        "economia",
+        "politica",
+        "deportes",
+        "tecnologia",
+        "entretenimiento",
+        "policiales",
+        "general",
+    }
+    CATEGORY_ALIASES = {
+        "economia y finanzas": "economia",
+        "economicas": "economia",
+        "economico": "economia",
+        "politica nacional": "politica",
+        "nacional": "politica",
+        "nacionales": "politica",
+        "seguridad": "policiales",
+        "policial": "policiales",
+        "policia": "policiales",
+        "crimen": "policiales",
+        "futbol": "deportes",
+        "deporte": "deportes",
+        "tech": "tecnologia",
+        "tecnologia e innovacion": "tecnologia",
+        "cultura": "entretenimiento",
+        "espectaculos": "entretenimiento",
+    }
 
     SYSTEM_PROMPT = """Eres un editor de noticias experto en espanol latinoamericano.
 Tu tarea es resumir noticias de forma clara, objetiva y concisa.
@@ -124,15 +152,87 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
         return self._parse_legacy_response(response, category, original_news)
 
     def _parse_json_response(self, response: str) -> list[Any] | None:
-        try:
-            data = json.loads(response)
-        except json.JSONDecodeError:
+        data = self._decode_json_candidate(response)
+        if data is None:
             data = self._extract_json_array(response)
 
         if isinstance(data, dict):
             data = data.get("summaries") or data.get("items") or data.get("data")
 
         return data if isinstance(data, list) else None
+
+    def _decode_json_candidate(self, response: str) -> Any | None:
+        for candidate in self._json_candidates(response):
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+
+        return None
+
+    def _json_candidates(self, response: str) -> list[str]:
+        response = str(response or "").strip()
+        if not response:
+            return []
+
+        candidates = [response]
+
+        fenced_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", response, flags=re.IGNORECASE)
+        candidates.extend(block.strip() for block in fenced_blocks if block.strip())
+
+        candidates.extend(self._balanced_json_snippets(response))
+        return candidates
+
+    def _balanced_json_snippets(self, response: str) -> list[str]:
+        snippets = []
+        for opener, closer in (("[", "]"), ("{", "}")):
+            for start, char in enumerate(response):
+                if char != opener:
+                    continue
+
+                snippet = self._balanced_json_from(response, start, opener, closer)
+                if snippet:
+                    snippets.append(snippet)
+
+        return snippets
+
+    def _balanced_json_from(
+        self,
+        response: str,
+        start: int,
+        opener: str,
+        closer: str,
+    ) -> str | None:
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for index in range(start, len(response)):
+            char = response[index]
+
+            if escaped:
+                escaped = False
+                continue
+
+            if char == "\\" and in_string:
+                escaped = True
+                continue
+
+            if char == '"':
+                in_string = not in_string
+                continue
+
+            if in_string:
+                continue
+
+            if char == opener:
+                depth += 1
+            elif char == closer:
+                depth -= 1
+                if depth == 0:
+                    return response[start : index + 1]
+
+        return None
 
     def _extract_json_array(self, response: str) -> list[Any] | None:
         match = re.search(r"\[[\s\S]*\]", response)
@@ -180,7 +280,7 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                         self._clean_generated_text(item.get("fact") or ""),
                         self.FACT_MAX_CHARS,
                     ),
-                    "category": str(item.get("category") or category).strip().lower(),
+                    "category": self._resolve_category(category, item, original),
                     "article_id": item.get("article_id")
                     or original.get("id")
                     or original.get("article_id"),
@@ -252,7 +352,7 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                         )
                         if len(subparts) > 2
                         else "",
-                        "category": category,
+                        "category": self._normalize_category(category),
                         "article_id": original.get("id") or original.get("article_id"),
                         "story_cluster_id": original.get("story_cluster_id"),
                         "source_article_count": self._source_article_count(original),
@@ -263,9 +363,36 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
 
         return summaries
 
+    def _resolve_category(self, category: str, item: dict, original: dict) -> str:
+        requested_category = self._valid_category_or_none(category)
+        if requested_category:
+            return requested_category
+
+        for value in (item.get("category"), original.get("category")):
+            normalized = self._valid_category_or_none(value)
+            if normalized:
+                return normalized
+
+        return "general"
+
+    def _normalize_category(self, value: Any) -> str:
+        return self._valid_category_or_none(value) or "general"
+
+    def _valid_category_or_none(self, value: Any) -> str | None:
+        normalized = self._normalize_text(value)
+        normalized = self.CATEGORY_ALIASES.get(normalized, normalized)
+        return normalized if normalized in self.VALID_CATEGORIES else None
+
     def _clean_generated_text(self, value: Any) -> str:
         text = str(value or "").strip()
         text = re.sub(r"^\s*(?:\d+[\.)]\s*)+", "", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    def _normalize_text(self, value: Any) -> str:
+        text = str(value or "").strip().lower()
+        text = unicodedata.normalize("NFKD", text)
+        text = "".join(char for char in text if unicodedata.category(char) != "Mn")
+        text = re.sub(r"[^a-z0-9]+", " ", text)
         return re.sub(r"\s+", " ", text).strip()
 
     def _summary_with_context(self, value: Any, original: dict) -> str:
