@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import declarative_base
 
 from src.db.migrations import apply_sql_migrations
+from src.processors.story_confidence import classify_story_confidence
 from src.processors.story_fingerprint import (
     build_canonical_key,
     build_content_fingerprint,
@@ -1270,6 +1271,13 @@ class Database:
             )
             rows = (await session.execute(stmt)).all()
 
+        confidence = classify_story_confidence(
+            source_count=story.source_count,
+            article_count=story.article_count,
+            current_status=story.current_status,
+            relationship_types=(link.relationship_type for link, _art, _source in rows),
+        )
+
         return {
             "id": story.id,
             "canonical_title": story.canonical_title,
@@ -1278,17 +1286,20 @@ class Database:
             "category": story.category,
             "country": story.country,
             "current_status": story.current_status,
+            "confidence": confidence,
             "first_published_at": story.first_published_at,
             "last_updated_at": story.last_updated_at,
             "last_update_note": story.last_update_note,
             "article_count": story.article_count,
             "source_count": story.source_count,
+            "sources": sorted({source_name for _link, _art, source_name in rows}),
             "articles": [
                 {
                     "article_id": link.article_id,
                     "title": art.title,
                     "url": art.url,
                     "source": source_name,
+                    "author": art.author,
                     "published_at": art.published_at,
                     "relationship_type": link.relationship_type,
                     "similarity_score": link.similarity_score,
@@ -1337,6 +1348,11 @@ class Database:
                     "category": story.category,
                     "country": story.country,
                     "current_status": story.current_status,
+                    "confidence": classify_story_confidence(
+                        source_count=story.source_count,
+                        article_count=story.article_count,
+                        current_status=story.current_status,
+                    ),
                     "first_published_at": story.first_published_at,
                     "last_updated_at": story.last_updated_at,
                     "last_update_note": story.last_update_note,

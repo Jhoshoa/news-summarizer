@@ -6,13 +6,14 @@ el frontend. Cero modelo de correcciones.
 
 **Tiempo estimado:** 1–2 semanas. Depende de Fase 1 (necesita el modelo `Story`).
 
-## 2.1 Fuentes visibles
+## 2.1 Fuentes visibles ✅ implementado (backend)
 
-Por historia: nombre del medio, enlace original, fecha de publicación, autor (si hay),
-número de fuentes consultadas, indicación de fuente oficial, última verificación. La
-mayoría de estos campos ya existen en `news_articles`; falta exponerlos agregados por
-historia en la respuesta de `src/api/summaries.py` (o el endpoint equivalente) y
-renderizarlos en el frontend.
+`GET /api/stories/{id}` ahora devuelve, por historia: `sources` (lista de medios
+distintos que la cubrieron), y por cada artículo en `articles`: medio, URL, fecha
+de publicación, autor (si existe), y `is_update`. `source_count`/`article_count`
+(número de fuentes/artículos consultados) y `last_updated_at` (última
+verificación) ya existían desde Fase 1.1. Falta la parte de frontend
+(renderizarlo) — no incluida en este backend-only pass.
 
 ## 2.2 Citas por afirmación
 
@@ -51,17 +52,20 @@ Por historia: qué fuentes la reportaron, qué datos aparecen en todas, qué apa
 una sola, qué se contradice, qué no está confirmado. Se deriva de `story_articles` +
 `story_claims`/`claim_evidence` una vez existan.
 
-## 2.4 Nivel de confianza (etiquetas explicables, no un score misterioso)
+## 2.4 Nivel de confianza (etiquetas explicables, no un score misterioso) ✅ implementado
 
-- Confirmado por varias fuentes.
-- Reportado por una sola fuente.
-- Basado en comunicado oficial.
-- Información en desarrollo.
-- Existen versiones contradictorias.
-- Corregido después de publicación.
+`src/processors/story_confidence.py` — `classify_story_confidence` deriva una de
+las 6 etiquetas desde `source_count`, `article_count`, `current_status` y
+`relationship_type` de los artículos, sin modelo de ML. Se expone como
+`confidence: {level, label}` en `GET /api/stories` y `GET /api/stories/{id}`.
 
-Se puede derivar de `story_count`/`source_count` + `relationship_type` sin necesitar
-un modelo de ML adicional al inicio.
+Hoy, con los datos que existen, solo 3 de las 6 etiquetas son alcanzables en la
+práctica (`multi_source`, `single_source`, `developing`) — las otras 3
+(`corrected`, `contradictory`, `official_statement`) están implementadas y
+listas, pero nada todavía asigna `current_status='corrected'`/`'contradictory'`
+ni `relationship_type='official_statement'`. Se activan solas en cuanto Fase 2.5
+(correcciones) o una clasificación más fina de `relationship_type` empiecen a
+escribir esos valores — no van a requerir tocar esta función.
 
 ## 2.5 Correcciones
 
@@ -71,6 +75,14 @@ un modelo de ML adicional al inicio.
   corrected_by).
 - Posibilidad de despublicar una historia (`stories.current_status = 'unpublished'`).
 - Revisión humana desde administración → depende de Fase 5.
+
+**Verificado:** 249/249 tests (7 nuevos para `classify_story_confidence` +
+2 actualizados en `test_stories_api.py`), backend y cron-job reconstruidos y
+reiniciados en Docker, y contra el Postgres real: una historia de 3 artículos
+de la misma fuente clasificó correctamente como `developing` (no
+`multi_source`, porque `source_count=1` aunque `article_count=3` — republicó,
+no confirmó desde otro medio), con `sources`/`articles[].author`/`is_update`
+devueltos correctamente por `GET /api/stories/{id}`.
 
 ## Criterio de salida
 

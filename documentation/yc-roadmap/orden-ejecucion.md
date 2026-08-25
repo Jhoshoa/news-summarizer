@@ -57,7 +57,12 @@ re-explorar todo el repo.
 - [x] Fase 1.3 — Resumen consolidado con contexto multi-fuente
 - [x] Fase 1.4 — Actualizaciones incrementales (heurística de título, sin IA todavía)
 - [x] Fase 1.5 — Línea de tiempo básica (`articles` + `is_update`; clasificación fina de `relationship_type` queda para cuando 1.3 se extienda con IA)
-- [ ] Fase 2 — Trazabilidad y confianza
+- [x] Fase 2.1 — Fuentes visibles (backend: `sources`, autor, `is_update` en `/api/stories`)
+- [x] Fase 2.4 — Nivel de confianza explicable (`classify_story_confidence`)
+- [ ] Fase 2.2 — Citas por afirmación (requiere extender el prompt del summarizer)
+- [ ] Fase 2.3 — Comparación de cobertura
+- [ ] Fase 2.5 — Correcciones (botón "Reportar error", `story_corrections`, despublicar)
+- [ ] Fase 2 (frontend) — Renderizar fuentes/confianza en la UI
 - [ ] Fase 3 — Onboarding
 - [ ] Fase 3 — Brief por email personalizado
 - [ ] Fase 3 — Entidades y seguimiento

@@ -25,6 +25,7 @@ class FakeStoriesDatabase:
                     "category": "economia",
                     "country": "BO",
                     "current_status": "developing",
+                    "confidence": {"level": "multi_source", "label": "Confirmado por varias fuentes"},
                     "first_published_at": datetime(2026, 8, 24, 10, 0),
                     "last_updated_at": datetime(2026, 8, 24, 12, 0),
                     "article_count": 3,
@@ -60,6 +61,10 @@ async def test_list_stories_returns_paginated_items(fake_app_instance):
     assert payload["total"] == 1
     assert payload["page"] == 2
     assert payload["items"][0]["id"] == "cluster-1"
+    assert payload["items"][0]["confidence"] == {
+        "level": "multi_source",
+        "label": "Confirmado por varias fuentes",
+    }
     assert fake_app_instance.list_calls == [
         {"category": "economia", "min_sources": 1, "page": 2, "page_size": 20}
     ]
