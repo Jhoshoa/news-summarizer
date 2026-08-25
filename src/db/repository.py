@@ -32,7 +32,9 @@ from src.db.migrations import apply_sql_migrations
 from src.processors.story_fingerprint import (
     build_canonical_key,
     build_content_fingerprint,
+    build_url_fingerprint,
     story_similarity,
+    temporal_proximity_factor,
 )
 
 TZ_BOLIVIA = ZoneInfo("America/La_Paz")
@@ -1382,14 +1384,28 @@ class Database:
             .limit(100)
         )
         candidates_result = await session.execute(candidates_stmt)
+        candidates = candidates_result.scalars().all()
 
+        url_fingerprint = build_url_fingerprint(article.get("url"))
+        if url_fingerprint:
+            for candidate in candidates:
+                if build_url_fingerprint(candidate.url) == url_fingerprint:
+                    return candidate, "url_normalized", 1.0
+
+        window_hours = lookback * 24
         best_match: NewsArticle | None = None
         best_score = 0.0
-        for candidate in candidates_result.scalars().all():
+        for candidate in candidates:
             score = story_similarity(
                 article,
                 self._article_for_story_matching(candidate, article.get("category")),
             )
+            if score <= 0.0:
+                continue
+
+            hours_apart = abs((published_at - candidate.published_at).total_seconds()) / 3600
+            score *= temporal_proximity_factor(hours_apart, window_hours=window_hours)
+
             if score > best_score:
                 best_score = score
                 best_match = candidate

@@ -76,7 +76,15 @@ distingue duplicado o no, no el tipo de relación narrativa.
 
 Orden recomendado, reusando lo existente donde aplica:
 
-1. URL normalizada — no implementado explícitamente, agregar antes que fingerprint.
+1. URL normalizada — ✅ implementado (`normalize_url`/`build_url_fingerprint` en
+   `story_fingerprint.py`). Corre en `find_recent_story_match` (`repository.py`)
+   antes del loop de similitud textual: si la URL normalizada de dos artículos
+   coincide (mismo host sin `www.`, mismo path sin barra final, sin parámetros
+   de tracking como `utm_*`/`fbclid`/`gclid`), se consideran la misma historia
+   con score 1.0 y razón `url_normalized`, sin necesidad de comparar texto.
+   Deliberadamente no toca `url_hash` (identidad exacta de artículo usada en
+   el upsert) — es una señal nueva solo para el matching de historias, no
+   cambia cuándo un artículo se trata como "ya existente" vs nuevo.
 2. Título normalizado — ✅ ya existe (`normalize_story_text` en `story_fingerprint.py`).
 3. Similitud textual (Jaccard de tokens + `SequenceMatcher`) — ✅ ya existe
    (`story_similarity`).
@@ -84,8 +92,20 @@ Orden recomendado, reusando lo existente donde aplica:
    85-90% del criterio de salida; no agregar un vector DB nuevo todavía, usar
    `pgvector` sobre el Postgres existente si se necesita.
 5. Entidades compartidas — depende de Fase 3.2 (extracción de entidades).
-6. Cercanía temporal — fácil de añadir, falta.
+6. Cercanía temporal — ✅ implementado (`temporal_proximity_factor` en
+   `story_fingerprint.py`). El score de similitud textual se multiplica por un
+   factor en (0.85, 1.0]: ~1.0 si los artículos son casi simultáneos, baja
+   hasta 0.85 cuando la distancia temporal se acerca al borde de la ventana de
+   búsqueda (`STORY_LOOKBACK_DAYS`, 3 días por defecto). Reduce falsos
+   positivos de temas recurrentes con titulares parecidos (ej. encuestas
+   semanales) sin afectar matches que ya eran claros por texto.
 7. Revisión humana para casos ambiguos — depende de Fase 5 (panel editorial).
+
+**Verificado:** 232/232 tests (incluye 8 tests nuevos en `test_story_fingerprint.py`
+para normalización de URL y decaimiento temporal) y validación manual contra el
+Postgres de desarrollo (`docker exec` con datos reales): una URL con parámetros
+de tracking distintos se detectó correctamente como `url_normalized`/1.0, y el
+factor temporal se aplicó con el valor exacto esperado por la fórmula.
 
 No usar solo un umbral de embeddings: combinar con fecha, ubicación, personas,
 organizaciones, tipo de evento, palabras distintivas — esto ya es parcialmente el

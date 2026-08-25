@@ -5,6 +5,7 @@ import re
 import unicodedata
 from difflib import SequenceMatcher
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 MAX_EXCERPT_CHARS = 280
 TITLE_WEIGHT = 0.65
@@ -17,6 +18,90 @@ LOW_VALUE_PREFIXES = (
     "en vivo",
     "envivo",
 )
+
+# Parametros de tracking que no cambian que articulo es: dos URLs que solo
+# difieren en estos deben normalizar al mismo valor.
+TRACKING_QUERY_PREFIXES = ("utm_",)
+TRACKING_QUERY_KEYS = frozenset(
+    {
+        "fbclid",
+        "gclid",
+        "gclsrc",
+        "dclid",
+        "msclkid",
+        "mc_cid",
+        "mc_eid",
+        "igshid",
+        "ref_src",
+        "ref",
+        "yclid",
+        "twclid",
+        "spm",
+        "_ga",
+        "mkt_tok",
+        "cmpid",
+        "amp",
+    }
+)
+
+
+def normalize_url(value: Any) -> str:
+    """Normaliza una URL para comparar identidad de articulo, no solo bytes iguales.
+
+    Unifica esquema/host, quita parametros de tracking y el fragmento, y
+    ordena los parametros restantes para que el orden en que la fuente los
+    emite no afecte la comparacion.
+    """
+
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    parsed = urlparse(raw if "://" in raw else f"//{raw}", scheme="https")
+    netloc = parsed.netloc.lower()
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+
+    path = parsed.path.rstrip("/") or ""
+
+    kept_params = [
+        (key, val)
+        for key, val in parse_qsl(parsed.query, keep_blank_values=True)
+        if key.lower() not in TRACKING_QUERY_KEYS
+        and not key.lower().startswith(TRACKING_QUERY_PREFIXES)
+    ]
+    kept_params.sort()
+    query = urlencode(kept_params)
+
+    normalized = f"https://{netloc}{path}"
+    if query:
+        normalized += f"?{query}"
+    return normalized
+
+
+def build_url_fingerprint(value: Any) -> str:
+    normalized = normalize_url(value)
+    if not normalized:
+        return ""
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def temporal_proximity_factor(hours_apart: float, *, window_hours: float) -> float:
+    """Factor en (floor, 1.0] que penaliza matches cerca del borde de la ventana.
+
+    No aporta nada cuando dos articulos son casi simultaneos (factor ~1.0);
+    reduce el score de similitud hasta un 15% cuando la distancia temporal se
+    acerca al limite de la ventana de busqueda de historias relacionadas, para
+    evitar que temas recurrentes con titulares parecidos (ej. encuestas
+    semanales) se agrupen como si fueran la misma historia.
+    """
+
+    if window_hours <= 0:
+        return 1.0
+
+    floor = 0.85
+    ratio = min(abs(hours_apart) / window_hours, 1.0)
+    return 1.0 - (1.0 - floor) * ratio
 
 
 def normalize_story_text(value: Any) -> str:
