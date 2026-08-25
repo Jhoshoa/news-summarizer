@@ -1130,12 +1130,24 @@ p {
   gap: 22px;
 }
 
+/* En el DOM el articulo va primero (para que el mobile, que apila en orden
+   de documento, lo muestre primero); en desktop se reordena solo con
+   `order` para mantener el layout original de 3 columnas sin tocar el DOM. */
 .related-briefs-sidebar {
+  order: 1;
   display: grid;
   gap: 12px;
   align-content: start;
   border-right: 2px solid var(--color-border-strong);
   padding-right: 18px;
+}
+
+.detail-article {
+  order: 2;
+}
+
+.detail-sidebar {
+  order: 3;
 }
 
 .related-briefs-list {
@@ -2401,6 +2413,14 @@ p {
   .article-content-layout.has-image,
   .subscribe-layout {
     grid-template-columns: 1fr;
+  }
+
+  /* En mobile mostramos el orden natural del documento (articulo primero,
+     luego los briefs relacionados), no el orden reordenado de desktop. */
+  .related-briefs-sidebar,
+  .detail-article,
+  .detail-sidebar {
+    order: initial;
   }
 
   .related-briefs-sidebar {

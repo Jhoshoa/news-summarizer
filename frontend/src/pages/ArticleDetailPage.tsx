@@ -148,16 +148,6 @@ export const ArticleDetailPage = () => {
   return (
     <>
       <section className="detail-layout">
-        <aside className="related-briefs-sidebar" aria-label="Briefs EcoBrief relacionados">
-          <div className="related-briefs-list">
-            {isFetchingLatestSummaries
-              ? Array.from({ length: 3 }, (_, index) => <PanelSkeleton key={index} />)
-              : relatedBriefs.map((summary) => (
-                  <SummaryCard key={summary.id ?? summary.title} summary={summary} />
-                ))}
-          </div>
-        </aside>
-
         <article className="detail-article">
           <span className="eyebrow">Detalle - {article.category}</span>
           <time className="published-date detail-date" dateTime={article.published_at}>
@@ -202,6 +192,16 @@ export const ArticleDetailPage = () => {
             )}
           </section>
         </article>
+
+        <aside className="related-briefs-sidebar" aria-label="Briefs EcoBrief relacionados">
+          <div className="related-briefs-list">
+            {isFetchingLatestSummaries
+              ? Array.from({ length: 3 }, (_, index) => <PanelSkeleton key={index} />)
+              : relatedBriefs.map((summary) => (
+                  <SummaryCard key={summary.id ?? summary.title} summary={summary} />
+                ))}
+          </div>
+        </aside>
 
         <aside className="detail-sidebar">
           {isFetchingIndicators ? (
