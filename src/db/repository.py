@@ -452,6 +452,93 @@ class Database:
             "unique_users": unique_users,
         }
 
+    async def get_pipeline_totals(self, since: datetime) -> dict[str, Any]:
+        """Suma metricas de corridas del pipeline (collection_runs) desde una fecha."""
+
+        async with self.session_maker() as session:
+            stmt = select(
+                func.count(CollectionRun.id),
+                func.coalesce(func.sum(CollectionRun.raw_collected_count), 0),
+                func.coalesce(func.sum(CollectionRun.usable_count), 0),
+                func.coalesce(func.sum(CollectionRun.quality_dropped_count), 0),
+                func.coalesce(func.sum(CollectionRun.deduplicated_count), 0),
+                func.coalesce(func.sum(CollectionRun.duplicate_dropped_count), 0),
+                func.coalesce(func.sum(CollectionRun.summary_candidates_count), 0),
+                func.coalesce(func.sum(CollectionRun.summaries_count), 0),
+                func.coalesce(func.sum(CollectionRun.ai_dedup_count), 0),
+            ).where(CollectionRun.started_at >= since)
+            (
+                total_runs,
+                raw_collected,
+                usable,
+                quality_dropped,
+                deduplicated,
+                duplicate_dropped,
+                summary_candidates,
+                summaries,
+                ai_dedup,
+            ) = (await session.execute(stmt)).one()
+
+            failed_stmt = (
+                select(func.count())
+                .select_from(CollectionRun)
+                .where(CollectionRun.started_at >= since, CollectionRun.status == "failed")
+            )
+            failed_runs = int((await session.execute(failed_stmt)).scalar_one())
+
+        return {
+            "since": since,
+            "total_runs": int(total_runs),
+            "failed_runs": failed_runs,
+            "raw_collected": int(raw_collected),
+            "usable": int(usable),
+            "quality_dropped": int(quality_dropped),
+            "deduplicated": int(deduplicated),
+            "duplicate_dropped": int(duplicate_dropped),
+            "summary_candidates": int(summary_candidates),
+            "summaries": int(summaries),
+            "ai_dedup_avoided": int(ai_dedup),
+        }
+
+    async def get_returning_session_rate(self, since: datetime, cohort_days: int = 7) -> dict[str, Any]:
+        """Aproxima retencion: sesiones que ya habian aparecido antes de la ventana actual.
+
+        No es retencion por usuario identificado (no hay login); es una aproximacion
+        por session_id mientras la mayoria del trafico es anonimo. Documentado como
+        limitacion en documentation/yc-roadmap/fase-0-analitica.md.
+        """
+
+        cohort_start = since - timedelta(days=cohort_days)
+
+        async with self.session_maker() as session:
+            current_sessions_stmt = select(func.distinct(AnalyticsEvent.session_id)).where(
+                AnalyticsEvent.created_at >= since,
+                AnalyticsEvent.session_id.is_not(None),
+            )
+            current_sessions = {
+                row[0] for row in (await session.execute(current_sessions_stmt)).all()
+            }
+
+            prior_sessions_stmt = select(func.distinct(AnalyticsEvent.session_id)).where(
+                AnalyticsEvent.created_at >= cohort_start,
+                AnalyticsEvent.created_at < since,
+                AnalyticsEvent.session_id.is_not(None),
+            )
+            prior_sessions = {
+                row[0] for row in (await session.execute(prior_sessions_stmt)).all()
+            }
+
+        returning = len(current_sessions & prior_sessions)
+        total_current = len(current_sessions)
+        rate = round(returning / total_current, 4) if total_current else 0.0
+
+        return {
+            "cohort_days": cohort_days,
+            "current_sessions": total_current,
+            "returning_sessions": returning,
+            "returning_rate": rate,
+        }
+
     async def get_preference_preview(
         self,
         categories: list[str],

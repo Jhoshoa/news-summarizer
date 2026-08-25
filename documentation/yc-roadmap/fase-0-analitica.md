@@ -1,11 +1,26 @@
 # Fase 0 — Instrumentación y línea base
 
-**Estado actual:** no existe. No hay tabla de eventos, ni endpoint de tracking, ni panel
-de métricas en `src/`. Esta es la fase de arranque real.
+**Estado actual: 0.1 y 0.2 implementadas y verificadas en Docker (agosto 2026).**
+0.3 (North Star) sigue siendo un objetivo a monitorear con estos datos, no una tarea
+de construcción aparte.
 
 **Tiempo estimado:** 1 semana.
 
-## 0.1 Analítica de producto
+## 0.1 Analítica de producto — ✅ implementado
+
+- Tabla `analytics_events` (migración `011_analytics_events.sql`, modelo `AnalyticsEvent`
+  en `src/db/repository.py`).
+- `POST /api/analytics/events` (`src/api/analytics.py`): batch, descarta eventos con
+  nombre desconocido sin fallar el lote, nunca 500 aunque falle la DB.
+- Cliente frontend `frontend/src/services/analytics.ts`: batching + debounce 2s +
+  `sendBeacon` al ocultar la pestaña.
+- Eventos enganchados: `brief_opened` (`HomePage.tsx`), `story_opened` y
+  `source_clicked` (`ArticleDetailPage.tsx`). `category_followed`, `entity_followed`,
+  `story_saved`, etc. quedan pendientes hasta que existan esas funciones (Fase 3).
+- 17 tests nuevos entre backend y frontend, todos verificados contra el stack Docker
+  real (evento con `session_id` real confirmado en Postgres).
+
+Referencia histórica (spec original antes de implementar):
 
 Eventos mínimos a registrar:
 
@@ -49,25 +64,32 @@ CREATE INDEX ix_analytics_events_name_time ON analytics_events(event_name, creat
 CREATE INDEX ix_analytics_events_user ON analytics_events(user_id);
 ```
 
-## 0.2 Panel interno de métricas
+## 0.2 Panel interno de métricas — ✅ implementado (versión mínima)
 
-No es un dashboard elaborado todavía: un endpoint `GET /admin/metrics` (protegido con
-`API_AUTH_KEY`, igual que otros endpoints admin en `src/api/security.py`) que devuelva
-JSON, y una página simple en el frontend o incluso en Grafana/Metabase apuntando
-directo a Postgres si prefieres no construir UI.
+`GET /api/analytics/dashboard` (protegido con `X-API-Key`, mismo patrón que
+`/api/economic-indicators/refresh`) combina en una sola respuesta:
 
-Métricas mínimas:
+- `product`: lo mismo que `/api/analytics/summary` (event_counts, sesiones/usuarios
+  únicos) — comportamiento de usuario.
+- `pipeline`: totales de `collection_runs` en la ventana (recolectados, útiles,
+  descartados por calidad, deduplicados, candidatos a IA, resúmenes generados,
+  duplicados evitados por IA) — eficiencia del pipeline, ya trackeada desde
+  `003_collection_run_pipeline_metrics.sql`, solo se sumó una vista agregada nueva.
+- `returning`: aproximación de retención por `session_id` (sesiones de la ventana
+  actual que ya habían aparecido en la ventana anterior). **Limitación explícita:**
+  no es retención por usuario identificado — la mayoría del tráfico es anónimo (sin
+  login). Es una proxy razonable hasta que exista una cuenta de usuario real; no
+  presentar esto como "retención D7" sin esta aclaración en la aplicación a YC.
+- `active_subscribers`: reusa `get_subscription_count()` ya existente.
 
-- Visitantes diarios/semanales, usuarios registrados, WAU, MAU.
-- Retención D1/D7/D30 (calculable con `analytics_events` + fecha de registro).
-- Briefs abiertos por usuario, historias leídas, fuentes originales abiertas.
-- Costo de IA por artículo/historia (ya tienes llamadas a Groq/OpenAI en `src/llm/`;
-  loguear tokens y costo por request en `collection_run_pipeline_metrics`, que ya
-  existe desde `003_collection_run_pipeline_metrics.sql`).
-- Artículos recopilados/descartados, duplicados detectados, historias únicas
-  producidas (ya parcialmente disponible vía `story_cluster_id`).
-- Errores de scraping (ya hay logging; falta agregarlo a una tabla consultable).
+Pendiente, no bloqueante para avanzar de fase:
+
+- Costo de IA por artículo/historia (requiere loguear tokens por request en
+  `src/llm/router.py` y sumarlos a `collection_run_pipeline_metrics`).
+- Errores de scraping en tabla consultable (hoy solo en logs).
 - Tiempo desde publicación hasta disponibilidad en el brief.
+- UI de panel en el frontend (hoy es JSON vía API; una página admin queda para
+  cuando haya un usuario interno que la use a diario, no antes).
 
 ## 0.3 Métrica de valor principal (North Star)
 

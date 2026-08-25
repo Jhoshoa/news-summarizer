@@ -51,7 +51,7 @@ re-explorar todo el repo.
 
 ## Checklist de progreso
 
-- [ ] Fase 0 — Analítica y métricas
+- [x] Fase 0 — Analítica y métricas (0.1 y 0.2 mínimas; costo IA y errores de scraping quedan pendientes, no bloqueantes)
 - [ ] Fase 1 — Modelo de historias
 - [ ] Fase 1 — Deduplicación por niveles + actualizaciones incrementales
 - [ ] Fase 2 — Trazabilidad y confianza

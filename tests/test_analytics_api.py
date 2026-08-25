@@ -26,6 +26,32 @@ class FakeAnalyticsDatabase:
             "unique_users": 1,
         }
 
+    async def get_pipeline_totals(self, since):
+        return {
+            "since": since,
+            "total_runs": 4,
+            "failed_runs": 1,
+            "raw_collected": 200,
+            "usable": 150,
+            "quality_dropped": 50,
+            "deduplicated": 120,
+            "duplicate_dropped": 30,
+            "summary_candidates": 40,
+            "summaries": 25,
+            "ai_dedup_avoided": 10,
+        }
+
+    async def get_returning_session_rate(self, since, cohort_days=7):
+        return {
+            "cohort_days": cohort_days,
+            "current_sessions": 2,
+            "returning_sessions": 1,
+            "returning_rate": 0.5,
+        }
+
+    async def get_subscription_count(self):
+        return 7
+
 
 @pytest.fixture
 def fake_app_instance():
@@ -146,3 +172,48 @@ async def test_summary_returns_counts_with_valid_api_key(fake_app_instance):
     assert payload["event_counts"] == {"brief_opened": 3}
     assert payload["unique_sessions"] == 2
     assert payload["unique_users"] == 1
+
+
+@pytest.mark.asyncio
+async def test_dashboard_requires_valid_api_key(fake_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/analytics/dashboard")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_dashboard_combines_product_pipeline_and_subscriber_metrics(fake_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(
+            "/api/analytics/dashboard", headers={"X-API-Key": "test-key"}
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["product"]["event_counts"] == {"brief_opened": 3}
+    assert payload["pipeline"]["total_runs"] == 4
+    assert payload["pipeline"]["failed_runs"] == 1
+    assert payload["returning"]["returning_rate"] == 0.5
+    assert payload["active_subscribers"] == 7
+
+
+@pytest.mark.asyncio
+async def test_dashboard_returns_zeros_when_db_unavailable():
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(db=None, settings=SimpleNamespace(api_auth_key="test-key"))
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/analytics/dashboard", headers={"X-API-Key": "test-key"}
+            )
+    finally:
+        main_module.app_instance = original
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["active_subscribers"] == 0
+    assert payload["pipeline"]["total_runs"] == 0
