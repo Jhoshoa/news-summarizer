@@ -83,6 +83,35 @@ BACKEND_BASE_URL=http://backend:8000
 
 That value is defined directly in `docker-compose.yml` because the backend and cron services run in the same Compose project.
 
+## Distribution Channels (Email / WhatsApp / Telegram)
+
+Each channel degrades independently: if it's not configured, `/api/preferences/options`
+reports it as unavailable in the subscribe form and sends silently fail (logged, not
+raised) rather than breaking delivery for other channels.
+
+**Email** — set `EMAIL_ENABLED=true` and `SMTP_HOST/PORT/USERNAME/PASSWORD/FROM_EMAIL`.
+With Gmail, use an App Password, not the account password, and rotate it if it was ever
+committed or shared. Gmail can rate-limit or spam-flag bulk sends without SPF/DKIM on a
+custom domain — consider a transactional provider (SES, Postmark, Resend) before scaling
+past a handful of daily subscribers.
+
+**WhatsApp** — set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and
+point the Twilio WhatsApp sender's webhook at `https://<domain>/webhook/whatsapp`. Twilio's
+WhatsApp sandbox only reaches numbers that manually joined it — for real subscribers you
+need a Meta-approved WhatsApp Business sender, which requires business verification and
+approved message templates for anything sent outside a 24h user-initiated window. There is
+no "send to a WhatsApp group" API on the WhatsApp Business Platform — only one-to-one
+messages to opted-in numbers, which is what `send_daily_summary` already does per
+subscriber (a broadcast list, not a group).
+
+**Telegram** — set `TELEGRAM_BOT_TOKEN` (from @BotFather) and `TELEGRAM_WEBHOOK_URL` to
+the backend's public HTTPS origin (no path — the app appends `/webhook/telegram` and
+registers the webhook with Telegram on startup). Set `TELEGRAM_WEBHOOK_SECRET` to a random
+string too; the app validates it on every incoming webhook request, which stops anyone who
+guesses the URL from injecting fake updates (fake unsubscribes, etc.). Telegram requires a
+valid HTTPS certificate on the webhook URL — a Dokploy/Traefik-issued Let's Encrypt cert on
+the domain satisfies this.
+
 ## URL Rules
 
 Use local URLs only in local development:

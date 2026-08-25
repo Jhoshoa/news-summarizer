@@ -1,10 +1,19 @@
 from contextlib import suppress
+from typing import Any
 
 from loguru import logger
 
 
 class TelegramHandler:
-    """Maneja el bot de Telegram."""
+    """Maneja el bot de Telegram.
+
+    Envio: usa un `telegram.Bot` directo (no un `Application` completo), que
+    no necesita inicializacion async previa para llamadas simples como
+    send_message. Recepcion: `process_update` recibe el payload crudo del
+    webhook (`/webhook/telegram` en main.py) y lo despacha a `handle_message`
+    sin pasar por el sistema de handlers de `Application` — mas simple y
+    evita correr un loop de polling dentro de FastAPI.
+    """
 
     CATEGORIES = {
         "1": {"name": "Economia", "emoji": "$", "category": "economia"},
@@ -17,12 +26,38 @@ class TelegramHandler:
     def __init__(self, db_repository=None, settings=None):
         self.db = db_repository
         self.settings = settings
-        self.app = None
+        self.bot = None
 
         if settings and settings.telegram_bot_token:
-            logger.info("Telegram handler inicializado")
+            try:
+                from telegram import Bot
+
+                self.bot = Bot(token=settings.telegram_bot_token)
+                logger.info("Telegram handler inicializado")
+            except ImportError:
+                logger.warning("python-telegram-bot no esta instalado")
         else:
             logger.info("Telegram handler inicializado sin token (modo desarrollo)")
+
+    async def process_update(self, payload: dict[str, Any]) -> None:
+        """Procesa un update entrante recibido por webhook (Fase distribucion).
+
+        No propaga excepciones: un update malformado o un error de Telegram
+        no debe tumbar el endpoint del webhook (Telegram reintentaria de
+        todos modos si respondemos error).
+        """
+
+        if not self.bot:
+            logger.warning("Telegram update recibido pero el bot no esta configurado")
+            return
+
+        try:
+            from telegram import Update
+
+            update = Update.de_json(payload, self.bot)
+            await self.handle_message(update, context=None)
+        except Exception as e:
+            logger.error(f"Error procesando update de Telegram: {e}")
 
     async def handle_message(self, update, context) -> str | None:
         """Procesa mensaje entrante."""
@@ -154,12 +189,12 @@ class TelegramHandler:
     async def send_message(self, chat_id: str, message: str) -> bool:
         """Envia mensaje."""
 
-        if not self.app:
+        if not self.bot:
             logger.warning(f"Telegram no configurado. Mensaje: {message[:50]}...")
             return False
 
         try:
-            await self.app.bot.send_message(
+            await self.bot.send_message(
                 chat_id=chat_id,
                 text=message,
                 parse_mode="Markdown",

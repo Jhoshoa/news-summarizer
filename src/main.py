@@ -11,7 +11,7 @@ from typing import Any
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import FastAPI, Header, HTTPException, Response
+from fastapi import FastAPI, Form, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -110,7 +110,27 @@ class NewsSummarizerApp:
         self.telegram = TelegramHandler(self.db, self.settings)
         self.email = EmailHandler(self.db, self.settings)
 
+        await self._register_telegram_webhook()
+
         logger.info("Aplicacion iniciada")
+
+    async def _register_telegram_webhook(self) -> None:
+        """Registra el webhook de Telegram si hay token y URL publica
+        configurados. No falla el arranque de la app si Telegram no
+        responde: el bot sigue funcionando en modo solo-envio."""
+
+        if not (self.telegram and self.telegram.bot and self.settings.telegram_webhook_url):
+            return
+
+        webhook_url = f"{self.settings.telegram_webhook_url.rstrip('/')}/webhook/telegram"
+        try:
+            await self.telegram.bot.set_webhook(
+                url=webhook_url,
+                secret_token=self.settings.telegram_webhook_secret or None,
+            )
+            logger.info(f"Telegram webhook registrado: {webhook_url}")
+        except Exception as e:
+            logger.warning(f"No se pudo registrar el webhook de Telegram: {e}")
 
     async def shutdown(self):
         """Closes the application."""
@@ -1171,14 +1191,51 @@ async def health():
 
 
 @app.post("/webhook/whatsapp")
-async def whatsapp_webhook(sender: str = None, body: str = None):
-    """Webhook for WhatsApp via Twilio."""
+async def whatsapp_webhook(
+    From: str = Form(default=""),  # noqa: N803 - nombre fijado por el webhook de Twilio
+    Body: str = Form(default=""),  # noqa: N803
+):
+    """Webhook for WhatsApp via Twilio.
+
+    Twilio manda el payload como form-urlencoded con los campos `From`/`Body`
+    (con mayuscula, no "sender"/"body") y espera de vuelta TwiML, no JSON —
+    si no, el mensaje de respuesta nunca le llega al usuario aunque
+    `handle_message` lo haya generado bien.
+    """
 
     if not app_instance or not app_instance.whatsapp:
         raise HTTPException(status_code=500, detail="WhatsApp no configurado")
 
-    response = app_instance.whatsapp.handle_message(sender, body)
-    return {"message": response}
+    sender = From.removeprefix("whatsapp:")
+    reply_text = app_instance.whatsapp.handle_message(sender, Body)
+    message_xml = f"<Message>{html.escape(reply_text)}</Message>" if reply_text else ""
+    twiml = f'<?xml version="1.0" encoding="UTF-8"?><Response>{message_xml}</Response>'
+    return Response(content=twiml, media_type="application/xml")
+
+
+@app.post("/webhook/telegram")
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+):
+    """Webhook for Telegram bot updates.
+
+    Se valida el secret token (si esta configurado) contra el header que
+    Telegram reenvia en cada request cuando el webhook se registro con
+    `secret_token` — evita que cualquiera pueda mandar updates falsos
+    (des-suscribir gente, etc.) simplemente adivinando la URL del webhook.
+    """
+
+    if not app_instance or not app_instance.telegram:
+        raise HTTPException(status_code=500, detail="Telegram no configurado")
+
+    expected_secret = app_instance.settings.telegram_webhook_secret
+    if expected_secret and x_telegram_bot_api_secret_token != expected_secret:
+        raise HTTPException(status_code=401, detail="Secret token invalido")
+
+    payload = await request.json()
+    await app_instance.telegram.process_update(payload)
+    return {"ok": True}
 
 
 @app.post("/trigger/summary")

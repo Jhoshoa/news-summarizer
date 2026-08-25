@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_url: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_URL")
+    telegram_webhook_secret: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_SECRET")
 
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
     email_provider: str = Field(default="smtp", alias="EMAIL_PROVIDER")
