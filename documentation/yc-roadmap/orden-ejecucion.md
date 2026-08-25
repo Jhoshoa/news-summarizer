@@ -63,9 +63,12 @@ re-explorar todo el repo.
 - [x] Fase 2.4 — Nivel de confianza explicable (`classify_story_confidence` + badge en frontend)
 - [x] Fase 2.5 — Correcciones (backend + frontend: `story_corrections`, unpublish/republish, botón "Reportar un error")
 - [ ] Fase 2 (frontend, extensión) — Llevar fuentes/confianza/claims a otras vistas (listado de historias, brief por email) si el uso real lo justifica
-- [ ] Fase 3 — Onboarding
-- [ ] Fase 3 — Brief por email personalizado
-- [ ] Fase 3 — Entidades y seguimiento
+- [x] Distribución — Telegram funcional de verdad (webhook + envío), WhatsApp webhook corregido (TwiML real), SMTP con soporte SSL/STARTTLS
+- [x] Fase 3.1/3.3 — Onboarding corto y brief filtrado a 10 historias (ya existían en `SubscribePage`/`_deliver_summaries`, documentado)
+- [x] Fase 3.5 — Feedback ligero (`StoryFeedback`: reacciones + seguir historia)
+- [ ] Fase 3.2 — Entidades y seguimiento (NER, esperando señal de qué temas pide la gente)
+- [ ] Fase 3.4 — Ampliar brief por email con "qué cambió" (usa `Story.last_update_note`, ya existe el dato)
+- [ ] Fase 3.6 — Tabla `saved_stories` real (hoy `story_saved` es solo evento de analítica)
 - [ ] Entrevistas B2B (mínimo 5 potenciales clientes contactados)
 - [ ] Fase 4 — Workspaces y monitores
 - [ ] Fase 4 — Informes automáticos

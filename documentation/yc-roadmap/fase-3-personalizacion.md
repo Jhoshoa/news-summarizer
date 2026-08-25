@@ -1,24 +1,34 @@
 # Fase 3 — Personalización que genere recurrencia
 
-**Estado actual:** hay una base de suscriptores con frecuencia/hora preferida/consentimiento
-(`004_subscriber_preferences.sql`) y canales Email/WhatsApp/Telegram ya implementados
-(`src/distributors/`). **No existe** onboarding guiado, seguimiento de entidades, ni
-brief realmente personalizado por temas — hoy el brief es el mismo contenido para todos
-los suscriptores, filtrado como mucho por frecuencia/hora, no por intereses.
+**Estado actual (revisado ago-2026):** más avanzado de lo que este documento decía —
+`SubscribePage.tsx` + `/api/preferences/*` ya cubren canal, categorías, frecuencia, hora
+preferida, consentimiento, preview y baja, con validación en frontend y backend. El envío
+diario (`_deliver_summaries` en `main.py`) **ya filtra por las categorías del suscriptor**
+y **ya limita a 10 historias**, no manda todo el catálogo — eso es 3.1 y 3.3 en la
+práctica, aunque nadie los haya llamado así. Los canales de distribución (Email/WhatsApp/
+Telegram) tenían bugs reales que impedían el envío/recepción confiable — arreglados
+(ver `fbe50ac`/`e48d486`). Lo que sigue faltando de verdad: onboarding con ubicación,
+seguimiento de entidades (3.2), y guardados persistentes (3.6, hoy solo un evento de
+analítica vía 3.5, no una tabla).
 
-**Tiempo estimado:** ~4 semanas (1 onboarding + 1 brief por email + 2 entidades/alertas).
+**Tiempo estimado restante:** bajo — la mayor parte del esfuerzo original ya está hecho.
 
-## 3.1 Onboarding corto
+## 3.1 Onboarding corto — parcialmente implementado
 
-Preguntar solo: país, departamento/ciudad, categorías de interés, temas/entidades a
-seguir, frecuencia, canal preferido.
+Canal, categorías, frecuencia y hora preferida ya se preguntan en `/suscribirse`. Lo que
+pide el roadmap original y falta: país/departamento/ciudad, y temas/entidades a seguir.
 
-Categorías iniciales: Política, Economía, Tecnología, Seguridad, Salud, Educación,
-Medioambiente, Negocios, Deportes, Internacional relevante para Bolivia.
+**País/departamento/ciudad — deliberadamente no agregado todavía:** ningún artículo tiene
+su departamento poblado de forma confiable hoy (`NewsArticle.department`/`Story.department`
+existen en el esquema pero casi nunca se llenan), así que pedirle ubicación al usuario no
+cambiaría nada de lo que recibe — sería fricción en el formulario sin beneficio real.
+Vale la pena agregarlo cuando exista contenido que realmente varíe por región.
 
-Implementación: nueva página en `frontend/src/pages/` (ej. `OnboardingPage.tsx`,
-al lado de la ya existente `SubscribePage.tsx`), y columnas nuevas en `subscribers`
-o una tabla `subscriber_categories` si es many-to-many.
+Temas/entidades a seguir — depende de 3.2 (NER), ver ahí.
+
+No se construyó una `OnboardingPage.tsx` separada como sugería la versión original de este
+documento: `SubscribePage.tsx` ya cumple ese rol razonablemente bien (incluye preview) y
+duplicar el formulario habría sido mantener dos superficies para lo mismo sin necesidad.
 
 ## 3.2 Seguir entidades
 
@@ -47,13 +57,13 @@ inicialmente con el mismo LLM ya usado (`src/llm/`) en un paso de post-procesami
 sin modelo propio (ver [no-construir-ahora.md](no-construir-ahora.md): no construir IA
 propia).
 
-## 3.3 Brief diario (5–10 historias, no 50)
+## 3.3 Brief diario (5–10 historias, no 50) ✅ implementado
 
-Estructura por historia: lo más importante, por qué importa, qué cambió, fuentes.
-Secciones: temas elegidos por el usuario, historias en seguimiento. Esto reemplaza el
-envío actual (que probablemente manda todo lo recolectado) por una selección rankeada
-y filtrada por preferencias — reusa `ranker.py` pero con un filtro de personalización
-antes del corte a 5-10.
+`_deliver_summaries` (`main.py`) ya filtra `summaries` por `sub.categories` antes de
+armar el mensaje, y corta a `user_news[:10]`. Lo que falta de la visión original: una
+sección aparte para "historias en seguimiento" (depende de 3.6) y mostrar explícitamente
+"qué cambió" por historia — eso ya existe a nivel de dato (`Story.last_update_note`,
+Fase 1.4) pero no se incluye todavía en el texto del brief que se envía por canal.
 
 ## 3.4 Canales de distribución (orden recomendado)
 
@@ -63,18 +73,31 @@ Telegram (ya implementados, evaluar costo/reglas de Meta y Telegram antes de esc
 volumen) → audio brief → app móvil (mucho después, ver
 [no-construir-ahora.md](no-construir-ahora.md)).
 
-## 3.5 Feedback ligero
+## 3.5 Feedback ligero ✅ implementado
 
-Por historia: Relevante / No me interesa / Ya conocía esto / Quiero seguir esta
-historia / El resumen tiene un error. Alimenta directamente `analytics_events`
-(Fase 0) y debería ajustar el ranking personal con el tiempo (empezar simple: boost/
-penalización por categoría, no un modelo de recomendación complejo todavía).
+`StoryFeedback.tsx` (`frontend/src/components/news/`), montado en `ArticleDetailPage`
+junto al resumen IA: tres reacciones mutuamente excluyentes (Relevante / No me interesa /
+Ya lo sabía, vía `feedback_submitted` con `metadata.feedback_type`) más un botón
+independiente "Seguir esta historia" (vía `story_saved`). "El resumen tiene un error" ya
+existía desde Fase 2.5 (`StoryTrustPanel`, mismo evento `feedback_submitted` con
+`feedback_type: 'error_report'`) — no se duplicó.
 
-## 3.6 Guardados y seguimiento
+Cero cambios de backend: ambos tipos de evento (`feedback_submitted`, `story_saved`) ya
+estaban en `ALLOWED_EVENT_NAMES` desde Fase 0.1. **Lo que falta de la visión original:**
+usar estos eventos para ajustar el ranking personal (boost/penalización por categoría) —
+hoy se registran en `analytics_events` pero nada los lee todavía para personalizar nada.
+Vale la pena esperar a tener volumen real de reacciones antes de construir esa lógica.
 
-Guardar historia, seguir actualizaciones, compartir enlace, crear colección, recibir
-alerta ante cambio importante. Tabla `saved_stories` (subscriber_id, story_id,
-created_at) es suficiente para empezar.
+**Verificado:** 19/19 tests de frontend (4 nuevos), `tsc`/`eslint` limpios, reconstruido
+en Docker.
+
+## 3.6 Guardados y seguimiento — parcialmente cubierto
+
+"Seguir esta historia" ya dispara `story_saved` (3.5), pero solo como evento de
+analítica — no hay tabla `saved_stories` ni una vista de "tus historias guardadas" donde
+el usuario pueda volver a verlas. Construir la tabla real cuando el evento `story_saved`
+muestre volumen de uso real que la justifique. Compartir enlace, colecciones y alertas
+por cambio siguen sin construir.
 
 ## Criterio de salida
 

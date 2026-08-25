@@ -2557,6 +2557,51 @@ p {
   font-weight: 600;
 }
 
+.story-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.story-feedback-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.story-feedback-button {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.story-feedback-button:hover:not(:disabled) {
+  border-color: var(--color-highlight);
+  color: var(--color-highlight);
+}
+
+.story-feedback-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.story-feedback-follow {
+  margin-left: auto;
+}
+
+.story-feedback-confirmation {
+  color: var(--color-collected);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
 .side-values {
   margin: 0;
 }

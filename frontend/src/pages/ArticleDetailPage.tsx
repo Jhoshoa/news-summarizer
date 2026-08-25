@@ -11,6 +11,7 @@ import {
   formatNumber,
 } from "../components/indicators/indicatorUtils";
 import { ArticleImage } from "../components/news/ArticleImage";
+import { StoryFeedback } from "../components/news/StoryFeedback";
 import { StoryTrustPanel } from "../components/news/StoryTrustPanel";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { ArticleDetailSkeleton, PanelSkeleton } from "../components/ui/Skeleton";
@@ -183,6 +184,8 @@ export const ArticleDetailPage = () => {
                   <p>Esta noticia fue recolectada y conservada como fuente original, pero todavía no fue priorizada para síntesis IA.</p>
                 </section>
               )}
+
+              <StoryFeedback articleId={article.id} storyId={storyClusterId} />
 
               {articleBody && (
                 <section className="article-body">
