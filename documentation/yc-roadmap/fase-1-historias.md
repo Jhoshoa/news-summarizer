@@ -72,7 +72,23 @@ CREATE TABLE story_articles (
 official_statement`. Esto es nuevo — hoy `duplicate_reason` en `news_articles` solo
 distingue duplicado o no, no el tipo de relación narrativa.
 
-## 1.2 Deduplicación por niveles (progresiva)
+## 1.2 Deduplicación por niveles (progresiva) — completo para lo que se puede construir ahora
+
+De los 7 niveles, 4 quedan deliberadamente sin construir todavía porque el propio
+roadmap los condiciona a cosas que aún no existen — no es trabajo pendiente
+olvidado, es la secuencia que el roadmap mismo definió:
+
+- **Nivel 4 (embeddings):** el roadmap dice explícitamente "evaluar solo si los
+  niveles 1-3 no alcanzan el 85-90%". Todavía no hay una medición real de esa
+  cifra (requiere correr Fase 0 sobre datos con volumen), así que construir
+  embeddings ahora sería adelantarse sin evidencia — y meter un vector DB nuevo
+  que el roadmap pide evitar hasta que sea necesario.
+- **Nivel 5 (entidades compartidas):** depende de Fase 3.2 (extracción de
+  entidades), que no existe todavía. No hay entidades que comparar.
+- **Nivel 7 (revisión humana):** depende de Fase 5 (panel editorial), que no
+  existe todavía. No hay dónde mostrarle casos ambiguos a un humano.
+
+Los 4 niveles restantes (1, 2, 3, 6) sí eran construibles ahora y ya están hechos.
 
 Orden recomendado, reusando lo existente donde aplica:
 
@@ -133,24 +149,51 @@ sobre el mismo hecho ("Aprehenden/Arrestan ... con más de Bs 1 millón") devolv
 correctamente los 2 artículos hermanos con su fuente al consultar por cualquiera de
 los tres IDs.
 
-## 1.4 Actualizaciones incrementales
+## 1.4 Actualizaciones incrementales ✅ implementado (versión sin IA)
 
-Cuando llega un artículo nuevo sobre un cluster existente:
+- No crear una historia nueva — ✅ ya pasaba desde 1.1 (`_upsert_story` asocia el
+  artículo a la historia existente vía `story_articles` en vez de crear una fila
+  `stories` nueva).
+- Actualizar `last_updated_at` — ✅ ya pasaba desde 1.1.
+- Determinar qué cambió y mostrárselo al usuario — ✅ nuevo: `is_meaningful_title_update`
+  (`story_fingerprint.py`) compara el título del artículo nuevo contra
+  `canonical_title` de la historia (mismo `SequenceMatcher` que ya usa el resto del
+  dedup, umbral 0.92). Si difieren lo suficiente como para no ser solo una
+  republicación, `_upsert_story` (`repository.py`) escribe
+  `stories.last_update_note = "Actualización: <título nuevo>"` (columna nueva,
+  migración `014_story_updates.sql`). `GET /api/stories/{id}` y `GET /api/stories`
+  ya lo devuelven.
+- `stories.short_summary` — ✅ nuevo: cerraba un hueco real de 1.1/1.3 (la columna
+  existía pero nada la llenaba). `save_summaries` (`repository.py`) ahora también
+  escribe el resumen consolidado en la historia cuando el summary trae
+  `story_cluster_id`, así `GET /api/stories/{id}` deja de devolver siempre `null`.
 
-- No crear una historia nueva — asociarla a la existente vía `story_articles`.
-- Determinar qué cambió (diff de resumen, nuevo dato).
-- Actualizar `detailed_summary` y `last_updated_at`.
-- Mostrar el cambio al usuario: "Actualización: la medida fue suspendida después del
-  anuncio inicial."
+**Deliberadamente sin IA todavía:** la nota de actualización es heurística (basada
+en similitud de título), no un diff semántico generado por LLM ("la medida fue
+suspendida después del anuncio inicial"). Eso evita una llamada de IA extra por
+cada artículo entrante (protege el costo que mide Fase 0.2) y es honesto sobre lo
+que el sistema realmente sabe. Si en el uso real esta señal resulta insuficiente,
+el siguiente paso natural es que el LLM que ya genera el resumen consolidado
+(1.3) también devuelva una nota de cambio explícita cuando detecte que está
+resumiendo una historia con artículos nuevos desde el último resumen — no
+requeriría una llamada de IA adicional, solo extender el prompt existente.
 
-Esto requiere un paso nuevo en el pipeline (`src/processors/`) que, en vez de solo
-descartar duplicados, decida entre `crear historia` / `actualizar historia existente`.
+**Verificado:** 242/242 tests, migración `014` aplicada en Docker, y contra el
+Postgres real (con rollback, sin dejar datos de prueba): una historia real de 1
+artículo recibió una nota de actualización correcta al simular un segundo
+artículo con título distinto, y `short_summary` se persistió correctamente al
+llamar `save_summaries` con `story_cluster_id`.
 
-## 1.5 Línea de tiempo
+## 1.5 Línea de tiempo ✅ implementado
 
-Cada historia importante muestra: primer reporte, confirmación oficial, nuevos datos,
-reacciones, correcciones, resultado conocido. Se deriva directamente de
-`story_articles.relationship_type` ordenado por `news_articles.published_at`.
+`GET /api/stories/{id}` devuelve `articles` ordenados por `published_at` con
+`relationship_type` (igual que desde 1.1) y ahora también `is_update` (`true` para
+todo artículo que no sea el primero cronológicamente de la historia) — el timeline
+básico que pedía el roadmap. Lo que falta para el timeline "completo" del roadmap
+(reacciones/correcciones/confirmaciones oficiales como categorías propias, no solo
+"duplicado") depende de clasificar `relationship_type` con más detalle, lo cual
+requiere comparar contenido con IA — ver nota de 1.2 sobre `relationship_type` y
+la idea de extender el prompt de 1.3 en vez de agregar una llamada nueva.
 
 ## Criterio de salida
 

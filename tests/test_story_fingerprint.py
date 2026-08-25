@@ -2,6 +2,7 @@ from src.processors.story_fingerprint import (
     build_canonical_key,
     build_content_fingerprint,
     build_url_fingerprint,
+    is_meaningful_title_update,
     normalize_story_text,
     normalize_url,
     story_similarity,
@@ -92,6 +93,25 @@ def test_temporal_proximity_factor_decays_near_window_edge():
 
 def test_temporal_proximity_factor_handles_zero_window():
     assert temporal_proximity_factor(10, window_hours=0) == 1.0
+
+
+def test_is_meaningful_title_update_ignores_near_identical_republish():
+    assert not is_meaningful_title_update(
+        "Bloqueo indefinido afecta abastecimiento de combustible",
+        "Bloqueo indefinido afecta el abastecimiento de combustible",
+    )
+
+
+def test_is_meaningful_title_update_detects_new_information():
+    assert is_meaningful_title_update(
+        "Bloqueo indefinido afecta abastecimiento de combustible",
+        "Gobierno suspende el bloqueo tras acuerdo con transportistas",
+    )
+
+
+def test_is_meaningful_title_update_handles_empty_titles():
+    assert not is_meaningful_title_update("", "Algun titulo")
+    assert not is_meaningful_title_update("Algun titulo", "")
 
 
 def test_story_similarity_keeps_distinct_short_titles_apart():

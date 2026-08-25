@@ -122,6 +122,26 @@ def normalize_story_text(value: Any) -> str:
     return text
 
 
+UPDATE_TITLE_SIMILARITY_THRESHOLD = 0.92
+
+
+def is_meaningful_title_update(old_title: str, new_title: str) -> bool:
+    """True si un articulo nuevo en una historia existente trae info distinta.
+
+    Se usa para decidir si vale la pena mostrarle al usuario una nota de
+    "Actualizacion: ..." (Fase 1.4) o si es solo el mismo hecho republicado
+    con el titulo casi identico.
+    """
+
+    old_norm = normalize_story_text(old_title)
+    new_norm = normalize_story_text(new_title)
+    if not old_norm or not new_norm:
+        return False
+
+    similarity = SequenceMatcher(None, old_norm, new_norm).ratio()
+    return similarity < UPDATE_TITLE_SIMILARITY_THRESHOLD
+
+
 def build_canonical_key(article: dict) -> str:
     category = normalize_story_text(article.get("category") or "general")
     title = normalize_story_text(article.get("title"))

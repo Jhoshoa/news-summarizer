@@ -33,6 +33,7 @@ from src.processors.story_fingerprint import (
     build_canonical_key,
     build_content_fingerprint,
     build_url_fingerprint,
+    is_meaningful_title_update,
     story_similarity,
     temporal_proximity_factor,
 )
@@ -225,6 +226,7 @@ class Story(Base):
     current_status = Column(String(40), nullable=False, default="developing")
     article_count = Column(Integer, nullable=False, default=1)
     source_count = Column(Integer, nullable=False, default=1)
+    last_update_note = Column(Text, nullable=True)
 
 
 class StoryArticle(Base):
@@ -1230,6 +1232,8 @@ class Database:
                 story.first_published_at = published_at
             if story.last_updated_at is None or published_at > story.last_updated_at:
                 story.last_updated_at = published_at
+            if is_meaningful_title_update(story.canonical_title, title):
+                story.last_update_note = f"Actualizacion: {title}"
 
         session.add(
             StoryArticle(
@@ -1276,6 +1280,7 @@ class Database:
             "current_status": story.current_status,
             "first_published_at": story.first_published_at,
             "last_updated_at": story.last_updated_at,
+            "last_update_note": story.last_update_note,
             "article_count": story.article_count,
             "source_count": story.source_count,
             "articles": [
@@ -1287,8 +1292,9 @@ class Database:
                     "published_at": art.published_at,
                     "relationship_type": link.relationship_type,
                     "similarity_score": link.similarity_score,
+                    "is_update": index > 0,
                 }
-                for link, art, source_name in rows
+                for index, (link, art, source_name) in enumerate(rows)
             ],
         }
 
@@ -1327,11 +1333,13 @@ class Database:
                 {
                     "id": story.id,
                     "canonical_title": story.canonical_title,
+                    "short_summary": story.short_summary,
                     "category": story.category,
                     "country": story.country,
                     "current_status": story.current_status,
                     "first_published_at": story.first_published_at,
                     "last_updated_at": story.last_updated_at,
+                    "last_update_note": story.last_update_note,
                     "article_count": story.article_count,
                     "source_count": story.source_count,
                 }
@@ -1728,6 +1736,11 @@ class Database:
                 fact = summary.get("fact")
                 story_cluster_id = summary.get("story_cluster_id")
                 source_article_count = self._safe_int(summary.get("source_article_count")) or 1
+
+                if story_cluster_id:
+                    story = await session.get(Story, story_cluster_id)
+                    if story is not None:
+                        story.short_summary = body
 
                 existing = await self._get_summary(session, category.id, summary_date, title)
                 if existing:
