@@ -31,6 +31,7 @@ from sqlalchemy.orm import declarative_base
 
 from src.db.migrations import apply_sql_migrations
 from src.processors.story_confidence import classify_story_confidence
+from src.processors.story_coverage import build_coverage_summary
 from src.processors.story_fingerprint import (
     build_canonical_key,
     build_content_fingerprint,
@@ -1344,6 +1345,20 @@ class Database:
             relationship_types=(link.relationship_type for link, _art, _source in rows),
         )
 
+        sources = sorted({source_name for _link, _art, source_name in rows})
+        claims = [
+            {
+                "claim": claim.claim,
+                "confidence": claim.confidence,
+                "claim_type": claim.claim_type,
+                "article_id": evidence.article_id,
+                "source_url": evidence.source_url,
+                "source_excerpt": evidence.source_excerpt,
+                "published_at": evidence.published_at,
+            }
+            for claim, evidence in claim_rows
+        ]
+
         return {
             "id": story.id,
             "canonical_title": story.canonical_title,
@@ -1358,7 +1373,7 @@ class Database:
             "last_update_note": story.last_update_note,
             "article_count": story.article_count,
             "source_count": story.source_count,
-            "sources": sorted({source_name for _link, _art, source_name in rows}),
+            "sources": sources,
             "articles": [
                 {
                     "article_id": link.article_id,
@@ -1373,18 +1388,8 @@ class Database:
                 }
                 for index, (link, art, source_name) in enumerate(rows)
             ],
-            "claims": [
-                {
-                    "claim": claim.claim,
-                    "confidence": claim.confidence,
-                    "claim_type": claim.claim_type,
-                    "article_id": evidence.article_id,
-                    "source_url": evidence.source_url,
-                    "source_excerpt": evidence.source_excerpt,
-                    "published_at": evidence.published_at,
-                }
-                for claim, evidence in claim_rows
-            ],
+            "claims": claims,
+            "coverage": build_coverage_summary(sources=sources, claims=claims),
             "corrections": [
                 {
                     "reason": correction.reason,

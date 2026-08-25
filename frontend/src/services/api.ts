@@ -9,6 +9,7 @@ import type {
   PreferencePreviewRequest,
   PreferencePreviewResponse,
   SourcesResponse,
+  Story,
   Summary,
   SubscribeRequest,
   SubscribeResponse,
@@ -60,7 +61,7 @@ export const newsApi = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: import.meta.env.VITE_API_BASE_URL || "",
   }),
-  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics", "Preferences", "Sources"],
+  tagTypes: ["EconomicIndicators", "Weather", "Articles", "Summaries", "ImpactMetrics", "Preferences", "Sources", "Stories"],
   endpoints: (builder) => ({
     getEconomicIndicators: builder.query<EconomicIndicatorsResponse, GetIndicatorsArgs | void>({
       query: (args) => ({
@@ -106,6 +107,10 @@ export const newsApi = createApi({
     getArticleById: builder.query<Article, number>({
       query: (id) => `/api/articles/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Articles", id }],
+    }),
+    getStoryById: builder.query<Story, string>({
+      query: (storyId) => `/api/stories/${storyId}`,
+      providesTags: (_result, _error, storyId) => [{ type: "Stories", id: storyId }],
     }),
     getSummaries: builder.query<PaginatedResponse<Summary>, GetSummariesArgs | void>({
       query: (args) => ({
@@ -185,6 +190,7 @@ export const {
   useGetWeatherLocationsQuery,
   useGetArticlesQuery,
   useGetArticleByIdQuery,
+  useGetStoryByIdQuery,
   useGetSummariesQuery,
   useGetImpactMetricsQuery,
   useGetPreferenceOptionsQuery,

@@ -57,12 +57,12 @@ re-explorar todo el repo.
 - [x] Fase 1.3 — Resumen consolidado con contexto multi-fuente
 - [x] Fase 1.4 — Actualizaciones incrementales (heurística de título, sin IA todavía)
 - [x] Fase 1.5 — Línea de tiempo básica (`articles` + `is_update`; clasificación fina de `relationship_type` queda para cuando 1.3 se extienda con IA)
-- [x] Fase 2.1 — Fuentes visibles (backend: `sources`, autor, `is_update` en `/api/stories`)
-- [x] Fase 2.2 — Citas por afirmación (backend: prompt estructurado + lista blanca de article_id + `story_claims`/`claim_evidence`)
-- [x] Fase 2.4 — Nivel de confianza explicable (`classify_story_confidence`)
-- [x] Fase 2.5 — Correcciones (backend: `story_corrections`, unpublish/republish, activa `confidence=corrected`)
-- [ ] Fase 2.3 — Comparación de cobertura (depende de tener volumen real de claims)
-- [ ] Fase 2 (frontend) — Renderizar fuentes/confianza/claims/botón de reporte en la UI
+- [x] Fase 2.1 — Fuentes visibles (backend + frontend en `StoryTrustPanel`)
+- [x] Fase 2.2 — Citas por afirmación (backend + frontend: lista blanca de article_id + `story_claims`/`claim_evidence` + UI agrupada por confianza)
+- [x] Fase 2.3 — Comparación de cobertura (`build_coverage_summary`; valor real crecerá con volumen de historias multi-fuente)
+- [x] Fase 2.4 — Nivel de confianza explicable (`classify_story_confidence` + badge en frontend)
+- [x] Fase 2.5 — Correcciones (backend + frontend: `story_corrections`, unpublish/republish, botón "Reportar un error")
+- [ ] Fase 2 (frontend, extensión) — Llevar fuentes/confianza/claims a otras vistas (listado de historias, brief por email) si el uso real lo justifica
 - [ ] Fase 3 — Onboarding
 - [ ] Fase 3 — Brief por email personalizado
 - [ ] Fase 3 — Entidades y seguimiento

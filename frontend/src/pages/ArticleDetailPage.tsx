@@ -11,6 +11,7 @@ import {
   formatNumber,
 } from "../components/indicators/indicatorUtils";
 import { ArticleImage } from "../components/news/ArticleImage";
+import { StoryTrustPanel } from "../components/news/StoryTrustPanel";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { ArticleDetailSkeleton, PanelSkeleton } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
@@ -18,6 +19,7 @@ import { trackEvent } from "../services/analytics";
 import {
   useGetArticleByIdQuery,
   useGetEconomicIndicatorsQuery,
+  useGetStoryByIdQuery,
   useGetSummariesQuery,
   useGetWeatherQuery,
   useRefreshEconomicIndicatorsMutation,
@@ -66,6 +68,12 @@ export const ArticleDetailPage = () => {
     fallback_to_latest: true,
     page_size: 6,
   });
+  const storyClusterId = summaryData?.items[0]?.story_cluster_id;
+  const {
+    data: storyData,
+    isFetching: isFetchingStory,
+    isError: isStoryError,
+  } = useGetStoryByIdQuery(storyClusterId ?? "", { skip: !storyClusterId });
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery();
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
@@ -183,6 +191,13 @@ export const ArticleDetailPage = () => {
                   ))}
                 </section>
               )}
+
+              <StoryTrustPanel
+                story={storyData}
+                isLoading={Boolean(storyClusterId) && isFetchingStory}
+                isError={isStoryError}
+                articleId={article.id}
+              />
             </div>
 
             {hasArticleImage && (

@@ -215,6 +215,77 @@ export type Summary = {
   image?: string | null;
   summary_date?: string | null;
   created_at?: string | null;
+  story_cluster_id?: string | null;
+};
+
+export type StoryConfidenceLevel =
+  | "corrected"
+  | "contradictory"
+  | "official_statement"
+  | "multi_source"
+  | "single_source"
+  | "developing";
+
+export type StoryConfidence = {
+  level: StoryConfidenceLevel;
+  label: string;
+};
+
+export type StoryClaim = {
+  claim: string;
+  confidence: StoryConfidenceLevel;
+  claim_type?: string | null;
+  article_id: number;
+  source_url: string;
+  source_excerpt?: string | null;
+  published_at?: string | null;
+};
+
+export type StoryArticleRef = {
+  article_id: number;
+  title: string;
+  url: string;
+  source: string;
+  author?: string | null;
+  published_at?: string | null;
+  relationship_type: string;
+  similarity_score?: number | null;
+  is_update: boolean;
+};
+
+export type StoryCoverage = {
+  source_count: number;
+  sources: string[];
+  confirmed_by_multiple_sources: StoryClaim[];
+  based_on_official_statement: StoryClaim[];
+  reported_by_single_source: StoryClaim[];
+};
+
+export type StoryCorrection = {
+  reason: string;
+  corrected_by?: string | null;
+  corrected_at: string;
+};
+
+export type Story = {
+  id: string;
+  canonical_title: string;
+  short_summary?: string | null;
+  detailed_summary?: string | null;
+  category?: string | null;
+  country: string;
+  current_status: string;
+  confidence: StoryConfidence;
+  first_published_at: string;
+  last_updated_at: string;
+  last_update_note?: string | null;
+  article_count: number;
+  source_count: number;
+  sources: string[];
+  articles: StoryArticleRef[];
+  claims: StoryClaim[];
+  coverage: StoryCoverage;
+  corrections: StoryCorrection[];
 };
 
 export type Source = {

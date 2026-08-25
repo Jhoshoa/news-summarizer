@@ -1,21 +1,21 @@
 # Fase 2 — Confianza y trazabilidad
 
-**Estado actual:** parcial en el backend (los artículos ya guardan `source`/URL), pero
-no hay nada de esto expuesto como afirmación-por-afirmación ni como UI de confianza en
-el frontend. Cero modelo de correcciones.
+**Estado actual:** backend completo (2.1, 2.2, 2.3, 2.4, 2.5) y frontend conectado
+para el detalle de artículo (`StoryTrustPanel`). Falta extender el frontend a otras
+vistas (listado de historias, brief por email) si se decide que vale la pena ahí.
 
 **Tiempo estimado:** 1–2 semanas. Depende de Fase 1 (necesita el modelo `Story`).
 
-## 2.1 Fuentes visibles ✅ implementado (backend)
+## 2.1 Fuentes visibles ✅ implementado (backend + frontend)
 
-`GET /api/stories/{id}` ahora devuelve, por historia: `sources` (lista de medios
+`GET /api/stories/{id}` devuelve, por historia: `sources` (lista de medios
 distintos que la cubrieron), y por cada artículo en `articles`: medio, URL, fecha
 de publicación, autor (si existe), y `is_update`. `source_count`/`article_count`
 (número de fuentes/artículos consultados) y `last_updated_at` (última
-verificación) ya existían desde Fase 1.1. Falta la parte de frontend
-(renderizarlo) — no incluida en este backend-only pass.
+verificación) ya existían desde Fase 1.1. El frontend (`StoryTrustPanel.tsx`,
+en `ArticleDetailPage`) muestra la lista de fuentes cuando hay más de una.
 
-## 2.2 Citas por afirmación ✅ implementado (backend)
+## 2.2 Citas por afirmación ✅ implementado (backend + frontend)
 
 No basta con enlaces al final del resumen — ahora el prompt del summarizer
 (`SYSTEM_PROMPT`/`_build_prompt` en `summarizer.py`) pide, además del resumen,
@@ -36,7 +36,9 @@ ninguna cita que una inventada). Verificado con un test que simula justo eso
 `story_claims`/`claim_evidence` (migración `015_story_claims.sql`) —
 **reemplaza**, no acumula: cada corrida de resumen refleja las afirmaciones
 vigentes, no un historial creciente de versiones viejas de la misma historia.
-`GET /api/stories/{id}` ya expone `claims`. Falta el frontend.
+`GET /api/stories/{id}` expone `claims`, y `StoryTrustPanel.tsx` las agrupa
+por confianza (confirmado por varias fuentes / comunicado oficial / una sola
+fuente) con un link "Ver fuente" por cada una.
 
 Esquema real (migración `015_story_claims.sql`, con `id`/`created_at` y
 `ON DELETE CASCADE` en la evidencia para que reemplazar sea una operación limpia):
@@ -74,11 +76,25 @@ generación de claims reemplazó correctamente a la primera sin acumular filas,
 un claim con `article_id` inventado se descartó solo, y `GET /api/stories/{id}`
 devuelve `claims` con su evidencia real.
 
-## 2.3 Comparación de cobertura
+## 2.3 Comparación de cobertura ✅ implementado (backend)
 
-Por historia: qué fuentes la reportaron, qué datos aparecen en todas, qué aparece en
-una sola, qué se contradice, qué no está confirmado. Se deriva de `story_articles` +
-`story_claims`/`claim_evidence` una vez existan.
+`src/processors/story_coverage.py` — `build_coverage_summary` agrupa las claims
+ya extraídas (2.2) por su propio `confidence` (`multi_source` /
+`official_statement` / `single_source`) junto con la lista de fuentes (2.1), sin
+IA ni tablas nuevas: reusa datos que ya existen. Expuesto como `coverage` en
+`GET /api/stories/{id}`.
+
+**Deliberadamente sin detección de contradicciones:** el roadmap original pedía
+"qué se contradice", pero hoy no hay ninguna señal real para eso (cada claim
+tiene un solo artículo de evidencia, no hay comparación semántica entre
+claims). Se omite en vez de fingir una comparación que no se está haciendo —
+el campo `contradictory` de `story_confidence.py` ya existe y está listo para
+cuando esa señal se construya.
+
+**Su valor real crecerá con volumen:** hoy casi todas las historias tienen 1
+artículo (dato real del entorno de desarrollo), así que `coverage` no tiene
+mucho que agrupar todavía — no es una limitación del código, es que no ha
+corrido suficiente tiempo en producción con múltiples fuentes por historia.
 
 ## 2.4 Nivel de confianza (etiquetas explicables, no un score misterioso) ✅ implementado
 
@@ -104,10 +120,12 @@ devueltos correctamente por `GET /api/stories/{id}`.
 
 ## 2.5 Correcciones ✅ implementado (backend)
 
-- `feedback_submitted` con `feedback_type='error_report'` — el botón "Reportar
-  un error" no necesita nada nuevo del backend: el evento ya estaba permitido
-  desde Fase 0.1 (`ALLOWED_EVENT_NAMES` en `analytics.py`), acepta `story_id` y
-  `metadata` libre. Solo falta el botón en el frontend.
+- `feedback_submitted` con `feedback_type='error_report'` — no necesitó nada
+  nuevo del backend: el evento ya estaba permitido desde Fase 0.1
+  (`ALLOWED_EVENT_NAMES` en `analytics.py`), acepta `story_id` y `metadata`
+  libre. El botón "Reportar un error" vive en `StoryTrustPanel.tsx` y llama
+  `trackEvent` directamente — verificado en el navegador real que el evento
+  llega a `analytics_events` con el `story_id` y `article_id` correctos.
 - Historial de correcciones: tabla `story_corrections` (migración
   `016_story_corrections.sql`) + `POST /api/stories/{id}/corrections` —
   registra la corrección **y** marca `stories.current_status = 'corrected'`,
@@ -132,6 +150,44 @@ sacó la historia del conteo de `list_stories` (1714 → 1713) sin afectar
 `get_story`, y republicar la restauró a `'corrected'` porque conservaba su
 corrección — exactamente el comportamiento que se buscaba, no un reseteo
 ciego a `'developing'`.
+
+## Frontend ✅ implementado (detalle de artículo)
+
+`StoryTrustPanel.tsx` (`frontend/src/components/news/`) es un componente
+presentacional puro (recibe `story`/`isLoading`/`isError` como props, no hace
+fetching él mismo) montado en `ArticleDetailPage` cuando el resumen del
+artículo trae `story_cluster_id`. Muestra: badge de confianza (2.4), fuentes
+que confirman la historia si hay más de una (2.1), claims agrupadas por nivel
+de confianza con link a la fuente (2.2), nota de actualización si existe
+(1.4), historial de correcciones si existe (2.5), y el botón "Reportar un
+error" (2.5).
+
+**Degrada con gracia por diseño:** si la historia todavía está cargando
+muestra un skeleton; si falla (404, red) o el artículo no tiene
+`story_cluster_id` todavía, el componente devuelve `null` — nunca rompe el
+resto de la página de detalle, que sigue mostrando el resumen y el cuerpo del
+artículo con normalidad.
+
+Se agregó `getStoryById` a `services/api.ts` y los tipos correspondientes
+(`Story`, `StoryClaim`, `StoryCoverage`, etc.) a `services/types.ts`. De paso
+se corrigió un problema real en la infraestructura de tests del frontend:
+`setupTests.ts` no llamaba `cleanup()` de Testing Library entre tests, así
+que el DOM de un test se acumulaba en el siguiente — afectaba a cualquier
+suite futura con más de un test por archivo, no solo a este componente.
+
+**Verificado:** 15/15 tests de frontend (8 nuevos para `StoryTrustPanel`,
+cubriendo loading/error/vacío/confianza/fuentes/claims/correcciones/reporte
+de error), `tsc -b` y `eslint` sin errores, build de producción exitoso, y en
+el navegador real contra Docker: se insertó temporalmente una claim y un
+resumen de prueba (con limpieza posterior, sin dejar datos en la DB), se
+confirmó que el panel renderiza correctamente con datos reales, que el botón
+de reporte dispara `trackEvent` y que el evento llega a `analytics_events`
+con el `story_id`/`article_id` correctos.
+
+**Lo que falta:** extender esta información a otras vistas (listado de
+historias en `NewsPage`, brief por email de Fase 3) si el uso real muestra
+que vale la pena ahí — por ahora solo vive en el detalle de artículo, que es
+donde el roadmap pedía que se pudiera responder la pregunta de confianza.
 
 ## Criterio de salida
 
