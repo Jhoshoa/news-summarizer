@@ -27,6 +27,46 @@ def test_build_prompt_includes_article_body_excerpt_and_url():
     assert '"article_id": 123' in prompt
 
 
+def test_build_prompt_includes_corroborating_articles_as_context():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    prompt = summarizer._build_prompt(
+        [
+            {
+                "title": "Bloqueo indefinido afecta abastecimiento de combustible",
+                "description": "Transportistas reportan filas en rutas clave.",
+                "source": "MedioA",
+                "id": 1,
+                "corroborating_articles": [
+                    {
+                        "title": "El bloqueo ya afecta a tres departamentos",
+                        "description": "Autoridades confirman que se extiende a Cochabamba y Oruro.",
+                        "source": "MedioB",
+                    },
+                    {"title": "", "description": "titulo vacio, debe ignorarse"},
+                ],
+            }
+        ],
+        "economia",
+    )
+
+    assert "Otras fuentes que cubren el mismo hecho" in prompt
+    assert "El bloqueo ya afecta a tres departamentos (MedioB)" in prompt
+    assert "Autoridades confirman que se extiende a Cochabamba y Oruro." in prompt
+    assert "titulo vacio, debe ignorarse" not in prompt
+
+
+def test_build_prompt_omits_corroborating_section_when_none_present():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    prompt = summarizer._build_prompt(
+        [{"title": "Noticia sin duplicados", "description": "Unica fuente.", "id": 1}],
+        "general",
+    )
+
+    assert "Otras fuentes que cubren el mismo hecho" not in prompt
+
+
 def test_parse_json_response_preserves_article_metadata_from_original_news():
     summarizer = NewsSummarizer(llm_provider=None)
 

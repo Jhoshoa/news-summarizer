@@ -54,7 +54,8 @@ re-explorar todo el repo.
 - [x] Fase 0 — Analítica y métricas (0.1 y 0.2 mínimas; costo IA y errores de scraping quedan pendientes, no bloqueantes)
 - [x] Fase 1.1 — Modelo de historias canónicas (tabla `stories`/`story_articles`, backfill, endpoints `/api/stories`)
 - [x] Fase 1.2 (parcial) — URL normalizada + cercanía temporal como señales de dedup
-- [ ] Fase 1.3–1.5 — Resumen consolidado + actualizaciones incrementales + timeline
+- [x] Fase 1.3 — Resumen consolidado con contexto multi-fuente
+- [ ] Fase 1.4–1.5 — Actualizaciones incrementales + línea de tiempo
 - [ ] Fase 2 — Trazabilidad y confianza
 - [ ] Fase 3 — Onboarding
 - [ ] Fase 3 — Brief por email personalizado

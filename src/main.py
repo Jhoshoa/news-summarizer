@@ -703,6 +703,7 @@ class NewsSummarizerApp:
                     a.get("id"), a.get("category",""), a.get("score",""),
                     (a.get("title","") or "")[:100],
                 )
+            await self._attach_corroborating_articles(to_summarize)
             try:
                 cat_summaries = await summarizer.summarize(to_summarize, category)
                 logger.info(
@@ -714,6 +715,29 @@ class NewsSummarizerApp:
                 logger.error(f"Error resumiendo {category}: {e}")
 
         return summaries
+
+    async def _attach_corroborating_articles(self, articles: list[dict]) -> None:
+        """Adjunta otros articulos de la misma historia como contexto multi-fuente
+        del resumen (Fase 1.3). No bloquea el flujo si la DB falla: el resumen
+        simplemente se genera sin ese contexto extra, como antes."""
+
+        if not self.db:
+            return
+
+        for article in articles:
+            story_cluster_id = article.get("story_cluster_id")
+            article_id = article.get("id")
+            if not story_cluster_id or not article_id:
+                continue
+            try:
+                siblings = await self.db.get_story_sibling_articles(
+                    story_cluster_id, exclude_article_id=article_id
+                )
+            except Exception as e:
+                logger.warning(f"No se pudo obtener contexto multi-fuente para {article_id}: {e}")
+                continue
+            if siblings:
+                article["corroborating_articles"] = siblings
 
     def _per_category_limit(self, category: str) -> int:
         extended = [

@@ -50,6 +50,10 @@ Cada resumen debe tener:
 - Resumen entre 180 y 320 caracteres, maximo 360 caracteres
 - Un dato relevante o dato clave, distinto del titulo
 
+Si una noticia incluye "Otras fuentes que cubren el mismo hecho", usa esa
+informacion para dar un resumen mas completo y preciso, pero sigue generando
+un unico resumen consolidado por noticia, no uno por fuente.
+
 Se preciso, no agregues opiniones personales.
 Responde en espanol.
 Devuelve solo JSON valido, sin markdown ni texto adicional."""
@@ -107,7 +111,9 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 prompt += f"   URL: {url}\n"
             if published_at:
                 prompt += f"   Publicado: {published_at}\n"
-            prompt += f"   Fuente: {source}\n\n"
+            prompt += f"   Fuente: {source}\n"
+            prompt += self._corroborating_articles_block(article)
+            prompt += "\n"
 
         prompt += "\nDevuelve un arreglo JSON con un objeto por noticia:"
         prompt += """
@@ -124,6 +130,33 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
 ]"""
 
         return prompt
+
+    def _corroborating_articles_block(self, article: dict) -> str:
+        """Contexto multi-fuente: otros articulos de la misma historia (Fase 1.3).
+
+        Solo titulo/extracto por fuente adicional, para no disparar el tamano
+        del prompt cuando una historia tiene muchos articulos.
+        """
+
+        others = article.get("corroborating_articles")
+        if not isinstance(others, list) or not others:
+            return ""
+
+        block = "   Otras fuentes que cubren el mismo hecho:\n"
+        for other in others[:4]:
+            other_title = str(other.get("title") or "").strip()
+            if not other_title:
+                continue
+            other_source = str(other.get("source") or "").strip()
+            other_excerpt = str(other.get("description") or other.get("content") or "").strip()
+            line = f"     - {other_title}"
+            if other_source:
+                line += f" ({other_source})"
+            block += line + "\n"
+            if other_excerpt:
+                block += f"       {self._truncate_content(other_excerpt, 200)}\n"
+
+        return block if block.count("\n") > 1 else ""
 
     def _truncate_content(self, content: str, max_length: int = 900) -> str:
         content = " ".join(str(content).split())

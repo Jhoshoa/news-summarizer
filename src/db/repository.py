@@ -1416,6 +1416,43 @@ class Database:
 
         return None
 
+    async def get_story_sibling_articles(
+        self,
+        story_cluster_id: str,
+        *,
+        exclude_article_id: int,
+        limit: int = 4,
+    ) -> list[dict]:
+        """Otros articulos activos de la misma historia, para dar contexto multi-fuente
+        al resumen consolidado (Fase 1.3) sin resumir cada duplicado por separado."""
+
+        if not story_cluster_id:
+            return []
+
+        async with self.session_maker() as session:
+            stmt = (
+                select(NewsArticle, NewsSource.name)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(
+                    NewsArticle.story_cluster_id == story_cluster_id,
+                    NewsArticle.id != exclude_article_id,
+                    NewsArticle.is_active.is_(True),
+                )
+                .order_by(NewsArticle.published_at.asc())
+                .limit(limit)
+            )
+            rows = (await session.execute(stmt)).all()
+
+        return [
+            {
+                "title": article.title,
+                "description": article.description,
+                "content": article.content,
+                "source": source_name,
+            }
+            for article, source_name in rows
+        ]
+
     async def get_recent_articles(
         self,
         categories: list[str],

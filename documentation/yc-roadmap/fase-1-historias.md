@@ -113,12 +113,25 @@ enfoque del prompt en `story_deduplicator.py` (reglas explícitas de "mismo hech
 verificable" en vez de solo similitud semántica), hay que extenderlo con las señales
 estructuradas del punto 6.
 
-## 1.3 Resumen consolidado
+## 1.3 Resumen consolidado ✅ implementado
 
-Regla: la IA resume la historia agrupada, no cada artículo duplicado por separado.
-Hoy `summarizer.py` corre después del dedup, así que el costo redundante ya se evita en
-parte; falta que el resumen use explícitamente todos los artículos del cluster como
-contexto (multi-fuente) en vez de resumir solo el primero.
+`Database.get_story_sibling_articles` (`repository.py`) trae los demás artículos
+activos del mismo `story_cluster_id`; `NewsSummarizerApp._attach_corroborating_articles`
+(`main.py`) los adjunta a cada candidato antes de resumir, y `summarizer._build_prompt`
+los incluye como sección "Otras fuentes que cubren el mismo hecho" (título + extracto,
+máximo 4 fuentes adicionales para no disparar el tamaño/costo del prompt). Sigue
+generándose **un solo resumen consolidado** por historia, no uno por artículo — el
+prompt solo le da al modelo más contexto para escribirlo mejor.
+
+Degrada con gracia: si `self.db` no está disponible, si el artículo no tiene
+`story_cluster_id`, o si la consulta a la DB falla, el resumen se genera igual que
+antes (sin la sección extra) — no hay ningún camino donde esto pueda romper el
+pipeline de recolección.
+
+**Verificado:** 239/239 tests, y contra el Postgres real: un cluster de 3 artículos
+sobre el mismo hecho ("Aprehenden/Arrestan ... con más de Bs 1 millón") devolvió
+correctamente los 2 artículos hermanos con su fuente al consultar por cualquiera de
+los tres IDs.
 
 ## 1.4 Actualizaciones incrementales
 
