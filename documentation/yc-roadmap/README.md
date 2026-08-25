@@ -19,6 +19,7 @@ salida.
 | — | [no-construir-ahora.md](no-construir-ahora.md) | Lista negra explícita para esta etapa |
 | — | [orden-ejecucion.md](orden-ejecucion.md) | Orden exacto, tiempos, y checklist semanal |
 | — | [narrativa-yc.md](narrativa-yc.md) | Problema/solución/cuña/expansión/ventaja para la aplicación |
+| — | [alineacion-green-tech.md](alineacion-green-tech.md) | Cómo se conecta este roadmap con la propuesta que ya ganó Green Tech |
 
 ## Decisión estratégica (resumen)
 
@@ -69,3 +70,25 @@ configuración multi-país (`CountryConfiguration`).
 
 Esto confirma que Fase 0 y buena parte de Fase 1 son el punto de partida correcto: no
 hay visibilidad de uso todavía, y el modelo de datos de "historia" está a medio camino.
+
+Ya existe también un panel de **impacto ambiental** (`GET /api/impact-metrics`,
+`Database.get_impact_metrics` en `src/db/repository.py`, página "Impacto" del
+frontend) que calcula `paginas_evitadas`, `minutos_ahorrados`, `mb_ahorrados` y
+`tasa_reduccion` a partir del pipeline real. **Fase 0 (analítica de producto) es
+complementaria a esto, no un reemplazo**: el panel de impacto mide eficiencia del
+pipeline (lo que ya ganó Green Tech); `analytics_events` mide comportamiento de
+usuario (lo que hace falta para YC). Ver [alineacion-green-tech.md](alineacion-green-tech.md).
+
+## Alineación con la propuesta Green Tech
+
+Antes de seguir agregando fases, se leyó `documentation/version-1/` (documento
+ejecutivo, anexo técnico e informe LaTeX del concurso Green Tech que este mismo
+proyecto ganó — USD 280). El mensaje central de esa propuesta es:
+
+> EcoBrief Bolivia usa IA no para producir más ruido, sino para reducirlo.
+
+Este roadmap **no reemplaza esa identidad, la extiende**. El roadmap YC agrega
+personalización, confianza/trazabilidad y B2B — pero cualquier feature nueva debe
+seguir la misma disciplina que ya premiaron: filtrar y deduplicar antes de llamar a
+IA, no volver a sumar ruido por sumar features. Ver el detalle en
+[alineacion-green-tech.md](alineacion-green-tech.md).
