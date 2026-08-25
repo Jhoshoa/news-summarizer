@@ -30,6 +30,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DEBUG: ${DEBUG:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SENTRY_DSN: ${SENTRY_DSN:-}
       TZ: America/La_Paz
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-news_user}:${POSTGRES_PASSWORD:-news_password}@postgres:5432/${POSTGRES_DB:-news_summarizer}
       GROQ_API_KEY: ${GROQ_API_KEY:-}

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="development", alias="ENVIRONMENT")
     debug: bool = Field(default=True, alias="DEBUG")
     log_level: str = Field(default="DEBUG", alias="LOG_LEVEL")
+    sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")
 
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")

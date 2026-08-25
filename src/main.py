@@ -57,6 +57,29 @@ class NewsSummarizerApp:
         self.email: EmailHandler | None = None
         self.scheduler: NewsScheduler | None = None
 
+    def _init_sentry(self) -> None:
+        """Error tracking en produccion (Fase: robustecer antes de redeploy).
+        `sentry-sdk[fastapi]` ya estaba en requirements-prod.txt pero nunca
+        se inicializaba en ningun lado — sin esto, un bug como el de
+        TelegramHandler.app (Fase de distribucion) podia pasar un mes en
+        produccion sin que nadie se enterara. Completamente opcional: sin
+        SENTRY_DSN configurado, no hace nada."""
+
+        if not self.settings.sentry_dsn:
+            return
+
+        try:
+            import sentry_sdk
+
+            sentry_sdk.init(
+                dsn=self.settings.sentry_dsn,
+                environment=self.settings.environment,
+                traces_sample_rate=0.1,
+            )
+            logger.info("Sentry inicializado")
+        except Exception as e:
+            logger.warning(f"No se pudo inicializar Sentry: {e}")
+
     async def startup(self):
         """Initializes the application."""
 
@@ -83,6 +106,8 @@ class NewsSummarizerApp:
 
         if self.settings.is_production:
             logger.info("Modo produccion")
+
+        self._init_sentry()
 
         try:
             self.db = Database(
