@@ -60,9 +60,9 @@ re-explorar todo el repo.
 - [x] Fase 2.1 — Fuentes visibles (backend: `sources`, autor, `is_update` en `/api/stories`)
 - [x] Fase 2.2 — Citas por afirmación (backend: prompt estructurado + lista blanca de article_id + `story_claims`/`claim_evidence`)
 - [x] Fase 2.4 — Nivel de confianza explicable (`classify_story_confidence`)
+- [x] Fase 2.5 — Correcciones (backend: `story_corrections`, unpublish/republish, activa `confidence=corrected`)
 - [ ] Fase 2.3 — Comparación de cobertura (depende de tener volumen real de claims)
-- [ ] Fase 2.5 — Correcciones (botón "Reportar error", `story_corrections`, despublicar)
-- [ ] Fase 2 (frontend) — Renderizar fuentes/confianza/claims en la UI
+- [ ] Fase 2 (frontend) — Renderizar fuentes/confianza/claims/botón de reporte en la UI
 - [ ] Fase 3 — Onboarding
 - [ ] Fase 3 — Brief por email personalizado
 - [ ] Fase 3 — Entidades y seguimiento

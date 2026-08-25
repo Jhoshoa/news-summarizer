@@ -267,6 +267,20 @@ class ClaimEvidence(Base):
     published_at = Column(DateTime, nullable=True)
 
 
+class StoryCorrection(Base):
+    """Historial de correcciones de una historia (Fase 2.5). Registrar una
+    correccion activa la etiqueta de confianza 'corrected' en
+    story_confidence.py, que ya estaba lista pero era inalcanzable."""
+
+    __tablename__ = "story_corrections"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    story_id = Column(String(64), ForeignKey("stories.id"), nullable=False, index=True)
+    reason = Column(Text, nullable=False)
+    corrected_by = Column(String(120), nullable=True)
+    corrected_at = Column(DateTime, nullable=False, default=_now_bolivia)
+
+
 class AnalyticsEvent(Base):
     __tablename__ = "analytics_events"
 
@@ -1316,6 +1330,13 @@ class Database:
             )
             claim_rows = (await session.execute(claims_stmt)).all()
 
+            corrections_stmt = (
+                select(StoryCorrection)
+                .where(StoryCorrection.story_id == story_id)
+                .order_by(StoryCorrection.corrected_at.desc())
+            )
+            corrections = (await session.execute(corrections_stmt)).scalars().all()
+
         confidence = classify_story_confidence(
             source_count=story.source_count,
             article_count=story.article_count,
@@ -1364,7 +1385,68 @@ class Database:
                 }
                 for claim, evidence in claim_rows
             ],
+            "corrections": [
+                {
+                    "reason": correction.reason,
+                    "corrected_by": correction.corrected_by,
+                    "corrected_at": correction.corrected_at,
+                }
+                for correction in corrections
+            ],
         }
+
+    async def add_story_correction(
+        self,
+        story_id: str,
+        *,
+        reason: str,
+        corrected_by: str | None = None,
+    ) -> dict | None:
+        """Registra una correccion (Fase 2.5) y marca la historia como
+        'corrected' — activa la etiqueta de confianza correspondiente
+        (story_confidence.py) sin necesitar cambios ahi."""
+
+        async with self.session_maker() as session:
+            story = await session.get(Story, story_id)
+            if story is None:
+                return None
+
+            story.current_status = "corrected"
+            correction = StoryCorrection(story_id=story_id, reason=reason, corrected_by=corrected_by)
+            session.add(correction)
+            await session.commit()
+            await session.refresh(correction)
+
+            return {
+                "id": correction.id,
+                "story_id": story_id,
+                "reason": correction.reason,
+                "corrected_by": correction.corrected_by,
+                "corrected_at": correction.corrected_at,
+            }
+
+    async def set_story_publication_status(self, story_id: str, *, unpublished: bool) -> bool:
+        """Despublica o republica una historia (Fase 2.5). No borra nada — solo
+        deja de aparecer en list_stories; get_story sigue funcionando para
+        auditoria/administracion."""
+
+        async with self.session_maker() as session:
+            story = await session.get(Story, story_id)
+            if story is None:
+                return False
+
+            if unpublished:
+                story.current_status = "unpublished"
+            else:
+                has_corrections = (
+                    await session.execute(
+                        select(exists().where(StoryCorrection.story_id == story_id))
+                    )
+                ).scalar_one()
+                story.current_status = "corrected" if has_corrections else "developing"
+
+            await session.commit()
+            return True
 
     async def list_stories(
         self,
@@ -1380,7 +1462,10 @@ class Database:
         page_size = max(1, min(page_size, 100))
 
         async with self.session_maker() as session:
-            filters = [Story.source_count >= max(min_sources, 1)]
+            filters = [
+                Story.source_count >= max(min_sources, 1),
+                Story.current_status != "unpublished",
+            ]
             if category:
                 filters.append(Story.category == category)
 
