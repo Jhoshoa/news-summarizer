@@ -13,6 +13,11 @@ class NewsSummarizer:
     SUMMARY_MIN_CHARS = 120
     SUMMARY_MAX_CHARS = 360
     FACT_MAX_CHARS = 140
+    CLAIM_MAX_CHARS = 220
+    CLAIM_EXCERPT_MAX_CHARS = 160
+    CLAIM_MAX_COUNT = 3
+    CLAIM_CONFIDENCE_LEVELS = {"multi_source", "single_source", "official_statement"}
+    DEFAULT_CLAIM_CONFIDENCE = "single_source"
     VALID_CATEGORIES = {
         "economia",
         "politica",
@@ -53,6 +58,22 @@ Cada resumen debe tener:
 Si una noticia incluye "Otras fuentes que cubren el mismo hecho", usa esa
 informacion para dar un resumen mas completo y preciso, pero sigue generando
 un unico resumen consolidado por noticia, no uno por fuente.
+
+Ademas del resumen, incluye hasta 3 afirmaciones puntuales ("claims") que sean
+hechos verificables y concretos (cifras, fechas, decisiones, resultados), no
+opiniones. Por cada afirmacion:
+- "claim": el hecho en una oracion corta.
+- "confidence": "multi_source" si dos o mas de las fuentes listadas confirman
+  el mismo dato, "official_statement" si viene de un comunicado o vocero
+  oficial, o "single_source" si solo una fuente lo reporta.
+- "claim_type": una palabra que describa el tipo (ej. cifra, fecha, decision,
+  resultado, declaracion).
+- "article_id": el Article ID exacto (el principal o uno de "Otras fuentes")
+  de donde sale ese dato especifico. Nunca inventes un ID que no este listado.
+- "excerpt": una frase MUY corta (menos de 160 caracteres) tomada de esa
+  fuente que respalde la afirmacion, no un parrafo completo.
+Si no hay suficiente informacion para una afirmacion confiable, omite "claims"
+o dejalo como arreglo vacio: mejor ninguna afirmacion que una inventada.
 
 Se preciso, no agregues opiniones personales.
 Responde en espanol.
@@ -125,7 +146,16 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
     "fact": "Dato relevante",
     "category": "politica",
     "source": "Nombre de la fuente",
-    "url": "https://..."
+    "url": "https://...",
+    "claims": [
+      {
+        "claim": "El bono se paga a partir del 15 de marzo",
+        "confidence": "multi_source",
+        "claim_type": "fecha",
+        "article_id": 123,
+        "excerpt": "el pago comenzara el 15 de marzo, confirmo el ministerio"
+      }
+    ]
   }
 ]"""
 
@@ -135,7 +165,9 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
         """Contexto multi-fuente: otros articulos de la misma historia (Fase 1.3).
 
         Solo titulo/extracto por fuente adicional, para no disparar el tamano
-        del prompt cuando una historia tiene muchos articulos.
+        del prompt cuando una historia tiene muchos articulos. El Article ID de
+        cada uno se expone para que las "claims" (Fase 2.2) puedan citar de
+        que fuente exacta sale cada dato.
         """
 
         others = article.get("corroborating_articles")
@@ -149,7 +181,11 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 continue
             other_source = str(other.get("source") or "").strip()
             other_excerpt = str(other.get("description") or other.get("content") or "").strip()
-            line = f"     - {other_title}"
+            other_id = other.get("article_id")
+            line = "     -"
+            if other_id is not None:
+                line += f" [Article ID: {other_id}]"
+            line += f" {other_title}"
             if other_source:
                 line += f" ({other_source})"
             block += line + "\n"
@@ -321,10 +357,104 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                     "source_article_count": self._source_article_count(original),
                     "source": item.get("source") or original.get("source"),
                     "url": item.get("url") or original.get("url"),
+                    "claims": self._normalize_claims(item, original),
                 }
             )
 
         return summaries
+
+    def _valid_evidence_articles(self, original: dict) -> dict[int, dict]:
+        """Article IDs a los que un claim puede apuntar de verdad: el articulo
+        principal y sus fuentes corroborantes (Fase 1.3), cada uno con URL real.
+        Nunca un ID inventado por el modelo."""
+
+        valid: dict[int, dict] = {}
+
+        main_id = self._safe_int(original.get("id") or original.get("article_id"))
+        main_url = original.get("url")
+        if main_id is not None and main_url:
+            valid[main_id] = {"url": main_url, "published_at": original.get("published_at")}
+
+        for sibling in original.get("corroborating_articles") or []:
+            if not isinstance(sibling, dict):
+                continue
+            sibling_id = self._safe_int(sibling.get("article_id"))
+            sibling_url = sibling.get("url")
+            if sibling_id is not None and sibling_url:
+                valid[sibling_id] = {
+                    "url": sibling_url,
+                    "published_at": sibling.get("published_at"),
+                }
+
+        return valid
+
+    def _normalize_claims(self, item: dict, original: dict) -> list[dict]:
+        """Afirmaciones puntuales con evidencia real (Fase 2.2).
+
+        Descarta cualquier claim sin texto o cuyo article_id no corresponda a
+        una fuente real de esta noticia (principal o corroborante) — nunca se
+        inserta una URL inventada por el modelo.
+        """
+
+        raw_claims = item.get("claims")
+        if not isinstance(raw_claims, list) or not raw_claims:
+            return []
+
+        valid_articles = self._valid_evidence_articles(original)
+        if not valid_articles:
+            return []
+
+        fallback_article_id = next(iter(valid_articles))
+
+        claims: list[dict] = []
+        for raw in raw_claims:
+            if not isinstance(raw, dict):
+                continue
+
+            claim_text = self._limit_text(
+                self._clean_generated_text(raw.get("claim") or ""), self.CLAIM_MAX_CHARS
+            )
+            if not claim_text:
+                continue
+
+            article_id = self._safe_int(raw.get("article_id"))
+            if article_id not in valid_articles:
+                article_id = fallback_article_id
+            evidence = valid_articles[article_id]
+
+            confidence = str(raw.get("confidence") or "").strip().lower()
+            if confidence not in self.CLAIM_CONFIDENCE_LEVELS:
+                confidence = self.DEFAULT_CLAIM_CONFIDENCE
+
+            claim_type = self._clean_generated_text(raw.get("claim_type") or "")[:30] or None
+
+            excerpt = self._limit_text(
+                self._clean_generated_text(raw.get("excerpt") or ""), self.CLAIM_EXCERPT_MAX_CHARS
+            )
+
+            claims.append(
+                {
+                    "claim": claim_text,
+                    "confidence": confidence,
+                    "claim_type": claim_type,
+                    "article_id": article_id,
+                    "source_url": evidence["url"],
+                    "source_excerpt": excerpt or None,
+                    "published_at": evidence.get("published_at"),
+                }
+            )
+            if len(claims) >= self.CLAIM_MAX_COUNT:
+                break
+
+        return claims
+
+    def _safe_int(self, value: Any) -> int | None:
+        try:
+            if value is None or isinstance(value, bool):
+                return None
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     def _find_original_article(
         self,
@@ -391,6 +521,7 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                         "source_article_count": self._source_article_count(original),
                         "source": original.get("source"),
                         "url": original.get("url"),
+                        "claims": [],
                     }
                 )
 

@@ -18,6 +18,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    delete,
     exists,
     func,
     or_,
@@ -239,6 +240,31 @@ class StoryArticle(Base):
     article_id = Column(Integer, ForeignKey("news_articles.id"), primary_key=True, index=True)
     similarity_score = Column(Float, nullable=True)
     relationship_type = Column(String(30), nullable=False, default="original_report")
+
+
+class StoryClaim(Base):
+    """Afirmacion puntual dentro de una historia (Fase 2.2), con su evidencia
+    en `ClaimEvidence` en vez de solo enlaces sueltos al final del resumen."""
+
+    __tablename__ = "story_claims"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    story_id = Column(String(64), ForeignKey("stories.id"), nullable=False, index=True)
+    claim = Column(Text, nullable=False)
+    confidence = Column(String(20), nullable=False)
+    claim_type = Column(String(30), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_now_bolivia)
+
+
+class ClaimEvidence(Base):
+    __tablename__ = "claim_evidence"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    claim_id = Column(Integer, ForeignKey("story_claims.id"), nullable=False, index=True)
+    article_id = Column(Integer, ForeignKey("news_articles.id"), nullable=False)
+    source_excerpt = Column(Text, nullable=True)
+    source_url = Column(Text, nullable=False)
+    published_at = Column(DateTime, nullable=True)
 
 
 class AnalyticsEvent(Base):
@@ -899,6 +925,17 @@ class Database:
         except (TypeError, ValueError):
             return 0
 
+    def _coerce_optional_int(self, value: Any) -> int | None:
+        """A diferencia de `_safe_int`, distingue "no hay valor" (None) de 0,
+        para no confundir un article_id ausente con el articulo id=0."""
+
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
     async def _latest_collection_run_for_date(
         self,
         session: AsyncSession,
@@ -1271,6 +1308,14 @@ class Database:
             )
             rows = (await session.execute(stmt)).all()
 
+            claims_stmt = (
+                select(StoryClaim, ClaimEvidence)
+                .join(ClaimEvidence, ClaimEvidence.claim_id == StoryClaim.id)
+                .where(StoryClaim.story_id == story_id)
+                .order_by(StoryClaim.created_at.asc())
+            )
+            claim_rows = (await session.execute(claims_stmt)).all()
+
         confidence = classify_story_confidence(
             source_count=story.source_count,
             article_count=story.article_count,
@@ -1306,6 +1351,18 @@ class Database:
                     "is_update": index > 0,
                 }
                 for index, (link, art, source_name) in enumerate(rows)
+            ],
+            "claims": [
+                {
+                    "claim": claim.claim,
+                    "confidence": claim.confidence,
+                    "claim_type": claim.claim_type,
+                    "article_id": evidence.article_id,
+                    "source_url": evidence.source_url,
+                    "source_excerpt": evidence.source_excerpt,
+                    "published_at": evidence.published_at,
+                }
+                for claim, evidence in claim_rows
             ],
         }
 
@@ -1469,10 +1526,13 @@ class Database:
 
         return [
             {
+                "article_id": article.id,
                 "title": article.title,
                 "description": article.description,
                 "content": article.content,
                 "source": source_name,
+                "url": article.url,
+                "published_at": article.published_at,
             }
             for article, source_name in rows
         ]
@@ -1717,6 +1777,63 @@ class Database:
             "items": items,
         }
 
+    async def _replace_story_claims(
+        self,
+        session: AsyncSession,
+        story_cluster_id: str,
+        claims: Any,
+    ) -> None:
+        """Reemplaza las claims de una historia con las del resumen mas reciente
+        (Fase 2.2). No acumula version tras version: cada corrida de resumen
+        refleja las afirmaciones vigentes, no un historial creciente."""
+
+        existing_claim_ids = (
+            (
+                await session.execute(
+                    select(StoryClaim.id).where(StoryClaim.story_id == story_cluster_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if existing_claim_ids:
+            await session.execute(
+                delete(ClaimEvidence).where(ClaimEvidence.claim_id.in_(existing_claim_ids))
+            )
+            await session.execute(delete(StoryClaim).where(StoryClaim.id.in_(existing_claim_ids)))
+
+        if not isinstance(claims, list) or not claims:
+            return
+
+        for claim in claims:
+            if not isinstance(claim, dict):
+                continue
+
+            claim_text = str(claim.get("claim") or "").strip()
+            article_id = self._coerce_optional_int(claim.get("article_id"))
+            source_url = claim.get("source_url")
+            if not claim_text or article_id is None or not source_url:
+                continue
+
+            story_claim = StoryClaim(
+                story_id=story_cluster_id,
+                claim=claim_text,
+                confidence=str(claim.get("confidence") or "single_source"),
+                claim_type=claim.get("claim_type"),
+            )
+            session.add(story_claim)
+            await session.flush()
+
+            session.add(
+                ClaimEvidence(
+                    claim_id=story_claim.id,
+                    article_id=article_id,
+                    source_excerpt=claim.get("source_excerpt"),
+                    source_url=source_url,
+                    published_at=claim.get("published_at"),
+                )
+            )
+
     async def save_summaries(
         self,
         summaries: list[dict],
@@ -1757,6 +1874,9 @@ class Database:
                     story = await session.get(Story, story_cluster_id)
                     if story is not None:
                         story.short_summary = body
+                        await self._replace_story_claims(
+                            session, story_cluster_id, summary.get("claims")
+                        )
 
                 existing = await self._get_summary(session, category.id, summary_date, title)
                 if existing:

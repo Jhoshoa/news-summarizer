@@ -67,6 +67,138 @@ def test_build_prompt_omits_corroborating_section_when_none_present():
     assert "Otras fuentes que cubren el mismo hecho" not in prompt
 
 
+def test_build_prompt_shows_article_id_for_corroborating_sources():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    prompt = summarizer._build_prompt(
+        [
+            {
+                "title": "Noticia principal",
+                "id": 1,
+                "corroborating_articles": [
+                    {"article_id": 99, "title": "Otra fuente", "source": "MedioB"}
+                ],
+            }
+        ],
+        "general",
+    )
+
+    assert "[Article ID: 99] Otra fuente (MedioB)" in prompt
+
+
+def test_parse_response_keeps_valid_claims_with_real_evidence():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "article_id": 1,
+            "title": "Gobierno anuncia bono",
+            "summary": "El gobierno anuncio un nuevo bono que se pagara desde marzo segun el ministerio.",
+            "claims": [
+              {
+                "claim": "El bono se paga desde el 15 de marzo",
+                "confidence": "multi_source",
+                "claim_type": "fecha",
+                "article_id": 1,
+                "excerpt": "el pago inicia el 15 de marzo"
+              }
+            ]
+          }
+        ]
+        """,
+        "economia",
+        [{"id": 1, "title": "Gobierno anuncia bono", "url": "https://a.com/1"}],
+    )
+
+    assert summaries[0]["claims"] == [
+        {
+            "claim": "El bono se paga desde el 15 de marzo",
+            "confidence": "multi_source",
+            "claim_type": "fecha",
+            "article_id": 1,
+            "source_url": "https://a.com/1",
+            "source_excerpt": "el pago inicia el 15 de marzo",
+            "published_at": None,
+        }
+    ]
+
+
+def test_parse_response_discards_claim_with_invented_article_id_but_keeps_summary():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "article_id": 1,
+            "title": "Gobierno anuncia bono",
+            "summary": "El gobierno anuncio un nuevo bono que se pagara desde marzo segun el ministerio.",
+            "claims": [
+              {
+                "claim": "Dato inventado sin fuente real",
+                "confidence": "multi_source",
+                "article_id": 999999
+              }
+            ]
+          }
+        ]
+        """,
+        "economia",
+        [{"id": 1, "title": "Gobierno anuncia bono", "url": "https://a.com/1"}],
+    )
+
+    assert len(summaries) == 1
+    assert summaries[0]["claims"][0]["article_id"] == 1
+    assert summaries[0]["claims"][0]["source_url"] == "https://a.com/1"
+
+
+def test_parse_response_normalizes_invalid_confidence_and_caps_claim_count():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    claims_json = ",".join(
+        f'{{"claim": "dato {i}", "confidence": "inventado", "article_id": 1}}' for i in range(5)
+    )
+    summaries = summarizer._parse_response(
+        f"""
+        [
+          {{
+            "article_id": 1,
+            "title": "Noticia con muchos claims",
+            "summary": "Resumen suficientemente largo para pasar la validacion minima del summarizer.",
+            "claims": [{claims_json}]
+          }}
+        ]
+        """,
+        "general",
+        [{"id": 1, "title": "Noticia con muchos claims", "url": "https://a.com/1"}],
+    )
+
+    assert len(summaries[0]["claims"]) == summarizer.CLAIM_MAX_COUNT
+    assert all(c["confidence"] == "single_source" for c in summaries[0]["claims"])
+
+
+def test_parse_response_ignores_claims_without_any_valid_evidence_article():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    summaries = summarizer._parse_response(
+        """
+        [
+          {
+            "title": "Noticia sin id ni url",
+            "summary": "Resumen suficientemente largo para pasar la validacion minima del summarizer.",
+            "claims": [{"claim": "dato sin fuente citable", "article_id": 5}]
+          }
+        ]
+        """,
+        "general",
+        [],
+    )
+
+    assert summaries[0]["claims"] == []
+
+
 def test_parse_json_response_preserves_article_metadata_from_original_news():
     summarizer = NewsSummarizer(llm_provider=None)
 
@@ -106,6 +238,7 @@ def test_parse_json_response_preserves_article_metadata_from_original_news():
             "source_article_count": 2,
             "source": "Unitel",
             "url": "https://unitel.bo/noticia",
+            "claims": [],
         }
     ]
 
@@ -142,6 +275,7 @@ def test_parse_json_response_extracts_array_from_extra_text_and_skips_bad_items(
             "source_article_count": 1,
             "source": "Red Uno",
             "url": "https://reduno.com.bo/noticia",
+            "claims": [],
         }
     ]
 

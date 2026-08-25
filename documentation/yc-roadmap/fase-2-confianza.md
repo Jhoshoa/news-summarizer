@@ -15,9 +15,31 @@ de publicación, autor (si existe), y `is_update`. `source_count`/`article_count
 verificación) ya existían desde Fase 1.1. Falta la parte de frontend
 (renderizarlo) — no incluida en este backend-only pass.
 
-## 2.2 Citas por afirmación
+## 2.2 Citas por afirmación ✅ implementado (backend)
 
-No basta con enlaces al final del resumen. Nuevas tablas:
+No basta con enlaces al final del resumen — ahora el prompt del summarizer
+(`SYSTEM_PROMPT`/`_build_prompt` en `summarizer.py`) pide, además del resumen,
+hasta 3 "claims" (afirmaciones puntuales y verificables) con `confidence`
+(`multi_source`/`single_source`/`official_statement`), `claim_type`, y el
+`article_id` + extracto corto (<160 caracteres, cuidando derechos de autor)
+de la fuente exacta que la respalda.
+
+**La pieza de seguridad real de esta feature:** el LLM nunca decide qué URL se
+guarda. `_normalize_claims`/`_valid_evidence_articles` construyen una lista
+blanca con el artículo principal y sus fuentes corroborantes (Fase 1.3) —
+cada `article_id` que el modelo devuelve se valida contra esa lista; si
+inventa un ID que no está ahí, la afirmación se descarta entera (mejor
+ninguna cita que una inventada). Verificado con un test que simula justo eso
+(`test_parse_response_discards_claim_with_invented_article_id_but_keeps_summary`).
+
+`Database._replace_story_claims` (`repository.py`) persiste esto en
+`story_claims`/`claim_evidence` (migración `015_story_claims.sql`) —
+**reemplaza**, no acumula: cada corrida de resumen refleja las afirmaciones
+vigentes, no un historial creciente de versiones viejas de la misma historia.
+`GET /api/stories/{id}` ya expone `claims`. Falta el frontend.
+
+Esquema real (migración `015_story_claims.sql`, con `id`/`created_at` y
+`ON DELETE CASCADE` en la evidencia para que reemplazar sea una operación limpia):
 
 ```sql
 CREATE TABLE story_claims (
@@ -25,11 +47,13 @@ CREATE TABLE story_claims (
   story_id VARCHAR(64) NOT NULL REFERENCES stories(id),
   claim TEXT NOT NULL,
   confidence VARCHAR(20) NOT NULL,
-  claim_type VARCHAR(30) NULL
+  claim_type VARCHAR(30) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE claim_evidence (
-  claim_id BIGINT NOT NULL REFERENCES story_claims(id),
+  id BIGSERIAL PRIMARY KEY,
+  claim_id BIGINT NOT NULL REFERENCES story_claims(id) ON DELETE CASCADE,
   article_id INTEGER NOT NULL REFERENCES news_articles(id),
   source_excerpt TEXT NULL,
   source_url TEXT NOT NULL,
@@ -39,12 +63,16 @@ CREATE TABLE claim_evidence (
 
 Los extractos (`source_excerpt`) son para verificación **interna**, no para
 republicar contenido de terceros extensamente — cuidado con derechos de autor al
-mostrarlos en la UI pública; usar frases cortas, no párrafos completos.
+mostrarlos en la UI pública; usar frases cortas, no párrafos completos. El límite
+de 160 caracteres en `CLAIM_EXCERPT_MAX_CHARS` (`summarizer.py`) lo hace cumplir
+en código, no solo como convención.
 
-Esto requiere un cambio en el prompt del summarizer: en vez de devolver solo texto
-libre, pedirle al LLM que devuelva afirmaciones estructuradas con su artículo fuente
-(similar en espíritu a como `story_deduplicator.py` ya le pide al LLM un formato JSON
-estricto — reusar ese patrón de prompting).
+**Verificado:** 254/254 tests (10 nuevos entre `summarizer.py` y el flujo de
+persistencia), migración `015` aplicada en Docker, y contra el Postgres real
+(con rollback donde correspondía, sin dejar datos de prueba): una segunda
+generación de claims reemplazó correctamente a la primera sin acumular filas,
+un claim con `article_id` inventado se descartó solo, y `GET /api/stories/{id}`
+devuelve `claims` con su evidencia real.
 
 ## 2.3 Comparación de cobertura
 
