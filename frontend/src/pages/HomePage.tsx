@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { Link } from "../app/router";
 import { usePageRefreshControl } from "../app/refreshControl";
@@ -16,6 +16,7 @@ import {
   SummaryCardSkeleton,
 } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
+import { trackEvent } from "../services/analytics";
 import {
   useGetArticlesQuery,
   useGetEconomicIndicatorsQuery,
@@ -170,6 +171,14 @@ export const HomePage = () => {
     [handleRefresh, isFetchingImpactMetrics, isFetchingIndicators, isRefreshing, isTriggeringSummary],
   );
   usePageRefreshControl(refreshControl);
+
+  const hasTrackedBriefOpen = useRef(false);
+  useEffect(() => {
+    if (!hasTrackedBriefOpen.current && !showSummarySkeleton && summaries.length > 0) {
+      hasTrackedBriefOpen.current = true;
+      trackEvent("brief_opened", { metadata: { brief_count: summaries.length } });
+    }
+  }, [showSummarySkeleton, summaries.length]);
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
 import { useRouter } from "../app/router";
@@ -14,6 +14,7 @@ import { ArticleImage } from "../components/news/ArticleImage";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { ArticleDetailSkeleton, PanelSkeleton } from "../components/ui/Skeleton";
 import { WeatherPanel } from "../components/weather/WeatherPanel";
+import { trackEvent } from "../services/analytics";
 import {
   useGetArticleByIdQuery,
   useGetEconomicIndicatorsQuery,
@@ -101,6 +102,25 @@ export const ArticleDetailPage = () => {
   );
   usePageRefreshControl(refreshControl);
 
+  useEffect(() => {
+    if (article) {
+      trackEvent("story_opened", {
+        storyId: String(article.id),
+        category: article.category,
+      });
+    }
+  }, [article]);
+
+  const handleSourceClick = useCallback(() => {
+    if (article) {
+      trackEvent("source_clicked", {
+        storyId: String(article.id),
+        sourceId: article.source,
+        category: article.category,
+      });
+    }
+  }, [article]);
+
   if (showArticleSkeleton) {
     return <ArticleDetailSkeleton />;
   }
@@ -146,7 +166,7 @@ export const ArticleDetailPage = () => {
           <h1>{article.title}</h1>
           <div className="article-source-link">
             <span>Fuente original</span>
-            <a href={article.url} rel="noreferrer" target="_blank">
+            <a href={article.url} rel="noreferrer" target="_blank" onClick={handleSourceClick}>
               {article.source}
             </a>
           </div>
