@@ -59,7 +59,7 @@ export const ArticleDetailPage = () => {
     skip: articleId === null,
   });
   const { data: summaryData, isFetching: isFetchingSummary } = useGetSummariesQuery(
-    articleId ? { article_id: articleId, page_size: 1 } : undefined,
+    articleId ? { article_id: articleId, page_size: 1, fallback_to_latest: true } : undefined,
     { skip: articleId === null },
   );
   const { data: latestSummariesData, isFetching: isFetchingLatestSummaries } = useGetSummariesQuery({
