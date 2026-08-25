@@ -13,15 +13,38 @@ descartar duplicados, no un objeto que el usuario ve evolucionar.
 
 **Tiempo estimado:** 3–4 semanas (1–2 modelo + 2 dedup/actualizaciones).
 
-## 1.1 Historia canónica
+## 1.1 Historia canónica ✅ implementado
 
-Nuevas tablas (migración `012_stories.sql`):
+Tablas creadas (migración `012_stories.sql`), modelos `Story`/`StoryArticle`
+(`src/db/repository.py`), backfill idempotente desde `story_cluster_id`
+(migración `013_stories_backfill.sql`, corrida y verificada: 1714 historias /
+1725 vínculos en el Postgres de desarrollo) y endpoints de lectura
+(`src/api/stories.py`): `GET /api/stories` (paginado, filtra por `category` y
+`min_sources`) y `GET /api/stories/{id}` (historia + artículos ordenados por
+fecha, con `relationship_type`). `upsert_articles` ahora llama a
+`_upsert_story` en cada inserción nueva, así que las historias se mantienen al
+día automáticamente en cada ciclo de recolección — verificado end-to-end en
+Docker (build, migración, y respuesta real de los endpoints).
+
+**Riesgo pendiente:** `_upsert_story` (el camino de escritura en vivo) solo
+está verificado manualmente contra Postgres real, no hay test automatizado que
+lo ejerza — los tests nuevos (`tests/test_stories_api.py`) cubren la capa API
+con una DB falsa. Antes de tocar esta lógica de nuevo, agregar un test de
+integración real (Postgres de test o fixture con sqlite si las migraciones lo
+permiten) que inserte artículos duplicados y no duplicados y verifique
+`article_count`/`source_count`.
+
+`relationship_type` todavía no distingue `follow_up`/`reaction`/`correction`/
+`official_statement` — sigue el TODO de 1.4 (requiere comparar contenido con
+IA, no solo duplicado/original).
+
+Definición de tablas de referencia:
 
 ```sql
 CREATE TABLE stories (
   id VARCHAR(64) PRIMARY KEY,              -- puede derivar de story_cluster_id existente
   canonical_title VARCHAR(300) NOT NULL,
-  short_summary TEXT NOT NULL,
+  short_summary TEXT NULL,          -- nullable: aun no se genera (ver 1.3, pendiente)
   detailed_summary TEXT NULL,
   category VARCHAR(60) NULL,
   country VARCHAR(10) NOT NULL DEFAULT 'BO',

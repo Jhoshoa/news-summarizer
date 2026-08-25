@@ -199,6 +199,43 @@ class NewsSummary(Base):
     created_at = Column(DateTime, nullable=False, default=_now_bolivia)
 
 
+class Story(Base):
+    """Historia canonica: agrupa articulos que cubren el mismo acontecimiento.
+
+    id es el story_cluster_id ya calculado por story_fingerprint.py, para que esta
+    tabla se pueda poblar a partir del clustering que ya existia (ver migracion 013).
+    """
+
+    __tablename__ = "stories"
+
+    id = Column(String(64), primary_key=True)
+    canonical_title = Column(String(300), nullable=False)
+    short_summary = Column(Text, nullable=True)
+    detailed_summary = Column(Text, nullable=True)
+    category = Column(String(60), nullable=True)
+    country = Column(String(10), nullable=False, default="BO")
+    department = Column(String(80), nullable=True)
+    city = Column(String(80), nullable=True)
+    importance_score = Column(Float, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    first_published_at = Column(DateTime, nullable=False)
+    last_updated_at = Column(DateTime, nullable=False)
+    current_status = Column(String(40), nullable=False, default="developing")
+    article_count = Column(Integer, nullable=False, default=1)
+    source_count = Column(Integer, nullable=False, default=1)
+
+
+class StoryArticle(Base):
+    """Relacion entre una historia y cada articulo que la compone."""
+
+    __tablename__ = "story_articles"
+
+    story_id = Column(String(64), ForeignKey("stories.id"), primary_key=True)
+    article_id = Column(Integer, ForeignKey("news_articles.id"), primary_key=True, index=True)
+    similarity_score = Column(Float, nullable=True)
+    relationship_type = Column(String(30), nullable=False, default="original_report")
+
+
 class AnalyticsEvent(Base):
     __tablename__ = "analytics_events"
 
@@ -1132,6 +1169,18 @@ class Database:
                     article["id"] = news_article.id
                     inserted += 1
 
+                    await self._upsert_story(
+                        session,
+                        story_cluster_id=story_cluster_id,
+                        article_id=news_article.id,
+                        title=title,
+                        category=category_name,
+                        country=article.get("country"),
+                        published_at=published_at,
+                        relationship_type="duplicate" if duplicate_of_article_id else "original_report",
+                        similarity_score=similarity_score,
+                    )
+
             await session.commit()
 
         return {
@@ -1139,6 +1188,155 @@ class Database:
             "updated": updated,
             "historical_duplicates": historical_duplicates,
         }
+
+    async def _upsert_story(
+        self,
+        session: AsyncSession,
+        *,
+        story_cluster_id: str,
+        article_id: int,
+        title: str,
+        category: str,
+        country: str | None,
+        published_at: datetime,
+        relationship_type: str,
+        similarity_score: float | None,
+    ) -> None:
+        """Crea o actualiza la Story de un cluster y enlaza el articulo nuevo.
+
+        No reclasifica relationship_type con mas detalle (follow_up, reaction,
+        correction, official_statement): eso requiere comparar contenido con IA y
+        queda para la siguiente iteracion de Fase 1 (ver fase-1-historias.md 1.4).
+        """
+
+        story = await session.get(Story, story_cluster_id)
+        if story is None:
+            story = Story(
+                id=story_cluster_id,
+                canonical_title=title,
+                category=category,
+                country=country or "BO",
+                first_published_at=published_at,
+                last_updated_at=published_at,
+                current_status="developing",
+                article_count=0,
+                source_count=0,
+            )
+            session.add(story)
+        else:
+            if story.first_published_at is None or published_at < story.first_published_at:
+                story.first_published_at = published_at
+            if story.last_updated_at is None or published_at > story.last_updated_at:
+                story.last_updated_at = published_at
+
+        session.add(
+            StoryArticle(
+                story_id=story_cluster_id,
+                article_id=article_id,
+                relationship_type=relationship_type,
+                similarity_score=similarity_score,
+            )
+        )
+        await session.flush()
+
+        counts_stmt = select(
+            func.count(),
+            func.count(func.distinct(NewsArticle.source_id)),
+        ).where(NewsArticle.story_cluster_id == story_cluster_id)
+        article_count, source_count = (await session.execute(counts_stmt)).one()
+        story.article_count = int(article_count)
+        story.source_count = int(source_count)
+
+    async def get_story(self, story_id: str) -> dict | None:
+        """Historia canonica con sus articulos, ordenados por fecha de publicacion."""
+
+        async with self.session_maker() as session:
+            story = await session.get(Story, story_id)
+            if story is None:
+                return None
+
+            stmt = (
+                select(StoryArticle, NewsArticle, NewsSource.name)
+                .join(NewsArticle, StoryArticle.article_id == NewsArticle.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(StoryArticle.story_id == story_id)
+                .order_by(NewsArticle.published_at.asc())
+            )
+            rows = (await session.execute(stmt)).all()
+
+        return {
+            "id": story.id,
+            "canonical_title": story.canonical_title,
+            "short_summary": story.short_summary,
+            "detailed_summary": story.detailed_summary,
+            "category": story.category,
+            "country": story.country,
+            "current_status": story.current_status,
+            "first_published_at": story.first_published_at,
+            "last_updated_at": story.last_updated_at,
+            "article_count": story.article_count,
+            "source_count": story.source_count,
+            "articles": [
+                {
+                    "article_id": link.article_id,
+                    "title": art.title,
+                    "url": art.url,
+                    "source": source_name,
+                    "published_at": art.published_at,
+                    "relationship_type": link.relationship_type,
+                    "similarity_score": link.similarity_score,
+                }
+                for link, art, source_name in rows
+            ],
+        }
+
+    async def list_stories(
+        self,
+        *,
+        category: str | None = None,
+        min_sources: int = 1,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[dict], int]:
+        """Lista historias ordenadas por actividad reciente, con paginacion simple."""
+
+        page = max(page, 1)
+        page_size = max(1, min(page_size, 100))
+
+        async with self.session_maker() as session:
+            filters = [Story.source_count >= max(min_sources, 1)]
+            if category:
+                filters.append(Story.category == category)
+
+            total_stmt = select(func.count()).select_from(Story).where(*filters)
+            total = int((await session.execute(total_stmt)).scalar_one())
+
+            stmt = (
+                select(Story)
+                .where(*filters)
+                .order_by(Story.last_updated_at.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+            stories = (await session.execute(stmt)).scalars().all()
+
+        return (
+            [
+                {
+                    "id": story.id,
+                    "canonical_title": story.canonical_title,
+                    "category": story.category,
+                    "country": story.country,
+                    "current_status": story.current_status,
+                    "first_published_at": story.first_published_at,
+                    "last_updated_at": story.last_updated_at,
+                    "article_count": story.article_count,
+                    "source_count": story.source_count,
+                }
+                for story in stories
+            ],
+            total,
+        )
 
     async def find_recent_story_match(
         self,

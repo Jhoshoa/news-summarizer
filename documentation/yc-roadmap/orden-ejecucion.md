@@ -52,8 +52,8 @@ re-explorar todo el repo.
 ## Checklist de progreso
 
 - [x] Fase 0 — Analítica y métricas (0.1 y 0.2 mínimas; costo IA y errores de scraping quedan pendientes, no bloqueantes)
-- [ ] Fase 1 — Modelo de historias
-- [ ] Fase 1 — Deduplicación por niveles + actualizaciones incrementales
+- [x] Fase 1.1 — Modelo de historias canónicas (tabla `stories`/`story_articles`, backfill, endpoints `/api/stories`)
+- [ ] Fase 1.2–1.5 — Deduplicación por niveles + actualizaciones incrementales + timeline
 - [ ] Fase 2 — Trazabilidad y confianza
 - [ ] Fase 3 — Onboarding
 - [ ] Fase 3 — Brief por email personalizado
