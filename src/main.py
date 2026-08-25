@@ -11,7 +11,7 @@ from typing import Any
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import FastAPI, Form, Header, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -1234,8 +1234,8 @@ async def health():
 
 @app.post("/webhook/whatsapp")
 async def whatsapp_webhook(
-    From: str = Form(default=""),  # noqa: N803 - nombre fijado por el webhook de Twilio
-    Body: str = Form(default=""),  # noqa: N803
+    request: Request,
+    x_twilio_signature: str | None = Header(default=None, alias="X-Twilio-Signature"),
 ):
     """Webhook for WhatsApp via Twilio.
 
@@ -1243,13 +1243,30 @@ async def whatsapp_webhook(
     (con mayuscula, no "sender"/"body") y espera de vuelta TwiML, no JSON —
     si no, el mensaje de respuesta nunca le llega al usuario aunque
     `handle_message` lo haya generado bien.
+
+    Se valida `X-Twilio-Signature` (si `TWILIO_AUTH_TOKEN` y
+    `TWILIO_WEBHOOK_URL` estan configurados) para que nadie pueda mandar
+    mensajes falsos a este endpoint adivinando la URL — sin esto, cualquiera
+    podria dar de baja a cualquier numero de telefono con un POST directo.
     """
 
     if not app_instance or not app_instance.whatsapp:
         raise HTTPException(status_code=500, detail="WhatsApp no configurado")
 
-    sender = From.removeprefix("whatsapp:")
-    reply_text = await app_instance.whatsapp.handle_message(sender, Body)
+    form = await request.form()
+    settings = app_instance.settings
+    auth_token = getattr(settings, "twilio_auth_token", None)
+    webhook_url = getattr(settings, "twilio_webhook_url", None)
+    if auth_token and webhook_url:
+        from twilio.request_validator import RequestValidator
+
+        validator = RequestValidator(auth_token)
+        if not validator.validate(webhook_url, dict(form), x_twilio_signature or ""):
+            raise HTTPException(status_code=401, detail="Firma de Twilio invalida")
+
+    sender = str(form.get("From", "")).removeprefix("whatsapp:")
+    body = str(form.get("Body", ""))
+    reply_text = await app_instance.whatsapp.handle_message(sender, body)
     message_xml = f"<Message>{html.escape(reply_text)}</Message>" if reply_text else ""
     twiml = f'<?xml version="1.0" encoding="UTF-8"?><Response>{message_xml}</Response>'
     return Response(content=twiml, media_type="application/xml")

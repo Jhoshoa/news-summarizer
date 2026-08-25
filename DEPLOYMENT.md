@@ -104,6 +104,14 @@ no "send to a WhatsApp group" API on the WhatsApp Business Platform — only one
 messages to opted-in numbers, which is what `send_daily_summary` already does per
 subscriber (a broadcast list, not a group).
 
+Also set `TWILIO_WEBHOOK_URL` to the exact webhook URL configured in the Twilio console
+(`https://<domain>/webhook/whatsapp`, matching scheme/host/path exactly). The app uses it
+together with `TWILIO_AUTH_TOKEN` to validate the `X-Twilio-Signature` header on every
+incoming request — without it, anyone who finds the URL could POST fake messages (e.g.
+unsubscribe any phone number by faking "cancelar"). If `TWILIO_WEBHOOK_URL` is left empty
+the endpoint still works but skips signature validation entirely, so set it before
+pointing real traffic at the webhook.
+
 **Telegram** — set `TELEGRAM_BOT_TOKEN` (from @BotFather) and `TELEGRAM_WEBHOOK_URL` to
 the backend's public HTTPS origin (no path — the app appends `/webhook/telegram` and
 registers the webhook with Telegram on startup). Set `TELEGRAM_WEBHOOK_SECRET` to a random
