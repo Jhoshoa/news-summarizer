@@ -11,8 +11,8 @@ class LLMProvider:
         "groq": {
             "base_url": "https://api.groq.com/openai/v1",
             "models": {
-                "fast": "llama-3.1-8b-instant",
-                "balanced": "qwen/qwen3-32b",
+                "fast": "openai/gpt-oss-20b",
+                "balanced": "qwen/qwen3.6-27b",
                 "quality": "openai/gpt-oss-120b",
             },
         },
