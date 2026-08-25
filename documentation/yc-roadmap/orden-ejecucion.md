@@ -67,7 +67,7 @@ re-explorar todo el repo.
 - [x] Fase 3.1/3.3 — Onboarding corto y brief filtrado a 10 historias (ya existían en `SubscribePage`/`_deliver_summaries`, documentado)
 - [x] Fase 3.5 — Feedback ligero (`StoryFeedback`: reacciones + seguir historia)
 - [ ] Fase 3.2 — Entidades y seguimiento (NER, esperando señal de qué temas pide la gente)
-- [ ] Fase 3.4 — Ampliar brief por email con "qué cambió" (usa `Story.last_update_note`, ya existe el dato)
+- [x] Fase 3.4 (parte) — "Qué cambió" en el brief (WhatsApp/Telegram/email, usa `Story.last_update_note`)
 - [ ] Fase 3.6 — Tabla `saved_stories` real (hoy `story_saved` es solo evento de analítica)
 - [ ] Entrevistas B2B (mínimo 5 potenciales clientes contactados)
 - [ ] Fase 4 — Workspaces y monitores

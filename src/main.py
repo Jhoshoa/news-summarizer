@@ -545,6 +545,8 @@ class NewsSummarizerApp:
         sent_count = 0
         delivery_stats = self._empty_delivery_stats()
 
+        await self._attach_story_update_notes(summaries)
+
         logger.info(f"Checking subscribers... DB: {self.db}")
         try:
             subscribers = await self.db.get_active_subscribers()
@@ -759,6 +761,33 @@ class NewsSummarizerApp:
             if siblings:
                 article["corroborating_articles"] = siblings
 
+    async def _attach_story_update_notes(self, summaries: list[dict]) -> None:
+        """Adjunta la nota de "que cambio" (Fase 1.4) a cada summary que la
+        tenga, para que el brief enviado por canal la muestre (Fase 3.4). Una
+        sola consulta batch para todo el lote, no una por summary. No bloquea
+        el envio si la DB falla: el brief se manda igual, sin esa linea extra."""
+
+        if not self.db:
+            return
+
+        story_cluster_ids = {s.get("story_cluster_id") for s in summaries if s.get("story_cluster_id")}
+        if not story_cluster_ids:
+            return
+
+        try:
+            notes = await self.db.get_story_update_notes(story_cluster_ids)
+        except Exception as e:
+            logger.warning(f"No se pudieron obtener notas de actualizacion: {e}")
+            return
+
+        if not notes:
+            return
+
+        for summary in summaries:
+            note = notes.get(summary.get("story_cluster_id"))
+            if note:
+                summary["update_note"] = note
+
     def _per_category_limit(self, category: str) -> int:
         extended = [
             c.strip().lower()
@@ -868,6 +897,8 @@ class NewsSummarizerApp:
 
             if article.get("fact"):
                 text += f"   Dato: {article.get('fact')}\n"
+            if article.get("update_note"):
+                text += f"   {article.get('update_note')}\n"
             text += "\n"
 
         text += "---\n"
@@ -909,12 +940,15 @@ class NewsSummarizerApp:
             source = str(article.get("source") or "").strip()
             url = str(article.get("url") or "").strip()
             category = str(article.get("category") or "general").strip()
+            update_note = str(article.get("update_note") or "").strip()
 
             body += f"{index}. {title}\n"
             body += f"   {summary}\n"
 
             if fact:
                 body += f"   Dato: {fact}\n"
+            if update_note:
+                body += f"   {update_note}\n"
             if source:
                 body += f"   Fuente: {source}\n"
             if url:
@@ -933,11 +967,18 @@ class NewsSummarizerApp:
                     f'{safe_url}" '
                     'style="color:#00606a;text-decoration:none;font-weight:700;">Link</a>'
                 )
-            meta_html = " · ".join(meta_parts)
-
             meta_html = " &middot; ".join(meta_parts)
             source_label = html.escape(source or "EcoBrief Bolivia")
             category_label = html.escape(category)
+            update_note_html = (
+                f"""
+                <p style="margin:0 0 10px;padding:8px 10px;border-left:3px solid #d97706;background:#fffbeb;color:#92400e;font:600 12px/1.5 Inter,Segoe UI,Arial,sans-serif;">
+                  {html.escape(update_note)}
+                </p>
+                """
+                if update_note
+                else ""
+            )
 
             items_html.append(
                 f"""
@@ -960,6 +1001,7 @@ class NewsSummarizerApp:
                           <h2 style="margin:0 0 8px;color:#222222;font:700 19px/1.22 Georgia,'Times New Roman',serif;">
                             {html.escape(title)}
                           </h2>
+                          {update_note_html}
                           <p style="margin:0 0 10px;color:#3f424c;font:400 14px/1.55 Inter,Segoe UI,Arial,sans-serif;">
                             {html.escape(summary)}
                           </p>

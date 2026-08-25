@@ -65,7 +65,23 @@ sección aparte para "historias en seguimiento" (depende de 3.6) y mostrar expl�
 "qué cambió" por historia — eso ya existe a nivel de dato (`Story.last_update_note`,
 Fase 1.4) pero no se incluye todavía en el texto del brief que se envía por canal.
 
-## 3.4 Canales de distribución (orden recomendado)
+## 3.4 (parte) "Qué cambió" en el brief ✅ implementado
+
+Cierra el ciclo de Fase 1.4: `Story.last_update_note` ya existía pero nada lo mostraba
+fuera de `GET /api/stories/{id}`. `Database.get_story_update_notes` (consulta batch,
+una sola vez por lote de entrega, no una por suscriptor) + `NewsSummarizerApp
+._attach_story_update_notes` enriquecen cada summary con `update_note` antes del loop de
+envío; `_format_summary` (WhatsApp/Telegram) y `_format_email_summary` (texto plano +
+HTML) lo incluyen cuando existe. Degrada con gracia: si la consulta falla, el brief se
+manda igual, sin esa línea.
+
+**Verificado:** 9 tests nuevos, y contra el Postgres real (con commit + limpieza
+posterior): una historia real recibió una nota temporal, `get_story_update_notes` la
+trajo correctamente (y no trajo la de una historia sin nota), y el pipeline completo
+(`_attach_story_update_notes` → `_format_summary`/`_format_email_summary`) la incluyó
+en el mensaje de WhatsApp/Telegram y en el email (texto y HTML).
+
+## 3.4 (resto) Canales de distribución (orden recomendado)
 
 Web → **Email** (ya implementado, priorizar aquí porque genera recurrencia sin
 depender de que el usuario recuerde visitar la web) → notificaciones web → WhatsApp/

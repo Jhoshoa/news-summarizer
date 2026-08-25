@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime, timedelta
+from collections.abc import Iterable
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -1626,6 +1627,24 @@ class Database:
             }
             for article, source_name in rows
         ]
+
+    async def get_story_update_notes(self, story_cluster_ids: Iterable[str]) -> dict[str, str]:
+        """Notas de actualizacion (Fase 1.4) para un lote de historias, para
+        mostrar "que cambio" en el brief que se envia por canal (Fase 3.4).
+        Una sola consulta batch, no una por articulo/suscriptor."""
+
+        ids = {sid for sid in story_cluster_ids if sid}
+        if not ids:
+            return {}
+
+        async with self.session_maker() as session:
+            stmt = select(Story.id, Story.last_update_note).where(
+                Story.id.in_(ids),
+                Story.last_update_note.isnot(None),
+            )
+            rows = (await session.execute(stmt)).all()
+
+        return {story_id: note for story_id, note in rows if note}
 
     async def get_recent_articles(
         self,
