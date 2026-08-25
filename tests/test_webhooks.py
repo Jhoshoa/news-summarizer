@@ -12,7 +12,7 @@ class FakeWhatsApp:
         self.reply = reply
         self.calls: list[tuple[str, str]] = []
 
-    def handle_message(self, from_number, body):
+    async def handle_message(self, from_number, body):
         self.calls.append((from_number, body))
         return self.reply
 

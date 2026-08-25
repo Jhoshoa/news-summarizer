@@ -1,5 +1,6 @@
 from email.message import EmailMessage
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -86,3 +87,54 @@ async def test_email_handler_does_not_send_when_disabled(monkeypatch):
     result = await handler.send_message("reader@example.com", "Asunto", "Contenido")
 
     assert result is False
+
+
+def _fake_smtp_context_manager():
+    """SMTP/SMTP_SSL se usan como `with SMTP(...) as smtp:` — el mock debe
+    soportar el protocolo de context manager, no solo ser llamable."""
+
+    instance = MagicMock()
+    context = MagicMock()
+    context.__enter__ = MagicMock(return_value=instance)
+    context.__exit__ = MagicMock(return_value=False)
+    return context, instance
+
+
+def test_send_sync_uses_starttls_for_non_465_ports():
+    handler = EmailHandler(settings=_settings(smtp_port=587))
+    message = EmailMessage()
+
+    smtp_context, smtp_instance = _fake_smtp_context_manager()
+    ssl_context, ssl_instance = _fake_smtp_context_manager()
+
+    with (
+        patch("smtplib.SMTP", return_value=smtp_context) as smtp_cls,
+        patch("smtplib.SMTP_SSL", return_value=ssl_context) as ssl_cls,
+    ):
+        handler._send_sync(message)
+
+    smtp_cls.assert_called_once_with("smtp.gmail.com", 587, timeout=20)
+    ssl_cls.assert_not_called()
+    smtp_instance.starttls.assert_called_once()
+    smtp_instance.login.assert_called_once_with("sender@example.com", "app-password")
+    smtp_instance.send_message.assert_called_once_with(message)
+
+
+def test_send_sync_uses_implicit_ssl_for_port_465():
+    handler = EmailHandler(settings=_settings(smtp_port=465))
+    message = EmailMessage()
+
+    smtp_context, smtp_instance = _fake_smtp_context_manager()
+    ssl_context, ssl_instance = _fake_smtp_context_manager()
+
+    with (
+        patch("smtplib.SMTP", return_value=smtp_context) as smtp_cls,
+        patch("smtplib.SMTP_SSL", return_value=ssl_context) as ssl_cls,
+    ):
+        handler._send_sync(message)
+
+    ssl_cls.assert_called_once_with("smtp.gmail.com", 465, timeout=20)
+    smtp_cls.assert_not_called()
+    ssl_instance.starttls.assert_not_called()  # TLS ya es implicito en SMTP_SSL
+    ssl_instance.login.assert_called_once_with("sender@example.com", "app-password")
+    ssl_instance.send_message.assert_called_once_with(message)

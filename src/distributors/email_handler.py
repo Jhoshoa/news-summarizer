@@ -79,7 +79,16 @@ class EmailHandler:
         username = self.settings.smtp_username
         password = self.settings.smtp_password
 
-        with smtplib.SMTP(host, port, timeout=20) as smtp:
-            smtp.starttls()
-            smtp.login(username, password)
-            smtp.send_message(message)
+        # Puerto 465 = TLS implicito desde la conexion (SMTP_SSL); cualquier
+        # otro puerto (587, 25, 2525...) usa conexion en claro + STARTTLS.
+        # Confundir los dos falla silenciosamente contra proveedores que
+        # solo ofrecen uno de los dos modos.
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=20) as smtp:
+                smtp.login(username, password)
+                smtp.send_message(message)
+        else:
+            with smtplib.SMTP(host, port, timeout=20) as smtp:
+                smtp.starttls()
+                smtp.login(username, password)
+                smtp.send_message(message)

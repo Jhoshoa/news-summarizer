@@ -1207,7 +1207,7 @@ async def whatsapp_webhook(
         raise HTTPException(status_code=500, detail="WhatsApp no configurado")
 
     sender = From.removeprefix("whatsapp:")
-    reply_text = app_instance.whatsapp.handle_message(sender, Body)
+    reply_text = await app_instance.whatsapp.handle_message(sender, Body)
     message_xml = f"<Message>{html.escape(reply_text)}</Message>" if reply_text else ""
     twiml = f'<?xml version="1.0" encoding="UTF-8"?><Response>{message_xml}</Response>'
     return Response(content=twiml, media_type="application/xml")

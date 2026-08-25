@@ -32,7 +32,7 @@ class WhatsAppHandler:
         else:
             logger.info("WhatsApp handler inicializado sin Twilio (modo desarrollo)")
 
-    def handle_message(self, from_number: str, body: str) -> str | None:
+    async def handle_message(self, from_number: str, body: str) -> str | None:
         """Procesa mensaje entrante."""
 
         if not body:
@@ -60,9 +60,10 @@ class WhatsAppHandler:
 
         handler = handlers.get(body)
         if handler:
-            return handler(from_number)
+            result = handler(from_number)
+            return await result if asyncio.iscoroutine(result) else result
 
-        return self._handle_selection(from_number, body)
+        return await self._handle_selection(from_number, body)
 
     def _handle_start(self, from_number: str) -> str:
         text = "*EcoBrief Bolivia*\n\n"
@@ -80,9 +81,9 @@ class WhatsAppHandler:
     def _handle_preferences(self, from_number: str) -> str:
         return self._handle_start(from_number)
 
-    def _handle_cancel(self, from_number: str) -> str:
+    async def _handle_cancel(self, from_number: str) -> str:
         if self.db:
-            asyncio.create_task(self.db.unsubscribe(from_number))
+            await self.db.unsubscribe(from_number)
 
         return "Te has dado de baja de EcoBrief Bolivia. Para volver a suscribirte, envia Hola."
 
@@ -96,7 +97,7 @@ class WhatsAppHandler:
         text += "ayuda - Ver esta ayuda"
         return text
 
-    def _handle_selection(self, from_number: str, body: str) -> str:
+    async def _handle_selection(self, from_number: str, body: str) -> str:
         import re
 
         selected_keys = {
@@ -114,13 +115,11 @@ class WhatsAppHandler:
         categories = {self.CATEGORIES[key]["category"] for key in selected_keys}
 
         if self.db:
-            asyncio.create_task(
-                self.db.save_subscription(
-                    phone=from_number,
-                    channel="whatsapp",
-                    categories=categories,
-                    consent_accepted=True,
-                )
+            await self.db.save_subscription(
+                phone=from_number,
+                channel="whatsapp",
+                categories=categories,
+                consent_accepted=True,
             )
 
         names = [
