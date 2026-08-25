@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from src.api import (
+    create_analytics_router,
     create_articles_router,
     create_economic_indicators_router,
     create_impact_metrics_router,
@@ -1109,6 +1110,7 @@ app.include_router(create_articles_router(lambda: app_instance))
 app.include_router(create_summaries_router(lambda: app_instance))
 app.include_router(create_impact_metrics_router(lambda: app_instance))
 app.include_router(create_preferences_router(lambda: app_instance))
+app.include_router(create_analytics_router(lambda: app_instance))
 
 
 @app.get("/")

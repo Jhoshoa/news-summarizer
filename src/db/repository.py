@@ -199,6 +199,23 @@ class NewsSummary(Base):
     created_at = Column(DateTime, nullable=False, default=_now_bolivia)
 
 
+class AnalyticsEvent(Base):
+    __tablename__ = "analytics_events"
+
+    id = Column(Integer, primary_key=True)
+    event_name = Column(String(60), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("subscribers.id"), nullable=True, index=True)
+    session_id = Column(String(80), nullable=True, index=True)
+    country = Column(String(10), nullable=True)
+    department = Column(String(80), nullable=True)
+    category = Column(String(60), nullable=True)
+    story_id = Column(String(64), nullable=True, index=True)
+    source_id = Column(String(120), nullable=True)
+    device = Column(String(20), nullable=True)
+    metadata_payload = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, nullable=False, default=_now_bolivia, index=True)
+
+
 class SummaryRefreshJob(Base):
     __tablename__ = "summary_refresh_jobs"
 
@@ -378,6 +395,62 @@ class Database:
             )
             result = await session.execute(stmt)
             return int(result.scalar_one())
+
+    async def record_events(self, events: list[dict]) -> int:
+        """Guarda eventos de analitica de producto. No lanza si el batch esta vacio."""
+
+        if not events:
+            return 0
+
+        async with self.session_maker() as session:
+            session.add_all(
+                AnalyticsEvent(
+                    event_name=event["event_name"],
+                    user_id=event.get("user_id"),
+                    session_id=event.get("session_id"),
+                    country=event.get("country"),
+                    department=event.get("department"),
+                    category=event.get("category"),
+                    story_id=event.get("story_id"),
+                    source_id=event.get("source_id"),
+                    device=event.get("device"),
+                    metadata_payload=event.get("metadata") or {},
+                )
+                for event in events
+            )
+            await session.commit()
+        return len(events)
+
+    async def get_analytics_summary(self, since: datetime) -> dict[str, Any]:
+        """Resumen minimo de analitica: conteo por evento y sesiones/usuarios unicos."""
+
+        async with self.session_maker() as session:
+            counts_stmt = (
+                select(AnalyticsEvent.event_name, func.count())
+                .where(AnalyticsEvent.created_at >= since)
+                .group_by(AnalyticsEvent.event_name)
+            )
+            counts_result = await session.execute(counts_stmt)
+            event_counts = {name: int(count) for name, count in counts_result.all()}
+
+            sessions_stmt = select(func.count(func.distinct(AnalyticsEvent.session_id))).where(
+                AnalyticsEvent.created_at >= since,
+                AnalyticsEvent.session_id.is_not(None),
+            )
+            unique_sessions = int((await session.execute(sessions_stmt)).scalar_one())
+
+            users_stmt = select(func.count(func.distinct(AnalyticsEvent.user_id))).where(
+                AnalyticsEvent.created_at >= since,
+                AnalyticsEvent.user_id.is_not(None),
+            )
+            unique_users = int((await session.execute(users_stmt)).scalar_one())
+
+        return {
+            "since": since,
+            "event_counts": event_counts,
+            "unique_sessions": unique_sessions,
+            "unique_users": unique_users,
+        }
 
     async def get_preference_preview(
         self,
