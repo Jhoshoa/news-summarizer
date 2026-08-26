@@ -1773,7 +1773,7 @@ class Database:
         article_date: date | None = None,
         exclude_summarized: bool = False,
     ) -> list[Any]:
-        filters = [NewsArticle.is_active.is_(True)]
+        filters = [NewsArticle.is_active.is_(True), self._article_not_unpublished_filter()]
         if article_date:
             start_at, end_at = self._day_bounds(article_date)
             filters.extend(
@@ -1804,6 +1804,34 @@ class Database:
             NewsSummary.article_id == NewsArticle.id,
         )
         return ~summarized_article_exists
+
+    def _article_not_unpublished_filter(self) -> Any:
+        """Excluye articulos que pertenecen a una historia despublicada.
+
+        Un articulo puede no estar clusterizado en ninguna historia todavia
+        (StoryArticle no lo referencia), en cuyo caso el EXISTS es falso y el
+        articulo pasa el filtro sin problema.
+        """
+
+        unpublished_story_exists = exists().where(
+            StoryArticle.article_id == NewsArticle.id,
+            StoryArticle.story_id == Story.id,
+            Story.current_status == "unpublished",
+        )
+        return ~unpublished_story_exists
+
+    def _summary_not_unpublished_filter(self) -> Any:
+        """Excluye summaries cuya historia (story_cluster_id) fue despublicada.
+
+        Un summary sin story_cluster_id (todavia no clusterizado) no matchea
+        el EXISTS y pasa el filtro sin problema.
+        """
+
+        unpublished_story_exists = exists().where(
+            Story.id == NewsSummary.story_cluster_id,
+            Story.current_status == "unpublished",
+        )
+        return ~unpublished_story_exists
 
     async def _latest_article_date(
         self,
@@ -2194,6 +2222,7 @@ class Database:
     ) -> list[Any]:
         filters = [
             NewsSummary.summary_date == summary_date,
+            self._summary_not_unpublished_filter(),
         ]
         if category:
             filters.append(NewsCategory.name == category.strip().lower())
@@ -2209,7 +2238,10 @@ class Database:
         article_id: int | None = None,
         before_or_on: date,
     ) -> date | None:
-        filters = [NewsSummary.summary_date <= before_or_on]
+        filters = [
+            NewsSummary.summary_date <= before_or_on,
+            self._summary_not_unpublished_filter(),
+        ]
         if category:
             filters.append(NewsCategory.name == category.strip().lower())
         if article_id is not None:
@@ -2273,6 +2305,7 @@ class Database:
                     NewsArticle.is_active.is_(True),
                     NewsArticle.published_at >= start_at,
                     NewsArticle.published_at < end_at,
+                    self._article_not_unpublished_filter(),
                 )
                 .group_by(NewsCategory.name)
             )
@@ -2280,7 +2313,10 @@ class Database:
             stmt = (
                 select(NewsCategory.name, func.count(NewsSummary.id))
                 .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
-                .where(NewsSummary.summary_date == target_date)
+                .where(
+                    NewsSummary.summary_date == target_date,
+                    self._summary_not_unpublished_filter(),
+                )
                 .group_by(NewsCategory.name)
             )
 
