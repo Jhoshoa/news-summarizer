@@ -158,7 +158,6 @@ export type UnsubscribeResponse = {
 
 export type PreferencePreviewRequest = {
   categories: string[];
-  frequency: string;
 };
 
 export type PreferencePreviewItem = {

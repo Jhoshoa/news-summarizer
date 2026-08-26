@@ -175,14 +175,16 @@ export const SubscribePage = () => {
       return undefined;
     }
 
+    // La frecuencia no afecta que briefs trae el preview (el backend la
+    // ignora), asi que a proposito no esta en las dependencias: cambiarla
+    // no debe disparar una recarga del preview.
     const categories = form.categories;
-    const frequency = form.frequency;
     const timeout = window.setTimeout(() => {
-      previewTriggerRef.current({ categories, frequency });
+      previewTriggerRef.current({ categories });
     }, 450);
 
     return () => window.clearTimeout(timeout);
-  }, [form.categories, form.frequency]);
+  }, [form.categories]);
 
   const handleSubmit = async () => {
     const errors = validateSubscribeForm(form, options);
