@@ -1,13 +1,34 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
-from typing import Any, Literal
+from collections.abc import Awaitable, Callable
+from typing import Any, Literal, TypeVar
 
+import sentry_sdk
 from fastapi import APIRouter, HTTPException
+from loguru import logger
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.db.repository import DEFAULT_CATEGORIES
+
+T = TypeVar("T")
+
+
+async def _call_db(coro: Awaitable[T], *, action: str) -> T:
+    """Runs a DB call and turns an unexpected failure (e.g. a dropped
+    connection to the database) into a clean 503 instead of a raw 500 --
+    still logged and reported to Sentry, just not leaked to the client as
+    an unhandled OSError."""
+
+    try:
+        return await coro
+    except Exception as e:
+        logger.error(f"Error de base de datos en {action}: {e}")
+        sentry_sdk.capture_exception(e)
+        raise HTTPException(
+            status_code=503,
+            detail="No se pudo conectar con la base de datos. Intenta de nuevo en un momento.",
+        ) from e
 
 ChannelSlug = Literal["whatsapp", "telegram", "email"]
 FrequencySlug = Literal["diario", "dias_habiles", "tres_veces_semana", "semanal"]
@@ -249,16 +270,19 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        saved = await app_instance.db.save_subscription(
-            phone=request.phone if request.channel == "whatsapp" else None,
-            telegram_id=request.telegram_id if request.channel == "telegram" else None,
-            email=request.email if request.channel == "email" else None,
-            channel=request.channel,
-            categories=set(request.categories),
-            frequency=request.frequency,
-            preferred_hour=request.preferred_hour,
-            timezone=request.timezone,
-            consent_accepted=request.consent_accepted,
+        saved = await _call_db(
+            app_instance.db.save_subscription(
+                phone=request.phone if request.channel == "whatsapp" else None,
+                telegram_id=request.telegram_id if request.channel == "telegram" else None,
+                email=request.email if request.channel == "email" else None,
+                channel=request.channel,
+                categories=set(request.categories),
+                frequency=request.frequency,
+                preferred_hour=request.preferred_hour,
+                timezone=request.timezone,
+                consent_accepted=request.consent_accepted,
+            ),
+            action="subscribe",
         )
         if not saved:
             raise HTTPException(status_code=500, detail="No se pudo guardar la suscripcion")
@@ -278,7 +302,7 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        await app_instance.db.unsubscribe(request.identifier)
+        await _call_db(app_instance.db.unsubscribe(request.identifier), action="unsubscribe")
         return UnsubscribeResponse(
             status="unsubscribed",
             message="Si existia una suscripcion activa, fue desactivada.",
@@ -290,7 +314,9 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        items = await app_instance.db.get_preference_preview(request.categories)
+        items = await _call_db(
+            app_instance.db.get_preference_preview(request.categories), action="preview"
+        )
         return PreviewResponse(
             items=items,
             has_data=bool(items),

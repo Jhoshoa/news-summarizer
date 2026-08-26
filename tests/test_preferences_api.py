@@ -270,3 +270,89 @@ async def test_preview_uses_existing_summaries_without_generation(fake_app_insta
     assert payload["has_data"] is True
     assert payload["items"][0]["title"] == "Brief de prueba"
     assert fake_app_instance.preview_categories == [["economia"]]
+
+
+class FakeFlakyDatabase:
+    """Simulates a DB connection that was fine at startup (app_instance.db is
+    set) but drops mid-request -- e.g. the real [WinError 121] "semaphore
+    timeout" seen in production when a query tries to open a fresh
+    connection to a remote Postgres and the network hiccups. Regression
+    test for that Sentry-reported crash: the endpoint used to let this
+    propagate as a raw unhandled 500."""
+
+    async def save_subscription(self, **kwargs):
+        raise OSError("[WinError 121] The semaphore timeout period has expired")
+
+    async def unsubscribe(self, identifier):
+        raise OSError("[WinError 121] The semaphore timeout period has expired")
+
+    async def get_preference_preview(self, categories):
+        raise OSError("[WinError 121] The semaphore timeout period has expired")
+
+
+@pytest.fixture
+def flaky_app_instance():
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        db=FakeFlakyDatabase(),
+        settings=SimpleNamespace(
+            summary_candidates_per_category=8,
+            summary_candidates_extended_limit=8,
+            summary_candidates_extended_categories="politica, economia",
+            telegram_bot_token=None,
+            twilio_account_sid=None,
+            email_enabled=False,
+        ),
+    )
+    try:
+        yield
+    finally:
+        main_module.app_instance = original
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_503_instead_of_a_raw_500_when_db_connection_drops(
+    flaky_app_instance,
+):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/preview",
+            json={"categories": ["economia"], "frequency": "diario"},
+        )
+
+    assert response.status_code == 503
+    assert "base de datos" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_subscribe_returns_503_instead_of_a_raw_500_when_db_connection_drops(
+    flaky_app_instance,
+):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/subscribe",
+            json={
+                "channel": "whatsapp",
+                "phone": "+59170000000",
+                "categories": ["economia"],
+                "consent_accepted": True,
+            },
+        )
+
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_returns_503_instead_of_a_raw_500_when_db_connection_drops(
+    flaky_app_instance,
+):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/unsubscribe",
+            json={"channel": "whatsapp", "identifier": "+59170000000"},
+        )
+
+    assert response.status_code == 503
