@@ -50,6 +50,11 @@ class NewsClassifier:
             "positive": [{"term": "cine", "weight": 3}, {"term": "musica", "weight": 3}],
             "negative": [],
         },
+        "policiales": {
+            "description": "Delitos, crimen, violencia y seguridad ciudadana.",
+            "positive": [{"term": "policia", "weight": 3}, {"term": "robo", "weight": 3}],
+            "negative": [],
+        },
     }
     DEFAULT_FIELD_WEIGHTS = {
         "title": 3.0,
@@ -91,6 +96,41 @@ class NewsClassifier:
         ]
         self.ai_fallback: dict[str, Any] = self.config["ai_fallback"]
         self.valid_categories = set(self.categories) | {"general"}
+        self._warn_category_mismatch()
+
+    def _warn_category_mismatch(self) -> None:
+        """Compara las categorias cargadas contra DEFAULT_CATEGORIES (fuente de verdad).
+
+        Solo registra un warning: un desajuste no debe tumbar el arranque, pero debe
+        quedar visible en logs/Sentry en vez de fallar en silencio como paso con
+        "policiales" (ver docs/mejorar-comportamiento-categorias/plan-categorias.md).
+
+        Import diferido (no al tope del modulo) para evitar un ciclo de imports: el
+        paquete src.processors ya se importa desde src.db.repository.
+        """
+
+        from src.db.repository import DEFAULT_CATEGORIES
+
+        known_categories = set(DEFAULT_CATEGORIES) - {"general"}
+        classifier_categories = set(self.categories)
+
+        missing_rules = sorted(known_categories - classifier_categories)
+        if missing_rules:
+            logger.warning(
+                "Categorias sin reglas de clasificacion en {}: {}. Nunca se les asignara "
+                "ninguna nota hasta que se agreguen sus reglas.",
+                self.config_path,
+                ", ".join(missing_rules),
+            )
+
+        unknown_categories = sorted(classifier_categories - known_categories)
+        if unknown_categories:
+            logger.warning(
+                "Categorias con reglas de clasificacion en {} pero no registradas en "
+                "DEFAULT_CATEGORIES: {}. No apareceran en la suscripcion ni en el frontend.",
+                self.config_path,
+                ", ".join(unknown_categories),
+            )
 
     def classify(self, article: dict) -> str:
         """Devuelve solo la categoria para mantener compatibilidad."""

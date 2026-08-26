@@ -51,6 +51,10 @@ def _now_bolivia() -> datetime:
 
 Base = declarative_base()
 
+# Fuente de verdad para "que categorias existen" (slug -> nombre visible). Agregar una
+# categoria nueva tambien requiere agregar sus reglas en config/classification.yaml; si no,
+# la categoria queda registrada pero nunca se le asigna ninguna nota. Ver
+# docs/mejorar-comportamiento-categorias/como-agregar-una-categoria.md para el procedimiento.
 DEFAULT_CATEGORIES = {
     "economia": "Economia",
     "politica": "Politica",
