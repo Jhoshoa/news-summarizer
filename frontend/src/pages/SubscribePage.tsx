@@ -103,6 +103,7 @@ export const SubscribePage = () => {
   const [unsubscribeMessage, setUnsubscribeMessage] = useState("");
   const [subscribeMessage, setSubscribeMessage] = useState("");
   const [isConfirmingSubscribe, setIsConfirmingSubscribe] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
@@ -118,19 +119,20 @@ export const SubscribePage = () => {
   );
 
   useEffect(() => {
-    if (!isConfirmingSubscribe) {
+    if (!isConfirmingSubscribe && !isTermsOpen) {
       return undefined;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsConfirmingSubscribe(false);
+        setIsTermsOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isConfirmingSubscribe]);
+  }, [isConfirmingSubscribe, isTermsOpen]);
 
   const toggleCategory = (slug: string) => {
     setForm((current) => {
@@ -435,7 +437,18 @@ export const SubscribePage = () => {
             />
             <span>
               Acepto recibir briefs de EcoBrief segun mis preferencias y entiendo que puedo darme
-              de baja cuando quiera.
+              de baja cuando quiera. Acepto los{" "}
+              <button
+                className="inline-link"
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setIsTermsOpen(true);
+                }}
+              >
+                terminos y condiciones
+              </button>
+              .
             </span>
           </label>
 
@@ -607,6 +620,104 @@ export const SubscribePage = () => {
               </button>
               <button className="button" disabled={subscribeState.isLoading} type="button" onClick={handleConfirmSubscribe}>
                 {subscribeState.isLoading ? "Guardando" : "Confirmar suscripcion"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isTermsOpen && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setIsTermsOpen(false)}>
+          <section
+            aria-labelledby="terms-modal-title"
+            aria-modal="true"
+            className="confirm-modal terms-modal"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div>
+              <span className="panel-title" id="terms-modal-title">
+                Terminos y condiciones
+              </span>
+              <p>Version resumida. Ultima actualizacion: agosto de 2026.</p>
+            </div>
+
+            <div className="terms-body">
+              <section>
+                <h3>1. Que es EcoBrief Bolivia</h3>
+                <p>
+                  Un servicio que resume noticias bolivianas de fuentes publicas con apoyo de
+                  inteligencia artificial. No reemplaza al medio original: cada resumen cita su
+                  fuente.
+                </p>
+              </section>
+
+              <section>
+                <h3>2. Tu suscripcion</h3>
+                <p>
+                  Al suscribirte aceptas recibir briefs por el canal, frecuencia y categorias que
+                  elijas. Puedes cambiar tus preferencias o darte de baja en cualquier momento
+                  desde esta misma pagina.
+                </p>
+              </section>
+
+              <section>
+                <h3>3. Tus datos</h3>
+                <p>
+                  Guardamos solo el contacto (correo, telefono o ID de Telegram) y las preferencias
+                  que configuras, unicamente para enviarte el brief. No los compartimos con
+                  terceros. Bolivia todavia no tiene una ley integral de proteccion de datos
+                  personales (hay un anteproyecto en tramite ante AGETIC); mientras tanto aplicamos
+                  los principios de la Ley N.º 164 sobre inviolabilidad de las comunicaciones y la
+                  Ley N.º 1080 (Ciudadania Digital, Art. 12) sobre uso limitado de datos
+                  personales.
+                </p>
+              </section>
+
+              <section>
+                <h3>4. Contenido generado con IA</h3>
+                <p>
+                  Los resumenes se generan automaticamente y pueden contener errores o
+                  imprecisiones. Ante cualquier duda, verifica siempre la fuente original citada en
+                  cada nota.
+                </p>
+              </section>
+
+              <section>
+                <h3>Marco legal de referencia</h3>
+                <ul>
+                  <li>
+                    <a href="https://www.lexivox.org/norms/BO-L-19250119.xhtml" rel="noopener noreferrer" target="_blank">
+                      Ley de Imprenta, 19 de enero de 1925
+                    </a>
+                    {" "}— Art. 1: libertad de publicar y difundir pensamientos sin censura previa.
+                  </li>
+                  <li>
+                    <a href="https://www.oas.org/dil/esp/constitucion_bolivia.pdf" rel="noopener noreferrer" target="_blank">
+                      Constitucion Politica del Estado
+                    </a>
+                    {" "}— Art. 21 y 106: derecho a la comunicacion, la informacion y la libertad de
+                    expresion.
+                  </li>
+                  <li>
+                    <a href="https://www.lexivox.org/norms/BO-L-N164.html" rel="noopener noreferrer" target="_blank">
+                      Ley N.º 164, Ley General de Telecomunicaciones, TIC (2011)
+                    </a>
+                    {" "}— inviolabilidad de las comunicaciones y proteccion de datos de usuarios.
+                  </li>
+                  <li>
+                    <a href="https://www.lexivox.org/norms/BO-L-N1080.html" rel="noopener noreferrer" target="_blank">
+                      Ley N.º 1080, Ley de Ciudadania Digital (2018)
+                    </a>
+                    {" "}— Art. 12: proteccion de datos personales y seguridad informatica.
+                  </li>
+                </ul>
+              </section>
+            </div>
+
+            <div className="form-actions">
+              <button className="button" type="button" onClick={() => setIsTermsOpen(false)}>
+                Cerrar
               </button>
             </div>
           </section>
