@@ -1,34 +1,14 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Awaitable, Callable
-from typing import Any, Literal, TypeVar
+from collections.abc import Callable
+from typing import Any, Literal
 
-import sentry_sdk
 from fastapi import APIRouter, HTTPException
-from loguru import logger
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from src.api.db_errors import call_db as _call_db
 from src.db.repository import DEFAULT_CATEGORIES
-
-T = TypeVar("T")
-
-
-async def _call_db(coro: Awaitable[T], *, action: str) -> T:
-    """Runs a DB call and turns an unexpected failure (e.g. a dropped
-    connection to the database) into a clean 503 instead of a raw 500 --
-    still logged and reported to Sentry, just not leaked to the client as
-    an unhandled OSError."""
-
-    try:
-        return await coro
-    except Exception as e:
-        logger.error(f"Error de base de datos en {action}: {e}")
-        sentry_sdk.capture_exception(e)
-        raise HTTPException(
-            status_code=503,
-            detail="No se pudo conectar con la base de datos. Intenta de nuevo en un momento.",
-        ) from e
 
 ChannelSlug = Literal["whatsapp", "telegram", "email"]
 FrequencySlug = Literal["diario", "dias_habiles", "tres_veces_semana", "semanal"]

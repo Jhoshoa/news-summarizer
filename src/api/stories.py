@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from src.api.db_errors import call_db
 from src.api.security import require_cron_key
 
 
@@ -28,11 +29,14 @@ def create_stories_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        items, total = await app_instance.db.list_stories(
-            category=category,
-            min_sources=min_sources,
-            page=page,
-            page_size=page_size,
+        items, total = await call_db(
+            app_instance.db.list_stories(
+                category=category,
+                min_sources=min_sources,
+                page=page,
+                page_size=page_size,
+            ),
+            action="list_stories",
         )
         return {
             "items": items,
@@ -47,7 +51,7 @@ def create_stories_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        story = await app_instance.db.get_story(story_id)
+        story = await call_db(app_instance.db.get_story(story_id), action="get_story")
         if story is None:
             raise HTTPException(status_code=404, detail="Historia no encontrada")
         return story
@@ -67,8 +71,11 @@ def create_stories_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        correction = await app_instance.db.add_story_correction(
-            story_id, reason=body.reason, corrected_by=body.corrected_by
+        correction = await call_db(
+            app_instance.db.add_story_correction(
+                story_id, reason=body.reason, corrected_by=body.corrected_by
+            ),
+            action="add_story_correction",
         )
         if correction is None:
             raise HTTPException(status_code=404, detail="Historia no encontrada")
@@ -84,7 +91,10 @@ def create_stories_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        found = await app_instance.db.set_story_publication_status(story_id, unpublished=True)
+        found = await call_db(
+            app_instance.db.set_story_publication_status(story_id, unpublished=True),
+            action="unpublish_story",
+        )
         if not found:
             raise HTTPException(status_code=404, detail="Historia no encontrada")
         return {"id": story_id, "current_status": "unpublished"}
@@ -99,7 +109,10 @@ def create_stories_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        found = await app_instance.db.set_story_publication_status(story_id, unpublished=False)
+        found = await call_db(
+            app_instance.db.set_story_publication_status(story_id, unpublished=False),
+            action="republish_story",
+        )
         if not found:
             raise HTTPException(status_code=404, detail="Historia no encontrada")
         return {"id": story_id}

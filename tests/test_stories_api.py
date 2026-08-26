@@ -247,3 +247,22 @@ async def test_unpublish_and_republish_succeed_with_valid_api_key(fake_app_insta
         {"story_id": "cluster-1", "unpublished": True},
         {"story_id": "cluster-1", "unpublished": False},
     ]
+
+
+@pytest.mark.asyncio
+async def test_list_stories_returns_503_instead_of_a_raw_500_when_db_connection_drops():
+    class FlakyDatabase:
+        async def list_stories(self, **kwargs):
+            raise OSError("[WinError 121] The semaphore timeout period has expired")
+
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        db=FlakyDatabase(), settings=SimpleNamespace(api_auth_key="test-key")
+    )
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/api/stories")
+        assert response.status_code == 503
+    finally:
+        main_module.app_instance = original

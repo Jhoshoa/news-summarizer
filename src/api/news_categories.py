@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from src.api.db_errors import call_db
 from src.db.repository import DEFAULT_CATEGORIES
 
 NewsView = Literal["resumenes", "recolectadas"]
@@ -61,10 +62,13 @@ def create_news_categories_router(get_app_instance: Callable[[], Any]) -> APIRou
         if target_date > today:
             raise HTTPException(status_code=422, detail="La fecha no puede ser futura")
 
-        result = await app_instance.db.get_category_counts(
-            view=view,
-            target_date=target_date,
-            fallback_to_latest=fallback_to_latest,
+        result = await call_db(
+            app_instance.db.get_category_counts(
+                view=view,
+                target_date=target_date,
+                fallback_to_latest=fallback_to_latest,
+            ),
+            action="get_category_counts",
         )
         raw_counts: dict[str, int] = result["counts"]
 

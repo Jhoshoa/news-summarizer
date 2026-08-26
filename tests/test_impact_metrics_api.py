@@ -104,3 +104,22 @@ async def test_impact_metrics_endpoint_rejects_future_dates(fake_app_instance):
     assert response.status_code == 422
     assert response.json()["detail"] == "La fecha no puede ser futura"
     assert fake_app_instance.calls == []
+
+
+@pytest.mark.asyncio
+async def test_impact_metrics_returns_503_instead_of_a_raw_500_when_db_connection_drops():
+    class FlakyDatabase:
+        async def get_impact_metrics(self, *args, **kwargs):
+            raise OSError("[WinError 121] The semaphore timeout period has expired")
+
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        db=FlakyDatabase(), settings=SimpleNamespace(schedule_timezone="America/La_Paz")
+    )
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/api/impact-metrics")
+        assert response.status_code == 503
+    finally:
+        main_module.app_instance = original

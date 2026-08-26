@@ -4,6 +4,8 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException, Query
 
+from src.api.db_errors import call_db
+
 
 def create_summaries_router(get_app_instance: Callable[[], Any]) -> APIRouter:
     router = APIRouter(prefix="/api/summaries", tags=["summaries"])
@@ -39,13 +41,16 @@ def create_summaries_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        return await app_instance.db.list_summaries(
-            category=category,
-            summary_date=summary_date,
-            article_id=article_id,
-            fallback_to_latest=fallback_to_latest,
-            page=page,
-            page_size=page_size,
+        return await call_db(
+            app_instance.db.list_summaries(
+                category=category,
+                summary_date=summary_date,
+                article_id=article_id,
+                fallback_to_latest=fallback_to_latest,
+                page=page,
+                page_size=page_size,
+            ),
+            action="list_summaries",
         )
 
     @router.get("/{summary_id}")
@@ -54,7 +59,9 @@ def create_summaries_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        summary = await app_instance.db.get_summary_by_id(summary_id)
+        summary = await call_db(
+            app_instance.db.get_summary_by_id(summary_id), action="get_summary_by_id"
+        )
         if not summary:
             raise HTTPException(status_code=404, detail="Resumen no encontrado")
 

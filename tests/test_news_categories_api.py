@@ -182,3 +182,22 @@ async def test_category_counts_requires_db():
         assert response.status_code == 503
     finally:
         main_module.app_instance = original
+
+
+@pytest.mark.asyncio
+async def test_category_counts_returns_503_instead_of_a_raw_500_when_db_connection_drops():
+    class FlakyDatabase:
+        async def get_category_counts(self, **kwargs):
+            raise OSError("[WinError 121] The semaphore timeout period has expired")
+
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        db=FlakyDatabase(), settings=SimpleNamespace(schedule_timezone="America/La_Paz")
+    )
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get("/api/news/category-counts")
+        assert response.status_code == 503
+    finally:
+        main_module.app_instance = original

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Header
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from src.api.db_errors import call_db
 from src.api.security import require_cron_key
 
 TZ_BOLIVIA = ZoneInfo("America/La_Paz")
@@ -136,7 +137,9 @@ def create_analytics_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             return AnalyticsSummaryResponse(
                 since=since, event_counts={}, unique_sessions=0, unique_users=0
             )
-        summary = await app_instance.db.get_analytics_summary(since)
+        summary = await call_db(
+            app_instance.db.get_analytics_summary(since), action="get_analytics_summary"
+        )
         return AnalyticsSummaryResponse(**summary)
 
     @router.get("/dashboard", response_model=MetricsDashboardResponse)
@@ -179,10 +182,19 @@ def create_analytics_router(get_app_instance: Callable[[], Any]) -> APIRouter:
                 active_subscribers=0,
             )
 
-        product = await app_instance.db.get_analytics_summary(since)
-        pipeline = await app_instance.db.get_pipeline_totals(since)
-        returning = await app_instance.db.get_returning_session_rate(since, cohort_days=days)
-        active_subscribers = await app_instance.db.get_subscription_count()
+        product = await call_db(
+            app_instance.db.get_analytics_summary(since), action="get_analytics_summary"
+        )
+        pipeline = await call_db(
+            app_instance.db.get_pipeline_totals(since), action="get_pipeline_totals"
+        )
+        returning = await call_db(
+            app_instance.db.get_returning_session_rate(since, cohort_days=days),
+            action="get_returning_session_rate",
+        )
+        active_subscribers = await call_db(
+            app_instance.db.get_subscription_count(), action="get_subscription_count"
+        )
 
         return MetricsDashboardResponse(
             product=AnalyticsSummaryResponse(**product),

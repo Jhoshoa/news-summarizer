@@ -5,6 +5,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Header, HTTPException, Query
 from loguru import logger
 
+from src.api.db_errors import call_db
 from src.api.security import require_cron_key
 from src.collectors.economic_indicators import EconomicIndicatorCollector
 from src.db import EconomicIndicatorRepository
@@ -31,7 +32,9 @@ def create_economic_indicators_router(get_app_instance: Callable[[], Any]) -> AP
             raise HTTPException(status_code=503, detail="DB no disponible")
 
         repository = EconomicIndicatorRepository(app_instance.db.session_maker)
-        indicators = await repository.get_latest_values(target_date=target_date)
+        indicators = await call_db(
+            repository.get_latest_values(target_date=target_date), action="get_latest_values"
+        )
         return {
             "count": len(indicators),
             "date": target_date,
@@ -60,13 +63,13 @@ def create_economic_indicators_router(get_app_instance: Callable[[], Any]) -> AP
             ) from exc
 
         repository = EconomicIndicatorRepository(app_instance.db.session_maker)
-        stats = await repository.save_values(indicators)
+        stats = await call_db(repository.save_values(indicators), action="save_values")
         logger.info(
             "Economic indicators refresh completed: "
             f"collected={len(indicators)} inserted={stats['inserted']} "
             f"unchanged={stats['unchanged']} skipped={stats['skipped']}"
         )
-        latest = await repository.get_latest_values()
+        latest = await call_db(repository.get_latest_values(), action="get_latest_values")
         return {
             "status": "success",
             "collected": len(indicators),

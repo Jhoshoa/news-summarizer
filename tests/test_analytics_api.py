@@ -217,3 +217,24 @@ async def test_dashboard_returns_zeros_when_db_unavailable():
     payload = response.json()
     assert payload["active_subscribers"] == 0
     assert payload["pipeline"]["total_runs"] == 0
+
+
+@pytest.mark.asyncio
+async def test_dashboard_returns_503_instead_of_a_raw_500_when_db_connection_drops():
+    class FlakyDatabase:
+        async def get_analytics_summary(self, *args, **kwargs):
+            raise OSError("[WinError 121] The semaphore timeout period has expired")
+
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        db=FlakyDatabase(), settings=SimpleNamespace(api_auth_key="test-key")
+    )
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/analytics/dashboard", headers={"X-API-Key": "test-key"}
+            )
+        assert response.status_code == 503
+    finally:
+        main_module.app_instance = original

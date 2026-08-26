@@ -6,6 +6,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Query
 
+from src.api.db_errors import call_db
+
 
 def _today_for_app(app_instance: Any) -> date_cls:
     timezone_name = getattr(app_instance.settings, "schedule_timezone", "America/La_Paz")
@@ -59,15 +61,18 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if article_date > today:
             raise HTTPException(status_code=422, detail="La fecha no puede ser futura")
 
-        return await app_instance.db.list_articles(
-            category=category,
-            source=source,
-            q=q,
-            article_date=article_date,
-            fallback_to_latest=fallback_to_latest,
-            exclude_summarized=exclude_summarized,
-            page=page,
-            page_size=page_size,
+        return await call_db(
+            app_instance.db.list_articles(
+                category=category,
+                source=source,
+                q=q,
+                article_date=article_date,
+                fallback_to_latest=fallback_to_latest,
+                exclude_summarized=exclude_summarized,
+                page=page,
+                page_size=page_size,
+            ),
+            action="list_articles",
         )
 
     @router.get("/{article_id}/related")
@@ -76,7 +81,9 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        related = await app_instance.db.get_related_articles(article_id)
+        related = await call_db(
+            app_instance.db.get_related_articles(article_id), action="get_related_articles"
+        )
         if related is None:
             raise HTTPException(status_code=404, detail="Articulo no encontrado")
 
@@ -88,7 +95,9 @@ def create_articles_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
 
-        article = await app_instance.db.get_article_by_id(article_id)
+        article = await call_db(
+            app_instance.db.get_article_by_id(article_id), action="get_article_by_id"
+        )
         if not article:
             raise HTTPException(status_code=404, detail="Articulo no encontrado")
 

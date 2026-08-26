@@ -6,6 +6,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, HTTPException, Query
 
+from src.api.db_errors import call_db
+
 
 def _today_for_app(app_instance: Any) -> date_cls:
     timezone_name = getattr(app_instance.settings, "schedule_timezone", "America/La_Paz")
@@ -41,9 +43,12 @@ def create_impact_metrics_router(get_app_instance: Callable[[], Any]) -> APIRout
         if requested_date > today:
             raise HTTPException(status_code=422, detail="La fecha no puede ser futura")
 
-        metrics = await app_instance.db.get_impact_metrics(
-            requested_date,
-            fallback_to_latest=fallback_to_latest,
+        metrics = await call_db(
+            app_instance.db.get_impact_metrics(
+                requested_date,
+                fallback_to_latest=fallback_to_latest,
+            ),
+            action="get_impact_metrics",
         )
         if hasattr(app_instance, "llm") and app_instance.llm:
             metrics["llm_provider"] = app_instance.llm.provider
