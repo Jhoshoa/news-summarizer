@@ -1,5 +1,9 @@
 # Alinear el sistema de categorias en toda la aplicacion
 
+> **Estado: Fases 1-4 implementadas.** Ver commits `be5c763` (Fase 1), `8ecb669` (Fase 2) y
+> `6d64fec` (Fase 3) en la rama `yc-roadmap-enhancement`. La guia de la Fase 4 es
+> [`como-agregar-una-categoria.md`](./como-agregar-una-categoria.md).
+
 ## Contexto
 
 El proyecto define la lista de categorias de noticias (`economia`, `politica`, `deportes`,
