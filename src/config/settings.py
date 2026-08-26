@@ -3,6 +3,10 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.db.repository import DEFAULT_CATEGORIES
+
+_DEFAULT_CATEGORIES_ENV_VALUE = ",".join(DEFAULT_CATEGORIES)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -81,7 +85,7 @@ class Settings(BaseSettings):
     )
 
     default_categories: str = Field(
-        default="economia,politica,deportes,tecnologia,entretenimiento,policiales",
+        default=_DEFAULT_CATEGORIES_ENV_VALUE,
         alias="DEFAULT_CATEGORIES",
     )
     summary_candidates_per_category: int = Field(
