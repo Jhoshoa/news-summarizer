@@ -664,13 +664,9 @@ export const SubscribePage = () => {
               <section>
                 <h3>3. Tus datos</h3>
                 <p>
-                  Guardamos solo el contacto (correo, telefono o ID de Telegram) y las preferencias
-                  que configuras, unicamente para enviarte el brief. No los compartimos con
-                  terceros. Bolivia todavia no tiene una ley integral de proteccion de datos
-                  personales (hay un anteproyecto en tramite ante AGETIC); mientras tanto aplicamos
-                  los principios de la Ley N.º 164 sobre inviolabilidad de las comunicaciones y la
-                  Ley N.º 1080 (Ciudadania Digital, Art. 12) sobre uso limitado de datos
-                  personales.
+                  Guardamos solo el contacto (correo, numero de telefono o ID de Telegram) y las
+                  preferencias que configuras, unicamente para enviarte el brief. No los
+                  compartimos con terceros.
                 </p>
               </section>
 
