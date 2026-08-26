@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 import type {
   Article,
+  CategoryCountsResponse,
   EconomicIndicatorsResponse,
   ImpactMetricsResponse,
   PaginatedResponse,
@@ -43,6 +44,12 @@ type GetSummariesArgs = {
   fallback_to_latest?: boolean;
   page?: number;
   page_size?: number;
+};
+
+type GetCategoryCountsArgs = {
+  view?: "resumenes" | "recolectadas";
+  date?: string;
+  fallback_to_latest?: boolean;
 };
 
 type GetImpactMetricsArgs = {
@@ -130,6 +137,17 @@ export const newsApi = createApi({
       query: () => "/api/sources",
       providesTags: ["Sources"],
     }),
+    getCategoryCounts: builder.query<CategoryCountsResponse, GetCategoryCountsArgs | void>({
+      query: (args) => ({
+        url: "/api/news/category-counts",
+        params: {
+          view: args?.view ?? "resumenes",
+          date: args?.date,
+          fallback_to_latest: args?.fallback_to_latest,
+        },
+      }),
+      providesTags: ["Articles", "Summaries"],
+    }),
     getImpactMetrics: builder.query<ImpactMetricsResponse, GetImpactMetricsArgs | void>({
       query: (args) => ({
         url: "/api/impact-metrics",
@@ -195,6 +213,7 @@ export const {
   useGetImpactMetricsQuery,
   useGetPreferenceOptionsQuery,
   useGetSourcesQuery,
+  useGetCategoryCountsQuery,
   usePreviewPreferencesMutation,
   useTriggerSummaryMutation,
   useSubscribeToBriefMutation,

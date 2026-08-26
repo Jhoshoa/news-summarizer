@@ -5,7 +5,12 @@ import { Link, useRouter } from "../app/router";
 import { NewsCard } from "../components/news/NewsCard";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { NewsCardSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
-import { useGetArticlesQuery, useGetSummariesQuery, useTriggerSummaryMutation } from "../services/api";
+import {
+  useGetArticlesQuery,
+  useGetCategoryCountsQuery,
+  useGetSummariesQuery,
+  useTriggerSummaryMutation,
+} from "../services/api";
 import {
   buildNewsHref,
   getCategory,
@@ -19,15 +24,6 @@ import {
 const navigateToDate = (date: string, category: string | undefined, view: "resumenes" | "recolectadas") => {
   return buildNewsHref(1, date, category, view);
 };
-
-const categoryTabs: Array<{ label: string; value?: string }> = [
-  { label: "general" },
-  { label: "economia", value: "economia" },
-  { label: "politica", value: "politica" },
-  { label: "deportes", value: "deportes" },
-  { label: "tecnologia", value: "tecnologia" },
-  { label: "entretenimiento", value: "entretenimiento" },
-];
 
 export const NewsPage = () => {
   const { location, navigate, replace } = useRouter();
@@ -53,6 +49,21 @@ export const NewsPage = () => {
     date: selectedDate,
     fallback_to_latest: allowLatestFallback,
   });
+  const categoryCountsQuery = useGetCategoryCountsQuery({
+    view,
+    date: selectedDate,
+    fallback_to_latest: allowLatestFallback,
+  });
+  const categoryTabs = useMemo(
+    () => [
+      { label: "Todas", value: undefined as string | undefined },
+      ...(categoryCountsQuery.data?.counts ?? []).map((item) => ({
+        label: item.label,
+        value: item.slug,
+      })),
+    ],
+    [categoryCountsQuery.data],
+  );
   const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
   const activeData = view === "resumenes" ? summariesQuery.data : articlesQuery.data;
   const activeError = view === "resumenes" ? summariesQuery.error : articlesQuery.error;

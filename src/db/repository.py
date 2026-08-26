@@ -2224,6 +2224,70 @@ class Database:
         )
         return await session.scalar(stmt)
 
+    async def get_category_counts(
+        self,
+        *,
+        view: str,
+        target_date: date,
+        fallback_to_latest: bool = False,
+    ) -> dict[str, Any]:
+        """Cuenta items por categoria para un dia. Usado para no mostrar pestanas vacias."""
+
+        effective_date = target_date
+        is_fallback = False
+
+        async with self.session_maker() as session:
+            counts, total = await self._category_counts_for(session, view, effective_date)
+
+            if total == 0 and fallback_to_latest:
+                latest_date = (
+                    await self._latest_article_date(session, before_or_on=target_date)
+                    if view == "recolectadas"
+                    else await self._latest_summary_date(session, before_or_on=target_date)
+                )
+                if latest_date and latest_date != target_date:
+                    effective_date = latest_date
+                    is_fallback = True
+                    counts, total = await self._category_counts_for(session, view, effective_date)
+
+        return {
+            "counts": counts,
+            "total": total,
+            "date": effective_date,
+            "requested_date": target_date,
+            "is_fallback": is_fallback,
+        }
+
+    async def _category_counts_for(
+        self,
+        session: AsyncSession,
+        view: str,
+        target_date: date,
+    ) -> tuple[dict[str, int], int]:
+        if view == "recolectadas":
+            start_at, end_at = self._day_bounds(target_date)
+            stmt = (
+                select(NewsCategory.name, func.count(NewsArticle.id))
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .where(
+                    NewsArticle.is_active.is_(True),
+                    NewsArticle.published_at >= start_at,
+                    NewsArticle.published_at < end_at,
+                )
+                .group_by(NewsCategory.name)
+            )
+        else:
+            stmt = (
+                select(NewsCategory.name, func.count(NewsSummary.id))
+                .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+                .where(NewsSummary.summary_date == target_date)
+                .group_by(NewsCategory.name)
+            )
+
+        rows = (await session.execute(stmt)).all()
+        counts = {name: count for name, count in rows}
+        return counts, sum(counts.values())
+
     async def get_summary_by_id(self, summary_id: int) -> dict | None:
         async with self.session_maker() as session:
             stmt = (

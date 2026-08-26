@@ -31,7 +31,7 @@ export const getCurrentPage = (search: string) => {
 export const getCategory = (search: string) => {
   const params = new URLSearchParams(search);
   const category = params.get("category");
-  return category && category !== "general" ? category : undefined;
+  return category || undefined;
 };
 
 export type NewsView = "resumenes" | "recolectadas";

@@ -21,6 +21,7 @@ from src.api import (
     create_articles_router,
     create_economic_indicators_router,
     create_impact_metrics_router,
+    create_news_categories_router,
     create_preferences_router,
     create_sources_router,
     create_stories_router,
@@ -1227,6 +1228,7 @@ app.include_router(create_weather_router())
 app.include_router(create_sources_router())
 app.include_router(create_articles_router(lambda: app_instance))
 app.include_router(create_summaries_router(lambda: app_instance))
+app.include_router(create_news_categories_router(lambda: app_instance))
 app.include_router(create_impact_metrics_router(lambda: app_instance))
 app.include_router(create_preferences_router(lambda: app_instance))
 app.include_router(create_analytics_router(lambda: app_instance))

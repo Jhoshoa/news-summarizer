@@ -2,6 +2,7 @@ from .analytics import create_analytics_router
 from .articles import create_articles_router
 from .economic_indicators import create_economic_indicators_router
 from .impact_metrics import create_impact_metrics_router
+from .news_categories import create_news_categories_router
 from .preferences import create_preferences_router
 from .sources import create_sources_router
 from .stories import create_stories_router
@@ -13,6 +14,7 @@ __all__ = [
     "create_articles_router",
     "create_economic_indicators_router",
     "create_impact_metrics_router",
+    "create_news_categories_router",
     "create_preferences_router",
     "create_sources_router",
     "create_stories_router",

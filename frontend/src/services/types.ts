@@ -175,6 +175,20 @@ export type PreferencePreviewResponse = {
   message: string;
 };
 
+export type CategoryCount = {
+  slug: string;
+  label: string;
+  count: number;
+};
+
+export type CategoryCountsResponse = {
+  counts: CategoryCount[];
+  total: number;
+  date: string;
+  requested_date: string;
+  is_fallback: boolean;
+};
+
 export type PaginatedResponse<T> = {
   items: T[];
   page: number;
