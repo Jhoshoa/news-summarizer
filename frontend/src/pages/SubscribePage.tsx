@@ -486,6 +486,7 @@ export const SubscribePage = () => {
                 <div className="channel-mock-header-text">
                   <strong>{CHANNEL_MOCK_COPY[form.channel].app}</strong>
                   <small>{CHANNEL_MOCK_COPY[form.channel].senderLine(form)}</small>
+                  <small>{CHANNEL_MOCK_COPY[form.channel].subLine}</small>
                 </div>
               </div>
 

@@ -1,4 +1,15 @@
+from loguru import logger
+
+from src.db.repository import DEFAULT_CATEGORIES
 from src.processors.classifier import NewsClassifier
+
+
+def _capture_warnings():
+    """Collects loguru WARNING+ messages emitted while the returned context is open."""
+
+    messages: list[str] = []
+    sink_id = logger.add(lambda record: messages.append(record.record["message"]), level="WARNING")
+    return messages, sink_id
 
 
 class FakeClassifierLLM:
@@ -263,3 +274,100 @@ async def test_classify_batch_async_parses_llm_json_inside_markdown_fence():
 
     assert result[0]["category"] == "politica"
     assert result[0]["category_method"] == "llm_fallback"
+
+
+def test_fallback_categories_matches_default_categories():
+    """Regression test for the bug where 'policiales' was missing from the
+    fallback used when config/classification.yaml fails to load: no article
+    could ever be classified as policial in that mode."""
+
+    fallback_keys = set(NewsClassifier.FALLBACK_CATEGORIES)
+    expected = set(DEFAULT_CATEGORIES) - {"general"}
+    assert fallback_keys == expected
+
+
+def test_classifier_still_classifies_policial_content_when_config_file_is_missing():
+    classifier = NewsClassifier(config_path="does/not/exist.yaml")
+
+    decision = classifier.classify_article(
+        {
+            "title": "La policia detuvo a un sospechoso tras un robo en pleno centro",
+            "description": "Un robo a mano armada termino con un detenido por la policia.",
+            "content": "",
+            "category": "general",
+        }
+    )
+
+    assert decision.category == "policiales"
+
+
+def test_no_mismatch_warning_when_real_config_is_used():
+    messages, sink_id = _capture_warnings()
+    try:
+        NewsClassifier()
+    finally:
+        logger.remove(sink_id)
+
+    mismatch_warnings = [m for m in messages if "Categorias" in m]
+    assert mismatch_warnings == []
+
+
+def test_warns_about_default_categories_missing_classification_rules(tmp_path):
+    config_path = tmp_path / "partial.yaml"
+    config_path.write_text(
+        "categories:\n"
+        "  economia:\n"
+        "    description: test\n"
+        "    positive: []\n"
+        "    negative: []\n",
+        encoding="utf-8",
+    )
+
+    messages, sink_id = _capture_warnings()
+    try:
+        NewsClassifier(config_path=config_path)
+    finally:
+        logger.remove(sink_id)
+
+    missing_rules_warnings = [m for m in messages if "sin reglas de clasificacion" in m]
+    assert len(missing_rules_warnings) == 1
+    missing_rules_warning = missing_rules_warnings[0]
+    assert "policiales" in missing_rules_warning
+    assert "politica" in missing_rules_warning
+    assert "economia" not in missing_rules_warning
+
+
+def test_warns_about_classification_rules_not_registered_in_default_categories(tmp_path):
+    config_path = tmp_path / "extra.yaml"
+    config_path.write_text(
+        "categories:\n"
+        "  economia:\n"
+        "    description: test\n"
+        "    positive: []\n"
+        "    negative: []\n"
+        "  salud:\n"
+        "    description: test\n"
+        "    positive: []\n"
+        "    negative: []\n",
+        encoding="utf-8",
+    )
+
+    messages, sink_id = _capture_warnings()
+    try:
+        NewsClassifier(config_path=config_path)
+    finally:
+        logger.remove(sink_id)
+
+    warning_text = "\n".join(messages)
+    assert "no registradas en DEFAULT_CATEGORIES" in warning_text
+    assert "salud" in warning_text
+
+
+def test_category_mismatch_warning_does_not_raise_or_block_instantiation(tmp_path):
+    config_path = tmp_path / "broken.yaml"
+    config_path.write_text("categories:\n  salud:\n    description: test\n", encoding="utf-8")
+
+    classifier = NewsClassifier(config_path=config_path)
+
+    assert classifier is not None
+    assert "salud" in classifier.categories
