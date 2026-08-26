@@ -460,7 +460,6 @@ export const SubscribePage = () => {
           <section className="subscribe-preview-panel">
             <div className="panel-heading">
               <span className="panel-title">Asi se veria tu brief</span>
-              <p>Un ejemplo real con tus categorias, en el canal que elegiste.</p>
             </div>
             <div className="chips">
               {selectedCategories.map((category) => (
