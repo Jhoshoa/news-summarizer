@@ -640,7 +640,11 @@ class Database:
             stmt = (
                 select(NewsSummary, NewsCategory.name)
                 .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
-                .where(NewsCategory.name.in_(normalized_categories))
+                .outerjoin(Story, NewsSummary.story_cluster_id == Story.id)
+                .where(
+                    NewsCategory.name.in_(normalized_categories),
+                    or_(Story.id.is_(None), Story.current_status != "unpublished"),
+                )
                 .order_by(NewsSummary.summary_date.desc(), NewsSummary.created_at.desc())
                 .limit(query_limit)
             )

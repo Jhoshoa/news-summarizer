@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import {
   useGetPreferenceOptionsQuery,
@@ -29,12 +29,68 @@ const defaultForm: SubscribeFormState = {
   consentAccepted: false,
 };
 
+const CHANNEL_ICONS: Record<string, ReactElement> = {
+  email: (
+    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <rect height="16" rx="2.5" stroke="currentColor" strokeWidth="1.8" width="20" x="2" y="4" />
+      <path d="m3 6 9 6 9-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  ),
+  whatsapp: (
+    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <path
+        d="M12 3.5a8.5 8.5 0 0 0-7.34 12.77L3.5 20.5l4.36-1.14A8.5 8.5 0 1 0 12 3.5Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8.7 8.6c.2-.45.4-.46.6-.47h.4c.15 0 .35-.05.53.42.2.5.65 1.68.7 1.8.05.13.09.28 0 .45-.09.18-.14.28-.27.44-.14.16-.28.35-.4.47-.13.13-.27.27-.12.53.15.27.68 1.13 1.47 1.83.99.9 1.83 1.18 2.1 1.31.27.13.43.11.6-.07.16-.18.68-.8.86-1.07.18-.27.36-.23.6-.14.25.09 1.56.74 1.83.87.27.13.44.2.51.31.07.11.07.63-.15 1.24-.22.6-1.28 1.18-1.77 1.22-.45.05-1.02.07-1.66-.1-.38-.1-.87-.27-1.5-.53-2.65-1.14-4.38-3.8-4.51-3.98-.13-.18-1.08-1.44-1.08-2.75 0-1.3.68-1.94.93-2.2Z"
+        fill="currentColor"
+      />
+    </svg>
+  ),
+  telegram: (
+    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 24 24" width="18">
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="m7.2 12.1 9.1-3.5c.42-.16.82.19.69.63l-1.53 6.85c-.1.46-.63.66-1 .36l-2.32-1.85-1.24 1.15c-.24.22-.63.13-.75-.17l-.85-2.16-2.25-.7c-.5-.16-.5-.87.15-1.06Z"
+        fill="currentColor"
+      />
+    </svg>
+  ),
+};
+
 const optionLabel = (option: PreferenceOption) => (
   <>
-    <strong>{option.label}</strong>
+    <span className="channel-label">
+      {CHANNEL_ICONS[option.slug]}
+      <strong>{option.label}</strong>
+    </span>
     {option.note && <small>{option.note}</small>}
   </>
 );
+
+const CHANNEL_MOCK_COPY: Record<
+  SubscribeFormState["channel"],
+  { app: string; senderLine: (form: SubscribeFormState) => string; subLine: string }
+> = {
+  email: {
+    app: "Bandeja de entrada",
+    senderLine: (form) => `Para: ${form.email.trim() || "tu-correo@gmail.com"}`,
+    subLine: "Asunto: Tu brief de EcoBrief",
+  },
+  whatsapp: {
+    app: "WhatsApp",
+    senderLine: (form) => (form.phone.trim() ? form.phone : "+591 700 00000"),
+    subLine: "en linea",
+  },
+  telegram: {
+    app: "Telegram",
+    senderLine: (form) => (form.telegramId.trim() ? `@${form.telegramId.trim().replace(/^@/, "")}` : "Bot de EcoBrief"),
+    subLine: "bot",
+  },
+};
 
 export const SubscribePage = () => {
   const { data: options, isError: optionsError, isFetching: isLoadingOptions } = useGetPreferenceOptionsQuery();
@@ -55,6 +111,10 @@ export const SubscribePage = () => {
     () =>
       (options?.categories ?? []).filter((category) => form.categories.includes(category.slug)),
     [form.categories, options?.categories],
+  );
+  const categoryLabelBySlug = useMemo(
+    () => new Map((options?.categories ?? []).map((category) => [category.slug, category.label])),
+    [options?.categories],
   );
 
   useEffect(() => {
@@ -104,20 +164,22 @@ export const SubscribePage = () => {
       ? "Telegram requiere un identificador o usar el bot configurado."
       : "";
 
-  const handlePreview = async () => {
-    const errors = validateSubscribeForm({ ...form, consentAccepted: true }, options);
-    const categoryErrors = errors.filter((error) => error.includes("categoria"));
-    if (categoryErrors.length) {
-      setFormErrors(categoryErrors);
-      return;
+  const previewTriggerRef = useRef(previewPreferences);
+  previewTriggerRef.current = previewPreferences;
+
+  useEffect(() => {
+    if (!form.categories.length) {
+      return undefined;
     }
 
-    setFormErrors([]);
-    await previewPreferences({
-      categories: form.categories,
-      frequency: form.frequency,
-    });
-  };
+    const categories = form.categories;
+    const frequency = form.frequency;
+    const timeout = window.setTimeout(() => {
+      previewTriggerRef.current({ categories, frequency });
+    }, 450);
+
+    return () => window.clearTimeout(timeout);
+  }, [form.categories, form.frequency]);
 
   const handleSubmit = async () => {
     const errors = validateSubscribeForm(form, options);
@@ -302,7 +364,25 @@ export const SubscribePage = () => {
                 <small>Para usuarios reales, lo ideal es conectar desde el bot con /preferencias.</small>
               </label>
             )}
+          </div>
 
+          <fieldset className="category-fieldset">
+            <legend>Categorias</legend>
+            <div className="category-choice-grid">
+              {(options?.categories ?? []).map((category) => (
+                <label className="check-card" key={category.slug}>
+                  <input
+                    checked={form.categories.includes(category.slug)}
+                    type="checkbox"
+                    onChange={() => toggleCategory(category.slug)}
+                  />
+                  <span>{category.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="form-grid">
             <label className="form-field">
               <span>Frecuencia</span>
               <select
@@ -342,22 +422,6 @@ export const SubscribePage = () => {
             </label>
           </div>
 
-          <fieldset className="category-fieldset">
-            <legend>Categorias</legend>
-            <div className="category-choice-grid">
-              {(options?.categories ?? []).map((category) => (
-                <label className="check-card" key={category.slug}>
-                  <input
-                    checked={form.categories.includes(category.slug)}
-                    type="checkbox"
-                    onChange={() => toggleCategory(category.slug)}
-                  />
-                  <span>{category.label}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
           <label className="consent-row">
             <input
               checked={form.consentAccepted}
@@ -389,39 +453,74 @@ export const SubscribePage = () => {
             <button className="button" disabled={subscribeState.isLoading || isLoadingOptions} type="button" onClick={handleSubmit}>
               {subscribeState.isLoading ? "Guardando" : "Guardar preferencias"}
             </button>
-            <button className="secondary-button" disabled={previewState.isLoading} type="button" onClick={handlePreview}>
-              {previewState.isLoading ? "Cargando preview" : "Ver preview"}
-            </button>
           </div>
         </section>
 
         <aside className="data-context-sidebar subscribe-side-panel">
           <section className="subscribe-preview-panel">
             <div className="panel-heading">
-              <span className="panel-title">Vista previa</span>
-              <p>Una muestra rapida segun tus categorias.</p>
+              <span className="panel-title">Asi se veria tu brief</span>
+              <p>Un ejemplo real con tus categorias, en el canal que elegiste.</p>
             </div>
             <div className="chips">
               {selectedCategories.map((category) => (
                 <span key={category.slug}>{category.label}</span>
               ))}
             </div>
-            <div className="preview-list">
-              {previewState.data?.items.length ? (
-                previewState.data.items.map((item) => (
-                  <article className="preview-item" key={`${item.category}-${item.title}`}>
-                    <span>{item.category}</span>
-                    <h3>{item.title}</h3>
-                    <p>{item.summary}</p>
-                  </article>
-                ))
-              ) : (
-                <p className="impact-section-copy">
-                  Usa "Ver preview" para cargar briefs recientes segun tus categorias.
-                </p>
-              )}
+
+            <div className={`channel-mock channel-mock--${form.channel}`}>
+              <div className="channel-mock-header">
+                <span className="channel-mock-avatar">{CHANNEL_ICONS[form.channel]}</span>
+                <div className="channel-mock-header-text">
+                  <strong>{CHANNEL_MOCK_COPY[form.channel].app}</strong>
+                  <small>{CHANNEL_MOCK_COPY[form.channel].senderLine(form)}</small>
+                </div>
+              </div>
+
+              <div className="channel-mock-body">
+                {previewState.isLoading ? (
+                  <p className="impact-section-copy">Cargando briefs recientes...</p>
+                ) : previewState.isError ? (
+                  <p className="form-notice">
+                    No se pudo cargar el preview. Revisa el backend e intenta de nuevo.
+                  </p>
+                ) : previewState.data?.items.length ? (
+                  form.channel === "email" ? (
+                    previewState.data.items.map((item) => (
+                      <article className="mock-email-card" key={`${item.category}-${item.title}`}>
+                        <span>{categoryLabelBySlug.get(item.category) ?? item.category}</span>
+                        <h3>{item.title}</h3>
+                        <p>{item.summary}</p>
+                        {item.summary_date && <small>{item.summary_date}</small>}
+                      </article>
+                    ))
+                  ) : (
+                    <div className="mock-chat-bubble">
+                      <strong>Tu brief de hoy</strong>
+                      <ul>
+                        {previewState.data.items.map((item) => (
+                          <li key={`${item.category}-${item.title}`}>
+                            <span>{categoryLabelBySlug.get(item.category) ?? item.category}</span>
+                            {item.title}
+                          </li>
+                        ))}
+                      </ul>
+                      <span className="mock-chat-meta">
+                        {new Date().toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit" })}
+                        {form.channel === "whatsapp" && <span className="mock-chat-check">&#10003;&#10003;</span>}
+                      </span>
+                    </div>
+                  )
+                ) : previewState.data ? (
+                  <p className="impact-section-copy">
+                    No hay briefs recientes para las categorias seleccionadas.
+                  </p>
+                ) : (
+                  <p className="impact-section-copy">Selecciona categorias para ver un ejemplo.</p>
+                )}
+              </div>
             </div>
-            {previewState.data && <small>{previewState.data.message}</small>}
+            {previewState.data && !previewState.isLoading && <small>{previewState.data.message}</small>}
           </section>
 
           <section className="unsubscribe-panel">
