@@ -25,7 +25,7 @@ const defaultForm: SubscribeFormState = {
   telegramId: "",
   categories: ["general"],
   frequency: "diario",
-  preferredTime: "manana",
+  preferredHour: 9,
   consentAccepted: false,
 };
 
@@ -405,22 +405,23 @@ export const SubscribePage = () => {
             </label>
 
             <label className="form-field">
-              <span>Ventana preferida</span>
+              <span>Hora preferida</span>
               <select
-                value={form.preferredTime}
+                value={form.preferredHour}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    preferredTime: event.target.value,
+                    preferredHour: Number(event.target.value),
                   }))
                 }
               >
-                {(options?.preferred_times ?? []).map((time) => (
-                  <option key={time.slug} value={time.slug}>
-                    {time.label}
+                {(options?.preferred_hours ?? []).map((hour) => (
+                  <option key={hour.slug} value={hour.slug}>
+                    {hour.label}
                   </option>
                 ))}
               </select>
+              <small>Entre 9:00 y 23:00 -- fuera de ese rango casi no hay noticias nuevas.</small>
             </label>
           </div>
 
@@ -608,10 +609,10 @@ export const SubscribePage = () => {
                 </dd>
               </div>
               <div>
-                <dt>Ventana</dt>
+                <dt>Hora</dt>
                 <dd>
-                  {options?.preferred_times.find((time) => time.slug === form.preferredTime)?.label ??
-                    form.preferredTime}
+                  {options?.preferred_hours.find((hour) => hour.slug === String(form.preferredHour))
+                    ?.label ?? `${form.preferredHour}:00`}
                 </dd>
               </div>
             </dl>

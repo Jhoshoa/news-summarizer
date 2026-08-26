@@ -28,6 +28,7 @@ from src.api import (
     create_summaries_router,
     create_weather_router,
 )
+from src.api.preferences import MAX_PREFERRED_HOUR, MIN_PREFERRED_HOUR
 from src.api.security import require_cron_key
 from src.collectors import NewsAPICollector, NewsScraper
 from src.config import Settings, get_settings
@@ -42,7 +43,6 @@ from src.processors import (
     NewsRewriter,
     NewsSummarizer,
 )
-from src.scheduler import NewsScheduler
 
 tz_bolivia = ZoneInfo("America/La_Paz")
 
@@ -57,7 +57,6 @@ class NewsSummarizerApp:
         self.whatsapp: WhatsAppHandler | None = None
         self.telegram: TelegramHandler | None = None
         self.email: EmailHandler | None = None
-        self.scheduler: NewsScheduler | None = None
 
     def _init_sentry(self) -> None:
         """Error tracking en produccion (Fase: robustecer antes de redeploy).
@@ -178,8 +177,19 @@ class NewsSummarizerApp:
         refresh: bool = False,
         *,
         deliver: bool = True,
+        hour: int | None = None,
     ):
-        """Generates summaries and optionally delivers them to active subscribers."""
+        """Generates summaries and optionally delivers them to active subscribers.
+
+        `time_of_day` is only a label used for logging/generation context now
+        (see docs/mejorar-comportamiento-categorias -- delivery used to reuse
+        this same string to match a subscriber's preferred_time window).
+        Delivery filtering is controlled by `hour` (9-23) instead: pass it
+        explicitly to only deliver to subscribers whose preferred_hour
+        matches; leave it None (the default) to deliver to everyone,
+        ignoring preferred_hour and frequency -- the same "manual/demo"
+        behavior the old `time_of_day="manual"` had.
+        """
 
         logger.info(f"Generating summaries ({time_of_day}) refresh={refresh} deliver={deliver}")
         if self.llm:
@@ -508,7 +518,7 @@ class NewsSummarizerApp:
             sent_count, delivery_stats = await self._deliver_summaries(
                 summaries=summaries,
                 categories=categories,
-                time_of_day=time_of_day,
+                hour=hour,
             )
         else:
             logger.info("Delivery skipped for summary refresh")
@@ -527,8 +537,13 @@ class NewsSummarizerApp:
             "delivery_stats": delivery_stats,
         }
 
-    async def deliver_cached_summaries(self, time_of_day: str = "manual"):
-        """Entrega summaries ya guardados sin recolectar, deduplicar ni llamar al LLM."""
+    async def deliver_cached_summaries(self, hour: int | None = None):
+        """Entrega summaries ya guardados sin recolectar, deduplicar ni llamar al LLM.
+
+        `hour` (9-23) entrega solo a suscriptores cuyo `preferred_hour` coincida.
+        `hour=None` es el modo manual/demo: entrega a todos, ignorando la hora
+        preferida y la frecuencia.
+        """
 
         categories = self.settings.categories_list
         brief_date = self._brief_date()
@@ -548,7 +563,7 @@ class NewsSummarizerApp:
         sent_count, delivery_stats = await self._deliver_summaries(
             summaries=summaries,
             categories=categories,
-            time_of_day=time_of_day,
+            hour=hour,
         )
         return {
             "collected": 0,
@@ -565,7 +580,7 @@ class NewsSummarizerApp:
         *,
         summaries: list[dict],
         categories: list[str],
-        time_of_day: str,
+        hour: int | None,
     ) -> tuple[int, dict[str, dict[str, int]]]:
         if not self.db:
             logger.warning("DB no disponible, no se envia nada")
@@ -588,11 +603,11 @@ class NewsSummarizerApp:
 
         for sub in subscribers:
             try:
-                if not self._should_send_to_subscriber(sub, time_of_day):
+                if not self._should_send_to_subscriber(sub, hour):
                     logger.info(
                         "Skipping subscriber outside preferences: "
                         f"channel={getattr(sub, 'channel', None)} "
-                        f"preferred_time={getattr(sub, 'preferred_time', None)} "
+                        f"preferred_hour={getattr(sub, 'preferred_hour', None)} "
                         f"frequency={getattr(sub, 'frequency', None)}"
                     )
                     continue
@@ -939,26 +954,20 @@ class NewsSummarizerApp:
 
         return text
 
-    def _should_send_to_subscriber(self, subscriber: Any, time_of_day: str) -> bool:
-        if time_of_day == "manual":
+    def _should_send_to_subscriber(self, subscriber: Any, hour: int | None) -> bool:
+        if hour is None:
             return True
 
-        if not self._matches_preferred_time(subscriber, time_of_day):
+        if not self._matches_preferred_hour(subscriber, hour):
             return False
 
         return self._matches_frequency(subscriber)
 
-    def _matches_preferred_time(self, subscriber: Any, time_of_day: str) -> bool:
-        preferred_time = str(getattr(subscriber, "preferred_time", "manana") or "manana").lower()
-        if time_of_day == "morning":
-            return preferred_time == "manana"
-        if time_of_day == "afternoon":
-            return preferred_time == "tarde"
-        if time_of_day == "night":
-            return preferred_time == "noche"
-        if time_of_day == "evening":
-            return preferred_time in {"tarde", "noche"}
-        return True
+    def _matches_preferred_hour(self, subscriber: Any, hour: int) -> bool:
+        preferred_hour = getattr(subscriber, "preferred_hour", None)
+        if preferred_hour is None:
+            preferred_hour = MIN_PREFERRED_HOUR
+        return int(preferred_hour) == int(hour)
 
     def _format_email_summary(self, news: list[dict]) -> tuple[str, str, str]:
         subject = "EcoBrief Bolivia - Brief del dia"
@@ -1440,28 +1449,38 @@ async def get_summary_refresh_job(
 
 @app.post("/trigger/delivery")
 async def trigger_delivery(
-    time_of_day: str = "manual",
+    hour: int | None = None,
     x_api_key: str | None = Header(
         default=None,
         alias="X-API-Key",
         description="Clave privada para endpoints internos.",
     ),
 ):
-    """Entrega summaries existentes sin recolectar ni generar nuevos briefs."""
+    """Entrega summaries existentes sin recolectar ni generar nuevos briefs.
+
+    `hour` (9-23) entrega solo a suscriptores cuya hora preferida coincida.
+    Sin `hour`, entrega a todos (modo manual/demo).
+    """
 
     if not app_instance:
         raise HTTPException(status_code=500, detail="App no inicializada")
     await require_cron_key(app_instance, x_api_key)
 
+    if hour is not None and not MIN_PREFERRED_HOUR <= hour <= MAX_PREFERRED_HOUR:
+        raise HTTPException(
+            status_code=422,
+            detail=f"hour debe estar entre {MIN_PREFERRED_HOUR} y {MAX_PREFERRED_HOUR}",
+        )
+
     try:
-        result = await app_instance.deliver_cached_summaries(time_of_day)
+        result = await app_instance.deliver_cached_summaries(hour)
         logger.info(
             "Cached summary delivery completed: "
             f"summaries={result.get('summaries')} sent={result.get('sent')}"
         )
         return {
             "status": "success",
-            "message": f"Entrega {time_of_day} procesada",
+            "message": f"Entrega {'manual' if hour is None else hour} procesada",
             "result": result,
         }
     except Exception as e:

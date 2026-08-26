@@ -449,7 +449,7 @@ def test_summaries_are_deduplicated_by_story_cluster_for_storage_and_delivery():
 
 
 @pytest.mark.asyncio
-async def test_morning_delivery_respects_preferred_time():
+async def test_morning_delivery_respects_preferred_hour():
     settings = SimpleNamespace(
         summary_candidates_per_category=8,
         summary_candidates_extended_limit=8,
@@ -473,7 +473,7 @@ async def test_morning_delivery_respects_preferred_time():
             telegram_id=None,
             categories=["politica"],
             frequency="diario",
-            preferred_time="manana",
+            preferred_hour=9,
             timezone="America/La_Paz",
         ),
         SimpleNamespace(
@@ -482,7 +482,7 @@ async def test_morning_delivery_respects_preferred_time():
             telegram_id=None,
             categories=["politica"],
             frequency="diario",
-            preferred_time="noche",
+            preferred_hour=20,
             timezone="America/La_Paz",
         ),
     ]
@@ -492,7 +492,7 @@ async def test_morning_delivery_respects_preferred_time():
     app.telegram = FakeTelegram()
     app.email = FakeEmail()
 
-    result = await app.send_summaries("morning")
+    result = await app.send_summaries("morning", hour=9)
 
     assert result["sent"] == 1
     assert app.whatsapp.sent == [
@@ -525,7 +525,7 @@ async def test_weekly_frequency_only_sends_on_monday():
         telegram_id=None,
         categories=["politica"],
         frequency="semanal",
-        preferred_time="manana",
+        preferred_hour=9,
         timezone="America/La_Paz",
     )
     app = NewsSummarizerApp(settings)
@@ -538,20 +538,20 @@ async def test_weekly_frequency_only_sends_on_monday():
     app.email = FakeEmail()
     app._subscriber_local_now = lambda _subscriber: datetime(2026, 6, 9, 8, 0)
 
-    result = await app.send_summaries("morning")
+    result = await app.send_summaries("morning", hour=9)
 
     assert result["sent"] == 0
     assert app.whatsapp.sent == []
 
     app._subscriber_local_now = lambda _subscriber: datetime(2026, 6, 8, 8, 0)
-    result = await app.send_summaries("morning")
+    result = await app.send_summaries("morning", hour=9)
 
     assert result["sent"] == 1
     assert len(app.whatsapp.sent) == 1
 
 
 @pytest.mark.asyncio
-async def test_manual_delivery_ignores_frequency_and_preferred_time_for_demo():
+async def test_manual_delivery_ignores_frequency_and_preferred_hour_for_demo():
     settings = SimpleNamespace(
         summary_candidates_per_category=8,
         summary_candidates_extended_limit=8,
@@ -567,7 +567,7 @@ async def test_manual_delivery_ignores_frequency_and_preferred_time_for_demo():
         telegram_id=None,
         categories=["politica"],
         frequency="semanal",
-        preferred_time="noche",
+        preferred_hour=20,
         timezone="America/La_Paz",
     )
     app = NewsSummarizerApp(settings)
@@ -604,7 +604,7 @@ async def test_email_delivery_sends_plain_text_brief():
         email="reader@example.com",
         categories=["politica"],
         frequency="diario",
-        preferred_time="manana",
+        preferred_hour=9,
         timezone="America/La_Paz",
     )
     summaries = [
@@ -666,7 +666,7 @@ async def test_cached_delivery_does_not_collect_or_generate_news():
         email="reader@example.com",
         categories=["politica"],
         frequency="diario",
-        preferred_time="manana",
+        preferred_hour=9,
         timezone="America/La_Paz",
     )
     summaries = [{"title": "Titulo", "summary": "Resumen politico.", "category": "politica"}]
@@ -681,7 +681,7 @@ async def test_cached_delivery_does_not_collect_or_generate_news():
 
     app._collect_news = collect_news
 
-    result = await app.deliver_cached_summaries("morning")
+    result = await app.deliver_cached_summaries(9)
 
     assert result["collected"] == 0
     assert result["summaries"] == 1
@@ -708,7 +708,7 @@ async def test_summary_refresh_can_skip_delivery():
         email="reader@example.com",
         categories=["politica"],
         frequency="diario",
-        preferred_time="manana",
+        preferred_hour=9,
         timezone="America/La_Paz",
     )
     summaries = [{"title": "Titulo", "summary": "Resumen politico.", "category": "politica"}]
@@ -727,7 +727,7 @@ async def test_summary_refresh_can_skip_delivery():
 
 
 @pytest.mark.asyncio
-async def test_afternoon_and_night_windows_match_exact_preferred_time():
+async def test_afternoon_and_night_windows_match_exact_preferred_hour():
     settings = SimpleNamespace(
         summary_candidates_per_category=8,
         summary_candidates_extended_limit=8,
@@ -745,7 +745,7 @@ async def test_afternoon_and_night_windows_match_exact_preferred_time():
         email="afternoon@example.com",
         categories=["politica"],
         frequency="diario",
-        preferred_time="tarde",
+        preferred_hour=16,
         timezone="America/La_Paz",
     )
     night_subscriber = SimpleNamespace(
@@ -755,7 +755,7 @@ async def test_afternoon_and_night_windows_match_exact_preferred_time():
         email="night@example.com",
         categories=["politica"],
         frequency="diario",
-        preferred_time="noche",
+        preferred_hour=20,
         timezone="America/La_Paz",
     )
     app = NewsSummarizerApp(settings)
@@ -764,13 +764,13 @@ async def test_afternoon_and_night_windows_match_exact_preferred_time():
     app.telegram = FakeTelegram()
     app.email = FakeEmail()
 
-    afternoon_result = await app.send_summaries("afternoon")
+    afternoon_result = await app.send_summaries("afternoon", hour=16)
 
     assert afternoon_result["sent"] == 1
     assert app.email.sent[0][0] == "afternoon@example.com"
 
     app.email = FakeEmail()
-    night_result = await app.send_summaries("night")
+    night_result = await app.send_summaries("night", hour=20)
 
     assert night_result["sent"] == 1
     assert app.email.sent[0][0] == "night@example.com"

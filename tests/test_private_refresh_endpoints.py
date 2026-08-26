@@ -63,8 +63,8 @@ def fake_summary_app_instance():
             "sent": 1 if deliver else 0,
         }
 
-    async def deliver_cached_summaries(time_of_day="manual"):
-        calls.append(("delivery", time_of_day))
+    async def deliver_cached_summaries(hour=None):
+        calls.append(("delivery", hour))
         return {
             "collected": 0,
             "summaries": 2,
@@ -225,7 +225,7 @@ async def test_summary_refresh_job_status_returns_404_for_unknown_job(fake_summa
 async def test_trigger_delivery_rejects_missing_cron_key(fake_summary_app_instance):
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/trigger/delivery", params={"time_of_day": "morning"})
+        response = await client.post("/trigger/delivery", params={"hour": 9})
 
     assert response.status_code == 401
     assert fake_summary_app_instance == []
@@ -237,13 +237,40 @@ async def test_trigger_delivery_accepts_valid_cron_key(fake_summary_app_instance
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/trigger/delivery",
-            params={"time_of_day": "afternoon"},
+            params={"hour": 16},
             headers={"X-API-Key": API_AUTH_KEY},
         )
 
     assert response.status_code == 200
     assert response.json()["result"]["used_cached_summaries"] is True
-    assert fake_summary_app_instance == [("delivery", "afternoon")]
+    assert fake_summary_app_instance == [("delivery", 16)]
+
+
+@pytest.mark.asyncio
+async def test_trigger_delivery_without_hour_means_manual_mode(fake_summary_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/trigger/delivery",
+            headers={"X-API-Key": API_AUTH_KEY},
+        )
+
+    assert response.status_code == 200
+    assert fake_summary_app_instance == [("delivery", None)]
+
+
+@pytest.mark.asyncio
+async def test_trigger_delivery_rejects_hour_outside_9_23(fake_summary_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/trigger/delivery",
+            params={"hour": 3},
+            headers={"X-API-Key": API_AUTH_KEY},
+        )
+
+    assert response.status_code == 422
+    assert fake_summary_app_instance == []
 
 
 @pytest.mark.asyncio

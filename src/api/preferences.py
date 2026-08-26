@@ -11,10 +11,12 @@ from src.db.repository import DEFAULT_CATEGORIES
 
 ChannelSlug = Literal["whatsapp", "telegram", "email"]
 FrequencySlug = Literal["diario", "dias_habiles", "tres_veces_semana", "semanal"]
-PreferredTimeSlug = Literal["manana", "tarde", "noche"]
 
 VALID_FREQUENCIES = {"diario", "dias_habiles", "tres_veces_semana", "semanal"}
-VALID_PREFERRED_TIMES = {"manana", "tarde", "noche"}
+# Fuera de este rango casi no hay noticias nuevas que enviar (madrugada) y el
+# cron no dispara ventanas de entrega antes/despues de este rango.
+MIN_PREFERRED_HOUR = 9
+MAX_PREFERRED_HOUR = 23
 EMAIL_PATTERN = re.compile(r"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$", re.IGNORECASE)
 
 
@@ -29,7 +31,7 @@ class PreferenceOptionsResponse(BaseModel):
     categories: list[PreferenceOption]
     channels: list[PreferenceOption]
     frequencies: list[PreferenceOption]
-    preferred_times: list[PreferenceOption]
+    preferred_hours: list[PreferenceOption]
 
 
 class SubscribeRequest(BaseModel):
@@ -39,7 +41,7 @@ class SubscribeRequest(BaseModel):
     email: str | None = None
     categories: list[str] = Field(min_length=1)
     frequency: FrequencySlug = "diario"
-    preferred_time: PreferredTimeSlug = "manana"
+    preferred_hour: int = Field(default=9, ge=MIN_PREFERRED_HOUR, le=MAX_PREFERRED_HOUR)
     timezone: str = "America/La_Paz"
     consent_accepted: bool = False
 
@@ -111,7 +113,7 @@ class SubscribeResponse(BaseModel):
     channel: ChannelSlug
     categories: list[str]
     frequency: str
-    preferred_time: str
+    preferred_hour: int
     message: str
 
 
@@ -226,16 +228,15 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             PreferenceOption(slug="tres_veces_semana", label="Tres veces por semana"),
             PreferenceOption(slug="semanal", label="Semanal"),
         ]
-        preferred_times = [
-            PreferenceOption(slug="manana", label="Manana"),
-            PreferenceOption(slug="tarde", label="Tarde"),
-            PreferenceOption(slug="noche", label="Noche"),
+        preferred_hours = [
+            PreferenceOption(slug=str(hour), label=f"{hour:02d}:00")
+            for hour in range(MIN_PREFERRED_HOUR, MAX_PREFERRED_HOUR + 1)
         ]
         return PreferenceOptionsResponse(
             categories=categories,
             channels=_channel_options(app_instance),
             frequencies=frequencies,
-            preferred_times=preferred_times,
+            preferred_hours=preferred_hours,
         )
 
     @router.post("/subscribe", response_model=SubscribeResponse)
@@ -251,7 +252,7 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             channel=request.channel,
             categories=set(request.categories),
             frequency=request.frequency,
-            preferred_time=request.preferred_time,
+            preferred_hour=request.preferred_hour,
             timezone=request.timezone,
             consent_accepted=request.consent_accepted,
         )
@@ -263,7 +264,7 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
             channel=request.channel,
             categories=request.categories,
             frequency=request.frequency,
-            preferred_time=request.preferred_time,
+            preferred_hour=request.preferred_hour,
             message="Preferencias guardadas. Puedes cambiarlas o darte de baja cuando quieras.",
         )
 

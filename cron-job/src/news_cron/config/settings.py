@@ -20,9 +20,7 @@ class CronSettings:
     summary_time_of_day: str
     summary_trigger_path: str
     delivery_trigger_path: str
-    delivery_morning_at: str | None
-    delivery_afternoon_at: str | None
-    delivery_night_at: str | None
+    delivery_hours: list[int]
     schedule_timezone: str
 
     @classmethod
@@ -78,34 +76,9 @@ class CronSettings:
             summary_time_of_day=os.getenv("SUMMARY_TIME_OF_DAY", "manual").strip() or "manual",
             summary_trigger_path=_env_path("SUMMARY_TRIGGER_PATH", default="/trigger/summary"),
             delivery_trigger_path=_env_path("DELIVERY_TRIGGER_PATH", default="/trigger/delivery"),
-            delivery_morning_at=_env_delivery_time(
-                "DELIVERY_MORNING_AT",
-                legacy_name="SCHEDULE_SUMMARY_MORNING",
-                default="09:00",
-            ),
-            delivery_afternoon_at=_env_delivery_time(
-                "DELIVERY_AFTERNOON_AT",
-                legacy_name="SCHEDULE_SUMMARY_AFTERNOON",
-                default="16:00",
-            ),
-            delivery_night_at=_env_delivery_time(
-                "DELIVERY_NIGHT_AT",
-                legacy_name="SCHEDULE_SUMMARY_NIGHT",
-                default="20:00",
-            ),
+            delivery_hours=_env_delivery_hours(),
             schedule_timezone=_env_timezone("SCHEDULE_TIMEZONE", default="America/La_Paz"),
         )
-
-    def delivery_windows(self) -> dict[str, str]:
-        return {
-            window: scheduled_at
-            for window, scheduled_at in {
-                "morning": self.delivery_morning_at,
-                "afternoon": self.delivery_afternoon_at,
-                "night": self.delivery_night_at,
-            }.items()
-            if scheduled_at
-        }
 
 
 def _required_env(name: str) -> str:
@@ -205,28 +178,39 @@ def _env_path(name: str, *, default: str) -> str:
     return value
 
 
-def _env_daily_time(name: str, *, default: str) -> str | None:
-    raw = os.getenv(name, default).strip()
-    if not raw:
-        return None
-
-    parts = raw.split(":")
-    if len(parts) != 2:
-        raise ValueError(f"{name} must use HH:MM format")
-    try:
-        hour = int(parts[0])
-        minute = int(parts[1])
-    except ValueError as exc:
-        raise ValueError(f"{name} must use HH:MM format") from exc
-    if not 0 <= hour <= 23 or not 0 <= minute <= 59:
-        raise ValueError(f"{name} must be a valid 24-hour time")
-    return f"{hour:02d}:{minute:02d}"
+DELIVERY_MIN_HOUR = 9
+DELIVERY_MAX_HOUR = 23
 
 
-def _env_delivery_time(name: str, *, legacy_name: str, default: str) -> str | None:
-    if os.getenv(name) is not None:
-        return _env_daily_time(name, default=default)
-    return _env_daily_time(legacy_name, default=default)
+def _env_delivery_hours() -> list[int]:
+    """Hours (24h, subscriber's local time) the cron fires a delivery run for.
+
+    Each subscriber only receives a message when their own preferred_hour
+    matches the hour a run fires for -- see _matches_preferred_hour in the
+    backend. Defaults to every hour in [DELIVERY_MIN_HOUR, DELIVERY_MAX_HOUR]:
+    outside that range there's little fresh news to send, and the /suscribirse
+    form doesn't let subscribers pick an hour outside it either.
+    """
+
+    raw = os.getenv("DELIVERY_HOURS")
+    if raw is None or raw.strip() == "":
+        return list(range(DELIVERY_MIN_HOUR, DELIVERY_MAX_HOUR + 1))
+
+    hours: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            hour = int(part)
+        except ValueError as exc:
+            raise ValueError(f"DELIVERY_HOURS must be comma-separated hours ({DELIVERY_MIN_HOUR}-{DELIVERY_MAX_HOUR}), got '{part}'") from exc
+        if not DELIVERY_MIN_HOUR <= hour <= DELIVERY_MAX_HOUR:
+            raise ValueError(f"DELIVERY_HOURS hour must be {DELIVERY_MIN_HOUR}-{DELIVERY_MAX_HOUR}, got {hour}")
+        hours.append(hour)
+    if not hours:
+        raise ValueError("DELIVERY_HOURS is set but no valid hours found")
+    return sorted(set(hours))
 
 
 def _env_timezone(name: str, *, default: str) -> str:

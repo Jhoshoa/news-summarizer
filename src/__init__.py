@@ -9,7 +9,6 @@ from src.processors import (
     NewsRewriter,
     NewsSummarizer,
 )
-from src.scheduler import NewsScheduler
 
 __all__ = [
     "NewsAPICollector",
@@ -23,5 +22,4 @@ __all__ = [
     "TelegramHandler",
     "Database",
     "LLMProvider",
-    "NewsScheduler",
 ]

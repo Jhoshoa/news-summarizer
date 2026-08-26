@@ -122,7 +122,7 @@ export type PreferenceOptionsResponse = {
   categories: PreferenceOption[];
   channels: PreferenceOption[];
   frequencies: PreferenceOption[];
-  preferred_times: PreferenceOption[];
+  preferred_hours: PreferenceOption[];
 };
 
 export type SubscribeRequest = {
@@ -132,7 +132,7 @@ export type SubscribeRequest = {
   email?: string | null;
   categories: string[];
   frequency: string;
-  preferred_time: string;
+  preferred_hour: number;
   timezone: string;
   consent_accepted: boolean;
 };
@@ -142,7 +142,7 @@ export type SubscribeResponse = {
   channel: "whatsapp" | "telegram";
   categories: string[];
   frequency: string;
-  preferred_time: string;
+  preferred_hour: number;
   message: string;
 };
 

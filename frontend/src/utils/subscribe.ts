@@ -7,7 +7,7 @@ export type SubscribeFormState = {
   telegramId: string;
   categories: string[];
   frequency: string;
-  preferredTime: string;
+  preferredHour: number;
   consentAccepted: boolean;
 };
 
@@ -80,7 +80,7 @@ export const validateSubscribeForm = (
   const errors: string[] = [];
   const validCategories = new Set((options?.categories ?? []).map((item) => item.slug));
   const validFrequencies = new Set((options?.frequencies ?? []).map((item) => item.slug));
-  const validPreferredTimes = new Set((options?.preferred_times ?? []).map((item) => item.slug));
+  const validPreferredHours = new Set((options?.preferred_hours ?? []).map((item) => item.slug));
   const selectedCategories = form.categories.filter((category) => !validCategories.size || validCategories.has(category));
 
   if (form.channel === "whatsapp" && !isValidInternationalPhone(form.phone)) {
@@ -103,8 +103,8 @@ export const validateSubscribeForm = (
     errors.push("Selecciona una frecuencia valida.");
   }
 
-  if (validPreferredTimes.size && !validPreferredTimes.has(form.preferredTime)) {
-    errors.push("Selecciona una ventana valida.");
+  if (validPreferredHours.size && !validPreferredHours.has(String(form.preferredHour))) {
+    errors.push("Selecciona una hora valida.");
   }
 
   if (!form.consentAccepted) {
@@ -128,7 +128,7 @@ export const buildSubscribePayload = (
     email: form.channel === "email" ? normalizeEmail(form.email) : null,
     categories,
     frequency: form.frequency,
-    preferred_time: form.preferredTime,
+    preferred_hour: form.preferredHour,
     timezone: "America/La_Paz",
     consent_accepted: form.consentAccepted,
   };

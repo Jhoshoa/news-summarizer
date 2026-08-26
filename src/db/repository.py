@@ -77,7 +77,7 @@ class Subscriber(Base):
     channel = Column(String(20), nullable=False, default="whatsapp")
     categories = Column(JSON, nullable=False, default=list)
     frequency = Column(String(20), nullable=False, default="diario")
-    preferred_time = Column(String(20), nullable=False, default="manana")
+    preferred_hour = Column(Integer, nullable=False, default=9)
     timezone = Column(String(50), nullable=False, default="America/La_Paz")
     consent_accepted = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=_now_bolivia)
@@ -378,7 +378,7 @@ class Database:
         channel: str = "whatsapp",
         categories: set[str] | None = None,
         frequency: str = "diario",
-        preferred_time: str = "manana",
+        preferred_hour: int = 9,
         timezone: str = "America/La_Paz",
         consent_accepted: bool = False,
     ) -> bool:
@@ -399,7 +399,7 @@ class Database:
                 subscriber.email = email
                 subscriber.channel = channel
                 subscriber.frequency = frequency
-                subscriber.preferred_time = preferred_time
+                subscriber.preferred_hour = preferred_hour
                 subscriber.timezone = timezone
                 subscriber.consent_accepted = consent_accepted
                 subscriber.updated_at = _now_bolivia()
@@ -414,7 +414,7 @@ class Database:
                     channel=channel,
                     categories=sorted(categories) if categories else ["general"],
                     frequency=frequency,
-                    preferred_time=preferred_time,
+                    preferred_hour=preferred_hour,
                     timezone=timezone,
                     consent_accepted=consent_accepted,
                 )

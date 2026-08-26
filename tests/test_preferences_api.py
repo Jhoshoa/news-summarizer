@@ -78,7 +78,8 @@ async def test_preference_options_returns_categories_channels_and_frequencies(fa
         "tres_veces_semana",
         "semanal",
     }
-    assert {item["slug"] for item in payload["preferred_times"]} == {"manana", "tarde", "noche"}
+    assert {item["slug"] for item in payload["preferred_hours"]} == {str(hour) for hour in range(9, 24)}
+    assert {"slug": "9", "label": "09:00", "enabled": True, "note": None} in payload["preferred_hours"]
 
 
 @pytest.mark.asyncio
@@ -92,7 +93,7 @@ async def test_subscribe_saves_normalized_whatsapp_preferences(fake_app_instance
                 "phone": "591 700-00000",
                 "categories": ["politica", "economia"],
                 "frequency": "diario",
-                "preferred_time": "manana",
+                "preferred_hour": 9,
                 "timezone": "America/La_Paz",
                 "consent_accepted": True,
             },
@@ -110,7 +111,7 @@ async def test_subscribe_saves_normalized_whatsapp_preferences(fake_app_instance
             "channel": "whatsapp",
             "categories": {"economia", "politica"},
             "frequency": "diario",
-            "preferred_time": "manana",
+            "preferred_hour": 9,
             "timezone": "America/La_Paz",
             "consent_accepted": True,
         }
@@ -146,7 +147,7 @@ async def test_subscribe_saves_normalized_email_preferences(fake_app_instance):
                 "email": " Persona@Example.COM ",
                 "categories": ["general"],
                 "frequency": "semanal",
-                "preferred_time": "noche",
+                "preferred_hour": 20,
                 "timezone": "America/La_Paz",
                 "consent_accepted": True,
             },
@@ -161,7 +162,7 @@ async def test_subscribe_saves_normalized_email_preferences(fake_app_instance):
             "channel": "email",
             "categories": {"general"},
             "frequency": "semanal",
-            "preferred_time": "noche",
+            "preferred_hour": 20,
             "timezone": "America/La_Paz",
             "consent_accepted": True,
         }
@@ -196,6 +197,25 @@ async def test_subscribe_rejects_invalid_category(fake_app_instance):
                 "channel": "whatsapp",
                 "phone": "+59170000000",
                 "categories": ["invalida"],
+                "consent_accepted": True,
+            },
+        )
+
+    assert response.status_code == 422
+    assert fake_app_instance.saved == []
+
+
+@pytest.mark.asyncio
+async def test_subscribe_rejects_preferred_hour_outside_9_23(fake_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/subscribe",
+            json={
+                "channel": "whatsapp",
+                "phone": "+59170000000",
+                "categories": ["economia"],
+                "preferred_hour": 6,
                 "consent_accepted": True,
             },
         )

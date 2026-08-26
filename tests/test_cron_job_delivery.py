@@ -2,6 +2,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -12,7 +13,12 @@ if str(CRON_SRC) not in sys.path:
 
 import news_cron.jobs.runner as runner_module  # noqa: E402
 from news_cron.clients.backend import BackendClient, BackendRequestError  # noqa: E402
-from news_cron.config.settings import CronSettings  # noqa: E402
+from news_cron.config.settings import (  # noqa: E402
+    DELIVERY_MAX_HOUR,
+    DELIVERY_MIN_HOUR,
+    CronSettings,
+    _env_delivery_hours,
+)
 from news_cron.jobs.runner import RefreshJobRunner  # noqa: E402
 
 
@@ -21,16 +27,13 @@ def test_cron_settings_defaults_keep_summary_and_delivery_separate(monkeypatch):
     monkeypatch.setenv("API_AUTH_KEY", "test-api-auth-key-value")
     monkeypatch.delenv("SUMMARY_TRIGGER_PATH", raising=False)
     monkeypatch.delenv("DELIVERY_TRIGGER_PATH", raising=False)
+    monkeypatch.delenv("DELIVERY_HOURS", raising=False)
 
     settings = CronSettings.from_env()
 
     assert settings.summary_trigger_path == "/trigger/summary"
     assert settings.delivery_trigger_path == "/trigger/delivery"
-    assert settings.delivery_windows() == {
-        "morning": "09:00",
-        "afternoon": "16:00",
-        "night": "20:00",
-    }
+    assert settings.delivery_hours == list(range(DELIVERY_MIN_HOUR, DELIVERY_MAX_HOUR + 1))
 
 
 @pytest.mark.asyncio
@@ -77,9 +80,9 @@ async def test_cron_delivery_window_uses_delivery_endpoint(monkeypatch):
 
     runner.backend = SimpleNamespace(post_json=post_json)
 
-    await runner.run_delivery_window("afternoon")
+    await runner.run_delivery_window(16)
 
-    assert calls == [("/trigger/delivery?time_of_day=afternoon", 45)]
+    assert calls == [("/trigger/delivery?hour=16", 45)]
 
 
 @pytest.mark.asyncio
@@ -135,35 +138,52 @@ async def test_run_safely_logs_controlled_backend_failure_without_traceback(capl
     assert all(record.exc_info is None for record in caplog.records)
 
 
-def test_cron_delivery_time_accepts_blank_to_disable_window(monkeypatch):
+def test_cron_delivery_hours_env_overrides_default_range(monkeypatch):
     monkeypatch.setenv("BACKEND_BASE_URL", "http://backend:8000")
     monkeypatch.setenv("API_AUTH_KEY", "test-api-auth-key-value")
-    monkeypatch.setenv("DELIVERY_MORNING_AT", "")
-    monkeypatch.setenv("DELIVERY_AFTERNOON_AT", "15:05")
-    monkeypatch.setenv("DELIVERY_NIGHT_AT", "")
+    monkeypatch.setenv("DELIVERY_HOURS", "9, 15,23")
 
     settings = CronSettings.from_env()
 
-    assert settings.delivery_windows() == {"afternoon": "15:05"}
+    assert settings.delivery_hours == [9, 15, 23]
 
 
-def test_cron_delivery_time_accepts_schedule_summary_aliases(monkeypatch):
-    monkeypatch.setenv("BACKEND_BASE_URL", "http://backend:8000")
-    monkeypatch.setenv("API_AUTH_KEY", "test-api-auth-key-value")
-    monkeypatch.delenv("DELIVERY_MORNING_AT", raising=False)
-    monkeypatch.delenv("DELIVERY_AFTERNOON_AT", raising=False)
-    monkeypatch.delenv("DELIVERY_NIGHT_AT", raising=False)
-    monkeypatch.setenv("SCHEDULE_SUMMARY_MORNING", "08:30")
-    monkeypatch.setenv("SCHEDULE_SUMMARY_AFTERNOON", "15:45")
-    monkeypatch.setenv("SCHEDULE_SUMMARY_NIGHT", "21:10")
+def test_env_delivery_hours_rejects_hour_outside_9_23(monkeypatch):
+    monkeypatch.setenv("DELIVERY_HOURS", "5")
 
-    settings = CronSettings.from_env()
+    with pytest.raises(ValueError, match="9-23"):
+        _env_delivery_hours()
 
-    assert settings.delivery_windows() == {
-        "morning": "08:30",
-        "afternoon": "15:45",
-        "night": "21:10",
-    }
+
+def test_env_delivery_hours_rejects_hour_24_and_negative(monkeypatch):
+    for bad_value in ("24", "-1"):
+        monkeypatch.setenv("DELIVERY_HOURS", bad_value)
+        with pytest.raises(ValueError):
+            _env_delivery_hours()
+
+
+def test_next_delivery_run_picks_todays_hour_when_still_ahead():
+    settings = SimpleNamespace(schedule_timezone="America/La_Paz")
+    runner = RefreshJobRunner.__new__(RefreshJobRunner)
+    runner.settings = settings
+    bolivia = ZoneInfo("America/La_Paz")
+    now = datetime(2026, 8, 26, 14, 0, tzinfo=bolivia).astimezone(UTC)
+
+    next_run = runner._next_delivery_run(15, after=now)
+
+    assert next_run.astimezone(bolivia) == datetime(2026, 8, 26, 15, 0, tzinfo=bolivia)
+
+
+def test_next_delivery_run_rolls_over_to_tomorrow_when_hour_already_passed():
+    settings = SimpleNamespace(schedule_timezone="America/La_Paz")
+    runner = RefreshJobRunner.__new__(RefreshJobRunner)
+    runner.settings = settings
+    bolivia = ZoneInfo("America/La_Paz")
+    now = datetime(2026, 8, 26, 14, 0, tzinfo=bolivia).astimezone(UTC)
+
+    next_run = runner._next_delivery_run(9, after=now)
+
+    assert next_run.astimezone(bolivia) == datetime(2026, 8, 27, 9, 0, tzinfo=bolivia)
 
 
 def test_cron_summary_hours_disable_interval_mode(monkeypatch):

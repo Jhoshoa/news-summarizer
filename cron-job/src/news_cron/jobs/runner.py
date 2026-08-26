@@ -34,11 +34,10 @@ class RefreshJobRunner:
             self.settings.run_once,
         )
         delivery_next = {
-            window: self._next_delivery_run(scheduled_at)
-            for window, scheduled_at in self.settings.delivery_windows().items()
+            hour: self._next_delivery_run(hour) for hour in self.settings.delivery_hours
         }
-        for window, scheduled_at in delivery_next.items():
-            LOGGER.info("delivery window scheduled window=%s next_run=%s", window, scheduled_at)
+        for hour, scheduled_at in delivery_next.items():
+            LOGGER.info("delivery window scheduled hour=%s next_run=%s", hour, scheduled_at)
 
         if self.settings.summary_refresh_hours:
             LOGGER.info("summary refresh hours=%s", self.settings.summary_refresh_hours)
@@ -83,19 +82,17 @@ class RefreshJobRunner:
                     )
                 LOGGER.info("summary refresh rescheduled next_run=%s", summary_next)
 
-            for window, due_at in list(delivery_next.items()):
+            for hour, due_at in list(delivery_next.items()):
                 if now >= due_at:
                     await self._run_safely(
-                        f"delivery_{window}",
-                        self.run_delivery_window(window),
+                        f"delivery_{hour:02d}",
+                        self.run_delivery_window(hour),
                     )
-                    delivery_next[window] = self._next_delivery_run(
-                        self.settings.delivery_windows()[window]
-                    )
+                    delivery_next[hour] = self._next_delivery_run(hour, after=due_at)
                     LOGGER.info(
-                        "delivery window rescheduled window=%s next_run=%s",
-                        window,
-                        delivery_next[window],
+                        "delivery window rescheduled hour=%s next_run=%s",
+                        hour,
+                        delivery_next[hour],
                     )
 
             waits = [
@@ -141,25 +138,24 @@ class RefreshJobRunner:
             result.get("sent"),
         )
 
-    async def run_delivery_window(self, time_of_day: str) -> None:
-        query = urlencode({"time_of_day": time_of_day})
+    async def run_delivery_window(self, hour: int) -> None:
+        query = urlencode({"hour": hour})
         payload = await self.backend.post_json(
             f"{self.settings.delivery_trigger_path}?{query}",
             timeout_seconds=self.settings.delivery_request_timeout_seconds,
         )
         result = payload.get("result") or {}
         LOGGER.info(
-            "summary delivery ok window=%s summaries=%s sent=%s",
-            time_of_day,
+            "summary delivery ok hour=%s summaries=%s sent=%s",
+            hour,
             result.get("summaries"),
             result.get("sent"),
         )
 
-    def _next_delivery_run(self, scheduled_at: str, *, after: datetime | None = None) -> datetime:
+    def _next_delivery_run(self, hour: int, *, after: datetime | None = None) -> datetime:
         zone = ZoneInfo(self.settings.schedule_timezone)
         now = (after or utc_now()).astimezone(zone)
-        hour, minute = (int(part) for part in scheduled_at.split(":", maxsplit=1))
-        candidate = datetime.combine(now.date(), time(hour, minute), tzinfo=zone)
+        candidate = datetime.combine(now.date(), time(hour, 0), tzinfo=zone)
         if candidate <= now:
             candidate += timedelta(days=1)
         return candidate.astimezone(UTC)

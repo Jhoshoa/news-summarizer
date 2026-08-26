@@ -53,7 +53,7 @@ async def test_deliver_summaries_reports_subscriber_fetch_failure_to_sentry():
 
     with patch.object(sentry_sdk, "capture_exception") as mock_capture:
         sent_count, _stats = await app._deliver_summaries(
-            summaries=[], categories=["politica"], time_of_day="manual"
+            summaries=[], categories=["politica"], hour=None
         )
 
     assert sent_count == 0
@@ -67,7 +67,7 @@ async def test_deliver_summaries_reports_per_subscriber_failure_to_sentry():
         channel="whatsapp",
         phone="+591700000",
         categories=["politica"],
-        preferred_time="manana",
+        preferred_hour=9,
         frequency="diario",
     )
     app = _make_app(db=OneSubscriberDatabase(subscriber))
@@ -77,7 +77,7 @@ async def test_deliver_summaries_reports_per_subscriber_failure_to_sentry():
         sent_count, stats = await app._deliver_summaries(
             summaries=[{"title": "A", "summary": "resumen", "category": "politica"}],
             categories=["politica"],
-            time_of_day="manual",
+            hour=None,
         )
 
     assert sent_count == 0
