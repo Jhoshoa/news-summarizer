@@ -108,6 +108,7 @@ export const SubscribePage = () => {
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
   const selectedChannel = options?.channels.find((channel) => channel.slug === form.channel);
+  const selectedFrequency = options?.frequencies.find((frequency) => frequency.slug === form.frequency);
   const selectedCategories = useMemo(
     () =>
       (options?.categories ?? []).filter((category) => form.categories.includes(category.slug)),
@@ -402,6 +403,7 @@ export const SubscribePage = () => {
                   </option>
                 ))}
               </select>
+              {selectedFrequency?.note && <small>{selectedFrequency.note}</small>}
             </label>
 
             <label className="form-field">
@@ -604,8 +606,8 @@ export const SubscribePage = () => {
               <div>
                 <dt>Frecuencia</dt>
                 <dd>
-                  {options?.frequencies.find((frequency) => frequency.slug === form.frequency)?.label ??
-                    form.frequency}
+                  {selectedFrequency?.label ?? form.frequency}
+                  {selectedFrequency?.note && <small>{selectedFrequency.note}</small>}
                 </dd>
               </div>
               <div>

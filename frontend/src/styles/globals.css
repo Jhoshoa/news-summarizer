@@ -2281,6 +2281,13 @@ p {
   text-align: right;
 }
 
+.confirm-summary dd small {
+  display: block;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
 .terms-modal {
   width: min(620px, 100%);
   max-height: min(80vh, 720px);

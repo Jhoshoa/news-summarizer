@@ -78,6 +78,11 @@ async def test_preference_options_returns_categories_channels_and_frequencies(fa
         "tres_veces_semana",
         "semanal",
     }
+    frequency_notes = {item["slug"]: item["note"] for item in payload["frequencies"]}
+    assert frequency_notes["diario"] is None
+    assert frequency_notes["dias_habiles"] is None
+    assert frequency_notes["tres_veces_semana"] == "Se envia lunes, miercoles y viernes."
+    assert frequency_notes["semanal"] == "Se envia los lunes."
     assert {item["slug"] for item in payload["preferred_hours"]} == {str(hour) for hour in range(9, 24)}
     assert {"slug": "9", "label": "09:00", "enabled": True, "note": None} in payload["preferred_hours"]
 

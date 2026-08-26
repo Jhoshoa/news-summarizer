@@ -225,8 +225,12 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         frequencies = [
             PreferenceOption(slug="diario", label="Diario"),
             PreferenceOption(slug="dias_habiles", label="Dias habiles"),
-            PreferenceOption(slug="tres_veces_semana", label="Tres veces por semana"),
-            PreferenceOption(slug="semanal", label="Semanal"),
+            PreferenceOption(
+                slug="tres_veces_semana",
+                label="Tres veces por semana",
+                note="Se envia lunes, miercoles y viernes.",
+            ),
+            PreferenceOption(slug="semanal", label="Semanal", note="Se envia los lunes."),
         ]
         preferred_hours = [
             PreferenceOption(slug=str(hour), label=f"{hour:02d}:00")
