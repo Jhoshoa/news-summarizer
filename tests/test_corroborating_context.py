@@ -1,6 +1,8 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
+import sentry_sdk
 
 from src.main import NewsSummarizerApp
 
@@ -83,6 +85,18 @@ async def test_attach_corroborating_articles_degrades_gracefully_on_db_error():
     await app._attach_corroborating_articles(articles)
 
     assert "corroborating_articles" not in articles[0]
+
+
+@pytest.mark.asyncio
+async def test_attach_corroborating_articles_reports_db_error_to_sentry():
+    app = _make_app(RaisingDatabase())
+    articles = [{"id": 1, "story_cluster_id": "cluster-1", "title": "Original"}]
+
+    with patch.object(sentry_sdk, "capture_exception") as mock_capture:
+        await app._attach_corroborating_articles(articles)
+
+    mock_capture.assert_called_once()
+    assert isinstance(mock_capture.call_args.args[0], RuntimeError)
 
 
 @pytest.mark.asyncio

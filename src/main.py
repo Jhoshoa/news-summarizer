@@ -11,6 +11,7 @@ from typing import Any
 from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import sentry_sdk
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -156,6 +157,7 @@ class NewsSummarizerApp:
             logger.info(f"Telegram webhook registrado: {webhook_url}")
         except Exception as e:
             logger.warning(f"No se pudo registrar el webhook de Telegram: {e}")
+            sentry_sdk.capture_exception(e)
 
     async def shutdown(self):
         """Closes the application."""
@@ -577,6 +579,7 @@ class NewsSummarizerApp:
             subscribers = await self.db.get_active_subscribers()
         except Exception as e:
             logger.error(f"Error obtaining subscribers: {e}")
+            sentry_sdk.capture_exception(e)
             return 0, delivery_stats
 
         logger.info(f"Active subscribers: {len(subscribers)}")
@@ -637,6 +640,7 @@ class NewsSummarizerApp:
                         delivery_stats["failed_by_channel"]["email"] += 1
             except Exception as e:
                 logger.error(f"Error enviando a {sub}: {e}")
+                sentry_sdk.capture_exception(e)
 
         return sent_count, delivery_stats
 
@@ -782,6 +786,7 @@ class NewsSummarizerApp:
                 )
             except Exception as e:
                 logger.warning(f"No se pudo obtener contexto multi-fuente para {article_id}: {e}")
+                sentry_sdk.capture_exception(e)
                 continue
             if siblings:
                 article["corroborating_articles"] = siblings
@@ -803,6 +808,7 @@ class NewsSummarizerApp:
             notes = await self.db.get_story_update_notes(story_cluster_ids)
         except Exception as e:
             logger.warning(f"No se pudieron obtener notas de actualizacion: {e}")
+            sentry_sdk.capture_exception(e)
             return
 
         if not notes:

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import sentry_sdk
 
 from src.distributors.telegram_handler import TelegramHandler
 
@@ -70,6 +71,21 @@ async def test_send_message_returns_false_when_telegram_api_fails():
 
 
 @pytest.mark.asyncio
+async def test_send_message_reports_telegram_failures_to_sentry():
+    handler = TelegramHandler(settings=_settings())
+    boom = RuntimeError("network down")
+
+    with (
+        patch("telegram.Bot.send_message", new=AsyncMock(side_effect=boom)),
+        patch.object(sentry_sdk, "capture_exception") as mock_capture,
+    ):
+        result = await handler.send_message("123", "hola")
+
+    assert result is False
+    mock_capture.assert_called_once_with(boom)
+
+
+@pytest.mark.asyncio
 async def test_process_update_without_bot_is_a_noop():
     handler = TelegramHandler(settings=_settings(token=None))
     await handler.process_update({"update_id": 1})  # no debe lanzar
@@ -101,6 +117,20 @@ async def test_process_update_dispatches_start_command_to_handle_message():
 async def test_process_update_malformed_payload_does_not_raise():
     handler = TelegramHandler(settings=_settings())
     await handler.process_update({"not": "a valid telegram update"})
+
+
+@pytest.mark.asyncio
+async def test_process_update_reports_failures_to_sentry():
+    handler = TelegramHandler(settings=_settings())
+    boom = RuntimeError("malformed update")
+
+    with (
+        patch("telegram.Update.de_json", side_effect=boom),
+        patch.object(sentry_sdk, "capture_exception") as mock_capture,
+    ):
+        await handler.process_update({"update_id": 1})
+
+    mock_capture.assert_called_once_with(boom)
 
 
 @pytest.mark.asyncio

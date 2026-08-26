@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import sentry_sdk
 
 from src.distributors.email_handler import EmailHandler
 
@@ -87,6 +88,23 @@ async def test_email_handler_does_not_send_when_disabled(monkeypatch):
     result = await handler.send_message("reader@example.com", "Asunto", "Contenido")
 
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_email_handler_reports_send_failures_to_sentry(monkeypatch):
+    handler = EmailHandler(settings=_settings())
+    boom = RuntimeError("smtp down")
+
+    def fail_send(message):
+        raise boom
+
+    monkeypatch.setattr(handler, "_send_sync", fail_send)
+
+    with patch.object(sentry_sdk, "capture_exception") as mock_capture:
+        result = await handler.send_message("reader@example.com", "Asunto", "Contenido")
+
+    assert result is False
+    mock_capture.assert_called_once_with(boom)
 
 
 def _fake_smtp_context_manager():

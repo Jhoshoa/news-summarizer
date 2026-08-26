@@ -1,6 +1,7 @@
 from contextlib import suppress
 from typing import Any
 
+import sentry_sdk
 from loguru import logger
 
 
@@ -58,6 +59,7 @@ class TelegramHandler:
             await self.handle_message(update, context=None)
         except Exception as e:
             logger.error(f"Error procesando update de Telegram: {e}")
+            sentry_sdk.capture_exception(e)
 
     async def handle_message(self, update, context) -> str | None:
         """Procesa mensaje entrante."""
@@ -203,6 +205,7 @@ class TelegramHandler:
             return True
         except Exception as e:
             logger.error(f"Error enviando Telegram: {e}")
+            sentry_sdk.capture_exception(e)
             return False
 
     async def send_daily_summary(self, chat_id: str, news: list[dict]) -> bool:

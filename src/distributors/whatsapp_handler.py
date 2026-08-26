@@ -1,5 +1,6 @@
 import asyncio
 
+import sentry_sdk
 from loguru import logger
 
 
@@ -160,6 +161,7 @@ class WhatsAppHandler:
             return True
         except Exception as e:
             logger.error(f"Error enviando WhatsApp: {e}")
+            sentry_sdk.capture_exception(e)
             return False
 
     def send_daily_summary(self, to: str, news: list[dict]) -> bool:

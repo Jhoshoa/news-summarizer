@@ -1,6 +1,8 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
+import sentry_sdk
 
 from src.main import NewsSummarizerApp
 
@@ -72,6 +74,18 @@ async def test_attach_story_update_notes_degrades_gracefully_on_db_error():
     await app._attach_story_update_notes(summaries)
 
     assert "update_note" not in summaries[0]
+
+
+@pytest.mark.asyncio
+async def test_attach_story_update_notes_reports_db_error_to_sentry():
+    app = _make_app(RaisingNotesDatabase())
+    summaries = [{"title": "A", "story_cluster_id": "cluster-1"}]
+
+    with patch.object(sentry_sdk, "capture_exception") as mock_capture:
+        await app._attach_story_update_notes(summaries)
+
+    mock_capture.assert_called_once()
+    assert isinstance(mock_capture.call_args.args[0], RuntimeError)
 
 
 @pytest.mark.asyncio

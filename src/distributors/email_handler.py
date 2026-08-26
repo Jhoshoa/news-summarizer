@@ -3,6 +3,7 @@ import smtplib
 from email.message import EmailMessage
 from email.utils import formataddr
 
+import sentry_sdk
 from loguru import logger
 
 
@@ -51,6 +52,7 @@ class EmailHandler:
             return True
         except Exception as exc:
             logger.error(f"Error enviando email a {to_email}: {exc}")
+            sentry_sdk.capture_exception(exc)
             return False
 
     def _build_message(
