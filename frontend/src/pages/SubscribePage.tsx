@@ -273,7 +273,7 @@ export const SubscribePage = () => {
           </div>
 
           <div className="form-grid">
-            <label className="form-field">
+            <label className="form-field form-field--full">
               <span>Canal</span>
               <div className="segmented-options">
                 {(options?.channels ?? []).map((channel) => (
@@ -297,7 +297,7 @@ export const SubscribePage = () => {
             </label>
 
             {form.channel === "whatsapp" ? (
-              <label className="form-field">
+              <label className="form-field form-field--full">
                 <span>Numero de WhatsApp</span>
                 <input
                   aria-describedby={phoneInputError ? "phone-error" : undefined}
@@ -319,7 +319,7 @@ export const SubscribePage = () => {
                 {phoneInputError && <small className="field-error" id="phone-error">{phoneInputError}</small>}
               </label>
             ) : form.channel === "email" ? (
-              <label className="form-field">
+              <label className="form-field form-field--full">
                 <span>Correo electronico</span>
                 <input
                   aria-describedby={emailInputError ? "email-error" : undefined}
@@ -342,7 +342,7 @@ export const SubscribePage = () => {
                 {emailInputError && <small className="field-error" id="email-error">{emailInputError}</small>}
               </label>
             ) : (
-              <label className="form-field">
+              <label className="form-field form-field--full">
                 <span>Telegram ID</span>
                 <input
                   aria-describedby={telegramInputError ? "telegram-error" : undefined}
