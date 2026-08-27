@@ -22,7 +22,15 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     github_api_key: str | None = Field(default=None, alias="GITHUB_API_KEY")
     nvidia_api_key: str | None = Field(default=None, alias="NVIDIA_API_KEY")
-    llm_fallback_order: str = Field(default="groq,github,nvidia,openai", alias="LLM_FALLBACK_ORDER")
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
+    # nvidia va al final (antes de openai, que casi nunca esta configurado):
+    # es el fallback mas lento y menos confiable de los que ya probamos en
+    # produccion (llamadas de 5+ minutos, a veces cuelga). gemini va segundo,
+    # justo despues de groq, porque tiene cuota diaria mas generosa y
+    # respuestas mas confiables.
+    llm_fallback_order: str = Field(
+        default="groq,gemini,github,nvidia,openai", alias="LLM_FALLBACK_ORDER"
+    )
     llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
 
     news_api_key: str | None = Field(default=None, alias="NEWS_API_KEY")
@@ -122,6 +130,7 @@ class Settings(BaseSettings):
             "github": self.github_api_key,
             "nvidia": self.nvidia_api_key,
             "openai": self.openai_api_key,
+            "gemini": self.gemini_api_key,
         }
         result: list[dict] = []
         for name in order:

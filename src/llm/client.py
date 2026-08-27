@@ -32,6 +32,22 @@ class LLMProvider:
                 "quality": "openai/gpt-4.1-mini",
             },
         },
+        "gemini": {
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+            "models": {
+                # gemini-2.5-* fue retirado para cuentas nuevas (confirmado con
+                # un 404 real en 2026-08-27: "no longer available to new
+                # users, use gemini-3.5-flash-lite"). flash-lite es mas debil
+                # pero tiene mas cuota diaria gratis, asi que se usa para
+                # clasificacion/dedup, tareas simples de si/no donde el
+                # volumen importa mas que la calidad.
+                "fast": "gemini-3.5-flash-lite",
+                "balanced": "gemini-3.5-flash-lite",
+                # flash tiene mejor calidad para el resumen final; como
+                # fallback (no como principal) la cuota gratis alcanza de sobra.
+                "quality": "gemini-3.6-flash",
+            },
+        },
         "nvidia": {
             "base_url": "https://integrate.api.nvidia.com/v1",
             "models": {
