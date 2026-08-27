@@ -3,6 +3,7 @@ import re
 import unicodedata
 from typing import Any
 
+import sentry_sdk
 from loguru import logger
 
 
@@ -91,13 +92,27 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
     def __init__(self, llm_provider):
         self.llm = llm_provider
 
-    async def summarize(self, news: list[dict], category: str) -> list[dict]:
-        """Resume una lista de noticias por categoria."""
+    # Tokens de salida por noticia enviada: cada resumen puede traer titulo,
+    # resumen, fact y hasta 3 claims con excerpt propio -- con lotes grandes
+    # (SUMMARY_CANDIDATES_EXTENDED_LIMIT) el output real puede superar largo
+    # los ~3000 tokens que se usaban antes, cortando el JSON a mitad de camino.
+    MAX_TOKENS_PER_ARTICLE = 700
+    MIN_MAX_TOKENS = 3000
+
+    async def summarize(self, news: list[dict], category: str, *, _is_retry: bool = False) -> list[dict]:
+        """Resume una lista de noticias por categoria.
+
+        Si el LLM devuelve una respuesta sin resumenes utilizables (JSON
+        cortado, formato inesperado, etc.) y el lote tiene mas de una
+        noticia, reintenta partiendo el lote a la mitad en vez de rendirse
+        con la categoria entera en 0 -- un lote mas chico tiene menos
+        probabilidad de truncarse."""
 
         if not news:
             return []
 
         prompt = self._build_prompt(news, category)
+        max_tokens = max(self.MIN_MAX_TOKENS, len(news[:10]) * self.MAX_TOKENS_PER_ARTICLE)
 
         try:
             result = await self.llm.chat(
@@ -105,16 +120,44 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
                 quality="quality",
                 system_prompt=self.SYSTEM_PROMPT,
                 temperature=0.3,
-                max_tokens=3000,
+                max_tokens=max_tokens,
             )
 
             summaries = self._parse_response(result, category, news)
+
+            if not summaries and len(news) > 1:
+                logger.warning(
+                    f"0 resumenes validos para {len(news)} noticias de '{category}' "
+                    "(lote completo), reintentando en dos lotes mas chicos"
+                )
+                return await self._summarize_in_halves(news, category)
+
+            if not summaries and _is_retry:
+                logger.warning(f"0 resumenes validos para categoria '{category}' tras reintento")
+
             logger.info(f"Resumidas {len(summaries)} noticias de categoria '{category}'")
             return summaries
 
         except Exception as e:
             logger.error(f"Error resumiendo noticias: {e}")
+            if _is_retry:
+                sentry_sdk.capture_exception(e)
             return []
+
+    async def _summarize_in_halves(self, news: list[dict], category: str) -> list[dict]:
+        mid = len(news) // 2
+        first_half = await self.summarize(news[:mid], category, _is_retry=True)
+        second_half = await self.summarize(news[mid:], category, _is_retry=True)
+        results = first_half + second_half
+
+        if not results:
+            sentry_sdk.capture_message(
+                f"NewsSummarizer: 0 resumenes para categoria '{category}' "
+                f"despues de reintentar con {len(news)} noticias en lotes mas chicos",
+                level="warning",
+            )
+
+        return results
 
     def _build_prompt(self, news: list[dict], category: str) -> str:
         """Construye el prompt para la IA."""
@@ -231,22 +274,54 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
 
     def _parse_json_response(self, response: str) -> list[Any] | None:
         data = self._decode_json_candidate(response)
-        if data is None:
-            data = self._extract_json_array(response)
+        if data is not None:
+            return data
 
-        if isinstance(data, dict):
-            data = data.get("summaries") or data.get("items") or data.get("data")
+        return self._extract_json_array(response)
 
-        return data if isinstance(data, list) else None
+    def _decode_json_candidate(self, response: str) -> list[Any] | None:
+        """Prueba cada fragmento candidato y se queda con el que mejor pinta
+        de "array de resumenes" tiene, no con el primero que logre parsear.
 
-    def _decode_json_candidate(self, response: str) -> Any | None:
+        Antes se devolvia el primer candidato valido sin mirar su forma: si
+        la respuesta del LLM se cortaba a mitad de camino, el array completo
+        de resumenes quedaba invalido, pero un array "claims" anidado dentro
+        de un resumen (que el prompt le pide incluir) podia seguir estando
+        bien formado y colarse como si fuera el array completo -- cada item
+        tiene claim/confidence/article_id pero nunca title/summary, asi que
+        todos se descartaban despues y la categoria enterca quedaba en 0.
+        Ahora se puntua cada candidato por cuantos items tienen title+summary
+        y se elige el mejor; si ninguno califica, se falla limpio (None) en
+        vez de devolver datos con la forma equivocada."""
+
+        best: list[Any] | None = None
+        best_score = 0
+
         for candidate in self._json_candidates(response):
             try:
-                return json.loads(candidate)
+                data = json.loads(candidate)
             except json.JSONDecodeError:
                 continue
 
-        return None
+            payload = data
+            if isinstance(payload, dict):
+                payload = payload.get("summaries") or payload.get("items") or payload.get("data")
+            if not isinstance(payload, list):
+                continue
+
+            score = self._summary_shape_score(payload)
+            if score > best_score:
+                best = payload
+                best_score = score
+
+        return best
+
+    def _summary_shape_score(self, payload: list[Any]) -> int:
+        return sum(
+            1
+            for item in payload
+            if isinstance(item, dict) and item.get("title") and item.get("summary")
+        )
 
     def _json_candidates(self, response: str) -> list[str]:
         response = str(response or "").strip()
@@ -324,7 +399,10 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
             logger.warning(f"Invalid LLM JSON response: {e}")
             return None
 
-        return data if isinstance(data, list) else None
+        if not isinstance(data, list) or self._summary_shape_score(data) == 0:
+            return None
+
+        return data
 
     def _normalize_json_summaries(
         self,

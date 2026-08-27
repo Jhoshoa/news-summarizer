@@ -476,3 +476,125 @@ def test_parse_response_uses_generated_title_when_original_is_missing():
     )
 
     assert summaries[0]["title"] == "Titulo generado"
+
+
+def test_parse_json_response_ignores_truncated_array_that_exposes_nested_claims():
+    """Regression test for the real bug seen in production: with a big batch
+    (SUMMARY_CANDIDATES_EXTENDED_LIMIT), the LLM's response got cut off before
+    the outer summaries array closed, but a "claims" array nested inside one
+    summary item was still complete and well-formed on its own. The old
+    "first candidate that parses" logic picked that inner claims array as if
+    it were the whole response -- each item has claim/confidence/article_id
+    but no title/summary, so every item got silently dropped and the whole
+    category ended up with 0 summaries. It should recognize the claims-shaped
+    array as the wrong shape and fail closed instead."""
+
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    truncated_response = """
+    [
+      {
+        "article_id": 4039,
+        "title": "Filas por combustible persisten pese a compromisos de YPFB",
+        "summary": "Este texto se corta a mitad de camino porque el modelo se quedo sin tokens de salida y nunca llega a cerrar el array completo, pero el array de claims de este item ya habia cerrado antes del corte",
+        "claims": [
+          {
+            "claim": "El Gobierno afirmo que YPFB se comprometio a regularizar paulatinamente la gasolina y luego el diesel.",
+            "confidence": "official_statement",
+            "claim_type": "declaracion",
+            "article_id": 4039,
+            "excerpt": "autoridades del Gobierno afirmaron que existia un compromiso de YPFB"
+          },
+          {
+            "claim": "En Santa Cruz, las colas se registran principalmente por diesel.",
+            "confidence": "single_source",
+            "claim_type": "situacion",
+            "article_id": 4039,
+            "excerpt": "en Santa Cruz, las colas se registran principalmente por diesel"
+    """
+
+    parsed = summarizer._parse_json_response(truncated_response)
+
+    assert parsed is None
+
+
+def test_decode_json_candidate_prefers_summary_shaped_array_over_claims_shaped_one():
+    summarizer = NewsSummarizer(llm_provider=None)
+
+    response = """
+    Aca esta el array de claims por separado: [{"claim": "dato", "confidence": "single_source", "article_id": 1}]
+
+    Y aca el array real de resumenes:
+    [
+      {"title": "Titulo real", "summary": "Resumen real de la noticia."}
+    ]
+    """
+
+    parsed = summarizer._decode_json_candidate(response)
+
+    assert parsed == [{"title": "Titulo real", "summary": "Resumen real de la noticia."}]
+
+
+class _FakeSummarizerLLM:
+    """LLM fake que devuelve una respuesta distinta en cada llamada, para
+    simular que un lote grande falla pero lotes mas chicos (el reintento)
+    funcionan -- exactamente lo que se vio en produccion: economia/politica
+    con 7-8 candidatos fallaban en 0, categorias con lotes chicos no."""
+
+    def __init__(self, responses: list[str]):
+        self.responses = list(responses)
+        self.calls: list[list[dict]] = []
+
+    async def chat(self, prompt: str, **kwargs: object) -> str:
+        return self.responses.pop(0)
+
+
+def _article(article_id: int, title: str) -> dict:
+    return {"id": article_id, "title": title, "source": "Test", "category": "economia"}
+
+
+async def test_summarize_retries_in_smaller_batches_when_batch_returns_nothing():
+    news = [_article(1, "Noticia uno"), _article(2, "Noticia dos"), _article(3, "Noticia tres")]
+
+    responses = [
+        "[]",  # lote completo (3 noticias): sin resumenes validos
+        '[{"article_id": 1, "title": "Uno", "summary": "Resumen de la noticia uno valido."}]',
+        (
+            '[{"article_id": 2, "title": "Dos", "summary": "Resumen de la noticia dos valido."},'
+            '{"article_id": 3, "title": "Tres", "summary": "Resumen de la noticia tres valida."}]'
+        ),
+    ]
+    llm = _FakeSummarizerLLM(responses)
+    summarizer = NewsSummarizer(llm_provider=llm)
+
+    summaries = await summarizer.summarize(news, "economia")
+
+    assert [s["article_id"] for s in summaries] == [1, 2, 3]
+
+
+async def test_summarize_returns_empty_when_single_article_batch_fails():
+    news = [_article(1, "Noticia unica")]
+    llm = _FakeSummarizerLLM(["[]"])
+    summarizer = NewsSummarizer(llm_provider=llm)
+
+    summaries = await summarizer.summarize(news, "economia")
+
+    assert summaries == []
+
+
+async def test_summarize_uses_larger_max_tokens_for_bigger_batches():
+    captured_calls: list[dict] = []
+
+    class _CapturingLLM:
+        async def chat(self, prompt: str, **kwargs: object) -> str:
+            captured_calls.append(dict(kwargs))
+            return '[{"article_id": 0, "title": "T", "summary": "Resumen valido de la noticia."}]'
+
+    news = [_article(i, f"Noticia {i}") for i in range(8)]
+    summarizer = NewsSummarizer(llm_provider=_CapturingLLM())
+
+    await summarizer.summarize(news, "politica")
+
+    first_call_max_tokens = captured_calls[0]["max_tokens"]
+    assert first_call_max_tokens > 3000
+    assert first_call_max_tokens == 8 * NewsSummarizer.MAX_TOKENS_PER_ARTICLE
