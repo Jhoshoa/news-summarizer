@@ -179,56 +179,54 @@ export const ArticleDetailPage = () => {
           </div>
 
           <section className={hasArticleImage ? "article-content-layout has-image" : "article-content-layout"}>
-            <div className="article-text-column">
-              {summaryText ? (
-                <section className="ai-summary">
-                  <div className="panel-title">Resumen IA</div>
-                  <p>{summaryText}</p>
-                  {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
-                </section>
-              ) : (
-                <section className="ai-summary pending-summary">
-                  <div className="panel-title">Resumen IA pendiente</div>
-                  <p>Esta noticia fue recolectada y conservada como fuente original, pero todavía no fue priorizada para síntesis IA.</p>
-                </section>
-              )}
+            {summaryText ? (
+              <section className="ai-summary">
+                <div className="panel-title">Resumen IA</div>
+                <p>{summaryText}</p>
+                {relatedSummary?.fact && <small>{relatedSummary.fact}</small>}
+              </section>
+            ) : (
+              <section className="ai-summary pending-summary">
+                <div className="panel-title">Resumen IA pendiente</div>
+                <p>Esta noticia fue recolectada y conservada como fuente original, pero todavía no fue priorizada para síntesis IA.</p>
+              </section>
+            )}
 
-              <StoryFeedback articleId={article.id} storyId={storyClusterId} />
-
-              {articleBody && (
-                <section className="article-body">
-                  {articleBody.split(/\n+/).map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                </section>
-              )}
-
-              <StoryTrustPanel
-                story={storyData}
-                isLoading={Boolean(storyClusterId) && isFetchingStory}
-                isError={isStoryError}
-                articleId={article.id}
-              />
-
-              {otherSourceArticles.length > 0 && (
-                <section className="other-sources" aria-label="Otras fuentes que cubren esta noticia">
-                  <div className="panel-title">Otras fuentes que cubren esto</div>
-                  <ul className="other-sources-list">
-                    {otherSourceArticles.map((item) => (
-                      <li key={item.id}>
-                        <Link href={`/article/${item.id}`}>{item.title}</Link>
-                        <span className="other-sources-meta">{item.source}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-            </div>
+            <StoryFeedback articleId={article.id} storyId={storyClusterId} />
 
             {hasArticleImage && (
               <aside className="article-media-column">
                 <ArticleImage image={article.image} alt={article.title} />
               </aside>
+            )}
+
+            {articleBody && (
+              <section className="article-body">
+                {articleBody.split(/\n+/).map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+              </section>
+            )}
+
+            <StoryTrustPanel
+              story={storyData}
+              isLoading={Boolean(storyClusterId) && isFetchingStory}
+              isError={isStoryError}
+              articleId={article.id}
+            />
+
+            {otherSourceArticles.length > 0 && (
+              <section className="other-sources" aria-label="Otras fuentes que cubren esta noticia">
+                <div className="panel-title">Otras fuentes que cubren esto</div>
+                <ul className="other-sources-list">
+                  {otherSourceArticles.map((item) => (
+                    <li key={item.id}>
+                      <Link href={`/article/${item.id}`}>{item.title}</Link>
+                      <span className="other-sources-meta">{item.source}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
           </section>
         </article>

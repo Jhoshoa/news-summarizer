@@ -2529,17 +2529,47 @@ p {
 .article-content-layout {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
+/* La imagen se ubica con su propio grid-area (no como columna con todo el
+   texto adentro) para poder decidir su posicion en el orden de lectura
+   independientemente de layout: en pantallas anchas queda en una columna
+   aparte a la derecha; en angostas (ver @media abajo) se apila justo
+   despues de "Relevancia", no al final de todo. */
 .article-content-layout.has-image {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.48fr);
+  grid-template-areas:
+    "summary  image"
+    "feedback image"
+    "body     image"
+    "trust    image"
+    "other    image";
   align-items: start;
 }
 
-.article-text-column {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
+.article-content-layout.has-image .ai-summary {
+  grid-area: summary;
+}
+
+.article-content-layout.has-image .story-feedback {
+  grid-area: feedback;
+}
+
+.article-content-layout.has-image .article-media-column {
+  grid-area: image;
+}
+
+.article-content-layout.has-image .article-body {
+  grid-area: body;
+}
+
+.article-content-layout.has-image .trust-panel {
+  grid-area: trust;
+}
+
+.article-content-layout.has-image .other-sources {
+  grid-area: other;
 }
 
 .article-media-column {
@@ -2891,6 +2921,29 @@ p {
 @media (max-width: 1240px) {
   .article-content-layout.has-image {
     grid-template-columns: 1fr;
+    grid-template-areas: none;
+  }
+
+  /* Un grid-area con un nombre que ya no existe en grid-template-areas NO
+     vuelve a "auto" solo: el navegador lo trata como referencia a una linea
+     con ese nombre y, al no encontrarla, crea una columna/fila implicita
+     nueva para cada una -- 5 nombres distintos generaban 5 columnas fantasma
+     y todo terminaba superpuesto en el mismo lugar. Hay que resetear a auto
+     a mano para que se apilen en orden de documento normal.*/
+  .article-content-layout.has-image .ai-summary,
+  .article-content-layout.has-image .story-feedback,
+  .article-content-layout.has-image .article-media-column,
+  .article-content-layout.has-image .article-body,
+  .article-content-layout.has-image .trust-panel,
+  .article-content-layout.has-image .other-sources {
+    grid-area: auto;
+  }
+
+  /* La posicion sticky es para acompanar el scroll de la columna de texto
+     larga en desktop; apilada (una sola columna) se ve normal como
+     cualquier otro bloque. */
+  .article-media-column {
+    position: static;
   }
 }
 
@@ -2945,11 +2998,6 @@ p {
 
   .data-status-card {
     align-content: start;
-  }
-
-  .article-media-column {
-    position: static;
-    order: -1;
   }
 
   .data-grid,

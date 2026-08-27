@@ -99,22 +99,20 @@ export const ArticleDetailSkeleton = () => (
       <SkeletonBlock className="skeleton-line skeleton-title" />
       <SkeletonBlock className="skeleton-line skeleton-title skeleton-title-short" />
       <section className="article-content-layout has-image">
-        <div className="article-text-column">
-          <section className="ai-summary skeleton-panel">
-            <SkeletonBlock className="skeleton-line skeleton-line-sm" />
-            <SkeletonBlock className="skeleton-line" />
-            <SkeletonBlock className="skeleton-line" />
-            <SkeletonBlock className="skeleton-line skeleton-line-md" />
-          </section>
-          <section className="article-body">
-            {Array.from({ length: 5 }, (_, index) => (
-              <SkeletonBlock className="skeleton-line" key={index} />
-            ))}
-          </section>
-        </div>
+        <section className="ai-summary skeleton-panel">
+          <SkeletonBlock className="skeleton-line skeleton-line-sm" />
+          <SkeletonBlock className="skeleton-line" />
+          <SkeletonBlock className="skeleton-line" />
+          <SkeletonBlock className="skeleton-line skeleton-line-md" />
+        </section>
         <aside className="article-media-column">
           <SkeletonBlock className="skeleton-image-large" />
         </aside>
+        <section className="article-body">
+          {Array.from({ length: 5 }, (_, index) => (
+            <SkeletonBlock className="skeleton-line" key={index} />
+          ))}
+        </section>
       </section>
     </article>
     <aside className="related-briefs-sidebar skeleton-related-briefs" aria-hidden="true">
