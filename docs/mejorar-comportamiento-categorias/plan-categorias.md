@@ -3,6 +3,16 @@
 > **Estado: Fases 1-4 implementadas.** Ver commits `be5c763` (Fase 1), `8ecb669` (Fase 2) y
 > `6d64fec` (Fase 3) en la rama `yc-roadmap-enhancement`. La guia de la Fase 4 es
 > [`como-agregar-una-categoria.md`](./como-agregar-una-categoria.md).
+>
+> **Correccion post-Fase 2:** la primera version de la Fase 2 solo "igualaba" el valor de
+> `DEFAULT_CATEGORIES` en `.env`/`.env.local.example`/`.env.prod.example`/`docker-compose.yml` al
+> de `repository.py`, sin eliminar la variable — asi que seguia siendo una copia manual, y se
+> volvio a desincronizar la primera vez que se agrego una categoria (`clima`, `mundo`, `salud`,
+> `sociedad`), dejando esas categorias clasificadas correctamente en la DB pero nunca resumidas
+> porque `src/main.py` itera sobre `settings.categories_list`. Se corrigio sacando la variable de
+> los 4 archivos (queda comentada, documentando por que) para que `settings.py` dependa siempre del
+> default derivado de `DEFAULT_CATEGORIES` en `repository.py` — ahora si es una sola fuente de
+> verdad sin nada que resincronizar a mano.
 
 ## Contexto
 
