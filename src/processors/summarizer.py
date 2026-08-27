@@ -25,6 +25,10 @@ class NewsSummarizer:
         "tecnologia",
         "entretenimiento",
         "policiales",
+        "clima",
+        "mundo",
+        "salud",
+        "sociedad",
         "general",
     }
     CATEGORY_ALIASES = {
@@ -44,6 +48,11 @@ class NewsSummarizer:
         "tecnologia e innovacion": "tecnologia",
         "cultura": "entretenimiento",
         "espectaculos": "entretenimiento",
+        "tiempo": "clima",
+        "meteorologia": "clima",
+        "internacional": "mundo",
+        "internacionales": "mundo",
+        "ciencia": "salud",
     }
 
     SYSTEM_PROMPT = """Eres un editor de noticias experto en espanol latinoamericano.

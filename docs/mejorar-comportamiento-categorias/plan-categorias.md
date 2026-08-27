@@ -13,6 +13,18 @@
 > los 4 archivos (queda comentada, documentando por que) para que `settings.py` dependa siempre del
 > default derivado de `DEFAULT_CATEGORIES` en `repository.py` — ahora si es una sola fuente de
 > verdad sin nada que resincronizar a mano.
+>
+> **Octavo lugar no mapeado, encontrado despues:** `NewsSummarizer.VALID_CATEGORIES` en
+> [`src/processors/summarizer.py`](../../src/processors/summarizer.py) es otra copia hardcodeada
+> de la lista, y no estaba en la tabla de inventario original de este documento. `_resolve_category`
+> usa ese set para decidir la categoria final de cada resumen — si la categoria que le pasa el
+> pipeline no esta ahi, cae silenciosamente a `"general"`, sin error ni warning. Con `clima`/
+> `mundo`/`salud`/`sociedad` faltando ahi, **todos los resumenes de esas categorias se guardaban
+> con categoria `general`** (los articulos se clasificaban bien, pero el resumen final quedaba mal
+> etiquetado en `news_summaries`). Se agrego a la tabla de inventario (fila 8) y se corrigio junto
+> con un test de regresion (`test_valid_categories_matches_default_categories` en
+> `tests/test_summarizer_prompt.py`) que compara este set contra `DEFAULT_CATEGORIES` directamente,
+> igual que ya existia para `NewsClassifier.FALLBACK_CATEGORIES`.
 
 ## Contexto
 
@@ -38,6 +50,7 @@ hay un proceso claro para agregar una categoria nueva sin romper algo en el cami
 | 5 | [`config/classification.yaml`](../../config/classification.yaml) `categories:` | reglas de clasificacion por categoria (pesos, keywords) | economia, politica, deportes, tecnologia, entretenimiento, policiales (6; `general` es el fallback implicito cuando nada califica) |
 | 6 | [`src/processors/classifier.py:27`](../../src/processors/classifier.py) `FALLBACK_CATEGORIES` (solo si el YAML de (5) falla al cargar) | mismo rol que (5) pero hardcodeado como red de seguridad | economia, politica, deportes, tecnologia, entretenimiento (5, **sin policiales**) |
 | 7 | [`frontend/src/pages/NewsPage.tsx:23`](../../frontend/src/pages/NewsPage.tsx) `categoryTabs` | pestanas de la pagina "Noticias" | general (= sin filtro), economia, politica, deportes, tecnologia, entretenimiento (6, **sin policiales**) |
+| 8 | [`src/processors/summarizer.py`](../../src/processors/summarizer.py) `NewsSummarizer.VALID_CATEGORIES` | que categoria final se guarda en cada resumen (`_resolve_category`); si la categoria no esta aca, el resumen se guarda como `general` sin avisar | economia, politica, deportes, tecnologia, entretenimiento, policiales, general (7) — no se detecto en el analisis original, encontrado despues al agregar `clima`/`mundo`/`salud`/`sociedad` |
 
 La pagina de suscripcion (`SubscribePage.tsx`) es la unica pantalla que ya hace lo correcto: no
 hardcodea nada, pide la lista a `/api/preferences/options`, que a su vez sale de (1).

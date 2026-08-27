@@ -1,4 +1,15 @@
+from src.db.repository import DEFAULT_CATEGORIES
 from src.processors.summarizer import NewsSummarizer
+
+
+def test_valid_categories_matches_default_categories():
+    """Regression test for the bug where NewsSummarizer.VALID_CATEGORIES was a
+    separate hardcoded copy of the category list that never got the new
+    categories (clima, mundo, salud, sociedad) added to it: _resolve_category
+    silently filed every summary in those categories under 'general' instead,
+    because the category the pipeline passed in wasn't recognized as valid."""
+
+    assert NewsSummarizer.VALID_CATEGORIES == set(DEFAULT_CATEGORIES)
 
 
 def test_build_prompt_includes_article_body_excerpt_and_url():
