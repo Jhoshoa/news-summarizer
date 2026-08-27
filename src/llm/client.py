@@ -35,9 +35,12 @@ class LLMProvider:
         "nvidia": {
             "base_url": "https://integrate.api.nvidia.com/v1",
             "models": {
-                "fast": "mistralai/mistral-small-4-119b-2603",
-                "balanced": "mistralai/mistral-small-4-119b-2603",
-                "quality": "mistralai/mistral-small-4-119b-2603",
+                # mistral-small-4-119b-2603 reached end-of-life on NVIDIA's
+                # platform (2026-07-27, confirmed via a live 410 response).
+                # mistral-nemotron verified reachable on the free-tier key.
+                "fast": "mistralai/mistral-nemotron",
+                "balanced": "mistralai/mistral-nemotron",
+                "quality": "mistralai/mistral-nemotron",
             },
         },
     }
