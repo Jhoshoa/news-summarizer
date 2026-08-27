@@ -237,7 +237,7 @@ async def test_classify_batch_async_skips_llm_for_confident_rule():
 
 
 async def test_classify_batch_async_keeps_rules_when_llm_returns_invalid_category():
-    llm = FakeClassifierLLM('{"category": "salud", "confidence": 0.95, "reason": "Invalida"}')
+    llm = FakeClassifierLLM('{"category": "gastronomia", "confidence": 0.95, "reason": "Invalida"}')
     classifier = NewsClassifier(llm_provider=llm)
     articles = [
         {
@@ -253,7 +253,7 @@ async def test_classify_batch_async_keeps_rules_when_llm_returns_invalid_categor
     assert len(llm.calls) == 1
     assert result[0]["category"] == "politica"
     assert result[0]["category_method"] == "rules_low_confidence"
-    assert result[0]["category_llm_error"] == "invalid_category:salud"
+    assert result[0]["category_llm_error"] == "invalid_category:gastronomia"
 
 
 async def test_classify_batch_async_parses_llm_json_inside_markdown_fence():
@@ -345,7 +345,7 @@ def test_warns_about_classification_rules_not_registered_in_default_categories(t
         "    description: test\n"
         "    positive: []\n"
         "    negative: []\n"
-        "  salud:\n"
+        "  gastronomia:\n"
         "    description: test\n"
         "    positive: []\n"
         "    negative: []\n",
@@ -360,7 +360,7 @@ def test_warns_about_classification_rules_not_registered_in_default_categories(t
 
     warning_text = "\n".join(messages)
     assert "no registradas en DEFAULT_CATEGORIES" in warning_text
-    assert "salud" in warning_text
+    assert "gastronomia" in warning_text
 
 
 def test_category_mismatch_warning_does_not_raise_or_block_instantiation(tmp_path):

@@ -648,6 +648,182 @@ categories:
       - { term: "tasa de interes", weight: 2 }
       - { term: "presupuesto", weight: 2 }
 
+  clima:
+    description: "Clima, fenomenos meteorologicos y desastres naturales: inundaciones, terremotos, nevadas, sequias, incendios forestales y alertas de emergencia climatica. No incluye delitos ni violencia, eso sigue siendo policiales."
+    positive:
+      - { term: "nevada", weight: 3 }
+      - { term: "nieve", weight: 2 }
+      - { term: "granizada", weight: 3 }
+      - { term: "granizo", weight: 3 }
+      - { term: "helada", weight: 3 }
+      - { term: "friaje", weight: 3 }
+      - { term: "ola de calor", weight: 3 }
+      - { term: "ola de frio", weight: 3 }
+      - { term: "alerta naranja", weight: 4 }
+      - { term: "alerta roja", weight: 4 }
+      - { term: "alerta amarilla", weight: 3 }
+      - { term: "senamhi", weight: 4 }
+      - { term: "pronostico del tiempo", weight: 3 }
+      - { term: "meteorologico", weight: 2 }
+      - { term: "desborde de rio", weight: 4 }
+      - { term: "desborde", weight: 2 }
+      - { term: "inundacion", weight: 4 }
+      - { term: "riada", weight: 4 }
+      - { term: "avalancha", weight: 4 }
+      - { term: "deslizamiento de tierra", weight: 4 }
+      - { term: "sequia", weight: 3 }
+      - { term: "terremoto", weight: 4 }
+      - { term: "sismo", weight: 3 }
+      - { term: "temblor", weight: 3 }
+      - { term: "tsunami", weight: 4 }
+      - { term: "huracan", weight: 4 }
+      - { term: "ciclon", weight: 3 }
+      - { term: "tifon", weight: 3 }
+      - { term: "tormenta electrica", weight: 3 }
+      - { term: "lluvias intensas", weight: 3 }
+      - { term: "vientos fuertes", weight: 3 }
+      - { term: "erupcion volcanica", weight: 4 }
+      - { term: "volcan", weight: 3 }
+      - { term: "incendio forestal", weight: 4 }
+      - { term: "zona de desastre", weight: 3 }
+      - { term: "estado de emergencia", weight: 3 }
+      - { term: "damnificados", weight: 3 }
+      - { term: "evacuacion", weight: 2 }
+      - { term: "cambio climatico", weight: 3 }
+      - { term: "sequia prolongada", weight: 3 }
+      - { term: "ondas de frio", weight: 3 }
+    negative:
+      - { term: "robo", weight: 2 }
+      - { term: "asesinato", weight: 2 }
+      - { term: "secuestro", weight: 2 }
+
+  mundo:
+    description: "Noticias internacionales: hechos, gobiernos, personas y eventos fuera de Bolivia. No incluye politica exterior con enfoque en el gobierno boliviano, eso sigue siendo politica."
+    positive:
+      - { term: "casa blanca", weight: 4 }
+      - { term: "kremlin", weight: 4 }
+      - { term: "vaticano", weight: 3 }
+      - { term: "papa leon", weight: 3 }
+      - { term: "union europea", weight: 3 }
+      - { term: "naciones unidas", weight: 3 }
+      - { term: "consejo de seguridad", weight: 3 }
+      - { term: "otan", weight: 3 }
+      - { term: "nasa", weight: 3 }
+      - { term: "agencia espacial", weight: 3 }
+      - { term: "medio oriente", weight: 3 }
+      - { term: "franja de gaza", weight: 3 }
+      - { term: "guerra en ucrania", weight: 4 }
+      - { term: "corea del norte", weight: 3 }
+      - { term: "corea del sur", weight: 2 }
+      - { term: "reino unido", weight: 3 }
+      - { term: "primer ministro britanico", weight: 3 }
+      - { term: "canciller aleman", weight: 3 }
+      - { term: "elecciones en estados unidos", weight: 3 }
+      - { term: "estados unidos", weight: 2 }
+      - { term: "donald trump", weight: 2 }
+      - { term: "francia", weight: 2 }
+      - { term: "alemania", weight: 2 }
+      - { term: "italia", weight: 2 }
+      - { term: "espana", weight: 2 }
+      - { term: "rusia", weight: 2 }
+      - { term: "ucrania", weight: 2 }
+      - { term: "china", weight: 2 }
+      - { term: "japon", weight: 2 }
+      - { term: "india", weight: 2 }
+      - { term: "israel", weight: 2 }
+      - { term: "palestina", weight: 2 }
+      - { term: "nepal", weight: 2 }
+      - { term: "filipinas", weight: 2 }
+      - { term: "indonesia", weight: 2 }
+      - { term: "mexico", weight: 2 }
+      - { term: "canada", weight: 2 }
+      - { term: "australia", weight: 2 }
+      - { term: "venezuela", weight: 2 }
+      - { term: "corresponsal internacional", weight: 3 }
+      - { term: "agencia internacional de noticias", weight: 3 }
+    negative:
+      - { term: "asamblea legislativa", weight: 3 }
+      - { term: "gobierno boliviano", weight: 3 }
+      - { term: "tribunal supremo electoral", weight: 3 }
+
+  salud:
+    description: "Salud, medicina, ciencia, bienestar, espacio y curiosidades cientificas. No incluye politicas de precios de medicamentos (economia) ni deportes de alto rendimiento (deportes)."
+    positive:
+      - { term: "hospital", weight: 3 }
+      - { term: "vacuna", weight: 3 }
+      - { term: "vacunacion", weight: 3 }
+      - { term: "enfermedad", weight: 2 }
+      - { term: "virus", weight: 2 }
+      - { term: "pandemia", weight: 3 }
+      - { term: "epidemia", weight: 3 }
+      - { term: "covid", weight: 3 }
+      - { term: "gripe", weight: 2 }
+      - { term: "medico", weight: 2 }
+      - { term: "medicina", weight: 2 }
+      - { term: "paciente", weight: 2 }
+      - { term: "cirugia", weight: 3 }
+      - { term: "tratamiento medico", weight: 3 }
+      - { term: "diagnostico medico", weight: 3 }
+      - { term: "sintoma", weight: 2 }
+      - { term: "nutricion", weight: 2 }
+      - { term: "dieta", weight: 2 }
+      - { term: "bienestar", weight: 2 }
+      - { term: "salud mental", weight: 3 }
+      - { term: "depresion", weight: 2 }
+      - { term: "ansiedad", weight: 2 }
+      - { term: "insomnio", weight: 2 }
+      - { term: "ciencia", weight: 3 }
+      - { term: "cientifico", weight: 2 }
+      - { term: "investigacion cientifica", weight: 3 }
+      - { term: "astronauta", weight: 3 }
+      - { term: "caminata espacial", weight: 3 }
+      - { term: "meteorito", weight: 3 }
+      - { term: "asteroide", weight: 3 }
+      - { term: "telescopio", weight: 2 }
+      - { term: "adn", weight: 2 }
+      - { term: "genetica", weight: 2 }
+      - { term: "estudio revela", weight: 2 }
+      - { term: "especie animal", weight: 2 }
+      - { term: "extincion", weight: 2 }
+    negative:
+      - { term: "precio de medicamentos", weight: 3 }
+      - { term: "seguro de salud publico", weight: 3 }
+
+  sociedad:
+    description: "Vida cotidiana, servicios publicos, tramites, infraestructura urbana y temas comunitarios que no encajan en las categorias anteriores. No incluye denuncias penales (policiales) ni debates de politica partidaria."
+    positive:
+      - { term: "tramite", weight: 2 }
+      - { term: "servicio publico", weight: 3 }
+      - { term: "corte de agua", weight: 3 }
+      - { term: "corte de luz", weight: 3 }
+      - { term: "apagon", weight: 3 }
+      - { term: "obra publica", weight: 3 }
+      - { term: "infraestructura vial", weight: 3 }
+      - { term: "vivienda social", weight: 3 }
+      - { term: "desalojo", weight: 3 }
+      - { term: "defensoria del pueblo", weight: 4 }
+      - { term: "derechos humanos", weight: 3 }
+      - { term: "educacion publica", weight: 3 }
+      - { term: "colegio", weight: 2 }
+      - { term: "universidad", weight: 2 }
+      - { term: "matricula escolar", weight: 3 }
+      - { term: "beca", weight: 2 }
+      - { term: "adulto mayor", weight: 3 }
+      - { term: "renta de vejez", weight: 3 }
+      - { term: "discapacidad", weight: 3 }
+      - { term: "migrante", weight: 2 }
+      - { term: "migracion", weight: 2 }
+      - { term: "transporte publico", weight: 2 }
+      - { term: "semaforo", weight: 2 }
+      - { term: "alcantarillado", weight: 3 }
+      - { term: "recojo de residuos", weight: 3 }
+      - { term: "aeropuerto", weight: 2 }
+      - { term: "vuelos cancelados", weight: 3 }
+      - { term: "senasir", weight: 3 }
+    negative:
+      - { term: "gol", weight: 2 }
+      - { term: "elecciones", weight: 2 }
+
 field_weights:
   title: 3.0
   description: 2.0
@@ -681,6 +857,15 @@ source_category_mappings:
     judicial: policiales
     sucesos: policiales
     accidentes: policiales
+    clima: clima
+    tiempo: clima
+    meteorologia: clima
+    mundo: mundo
+    internacional: mundo
+    internacionales: mundo
+    salud: salud
+    ciencia: salud
+    sociedad: sociedad
     general: general
 
   reduno:
@@ -709,7 +894,7 @@ source_category_mappings:
     farandula: entretenimiento
     farándula: entretenimiento
     seguridad: policiales
-    sociedad: general
+    sociedad: sociedad
 
   radiofides:
     politica: politica
@@ -717,7 +902,7 @@ source_category_mappings:
     economia: economia
     economía: economia
     deportes: deportes
-    sociedad: general
+    sociedad: sociedad
     nacional: politica
     nacionales: politica
 

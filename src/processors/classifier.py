@@ -55,6 +55,26 @@ class NewsClassifier:
             "positive": [{"term": "policia", "weight": 3}, {"term": "robo", "weight": 3}],
             "negative": [],
         },
+        "clima": {
+            "description": "Clima, fenomenos meteorologicos y desastres naturales.",
+            "positive": [{"term": "nevada", "weight": 3}, {"term": "terremoto", "weight": 4}],
+            "negative": [],
+        },
+        "mundo": {
+            "description": "Noticias internacionales fuera de Bolivia.",
+            "positive": [{"term": "casa blanca", "weight": 3}, {"term": "naciones unidas", "weight": 3}],
+            "negative": [],
+        },
+        "salud": {
+            "description": "Salud, medicina y ciencia.",
+            "positive": [{"term": "hospital", "weight": 3}, {"term": "vacuna", "weight": 3}],
+            "negative": [],
+        },
+        "sociedad": {
+            "description": "Vida cotidiana, servicios publicos y temas comunitarios.",
+            "positive": [{"term": "defensoria del pueblo", "weight": 3}, {"term": "tramite", "weight": 2}],
+            "negative": [],
+        },
     }
     DEFAULT_FIELD_WEIGHTS = {
         "title": 3.0,

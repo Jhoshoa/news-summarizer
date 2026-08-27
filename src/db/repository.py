@@ -62,6 +62,10 @@ DEFAULT_CATEGORIES = {
     "tecnologia": "Tecnologia",
     "entretenimiento": "Entretenimiento",
     "policiales": "Policiales",
+    "clima": "Clima",
+    "mundo": "Mundo",
+    "salud": "Salud",
+    "sociedad": "Sociedad",
     "general": "General",
 }
 
