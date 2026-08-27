@@ -1553,15 +1553,19 @@ class Database:
         if exact_match:
             return exact_match, "fingerprint", 1.0
 
+        # El filtro de categoria exacta se relaja aqui a proposito: distintas fuentes
+        # a veces clasifican el mismo hecho en categorias distintas (ej. una nota de
+        # una tragedia como "general" y otra como "policiales"), y eso no deberia
+        # impedir que se comparen por similitud. El umbral STORY_SIMILARITY_THRESHOLD
+        # sigue siendo la unica barrera contra falsos positivos cruzando categorias.
         candidates_stmt = (
             select(NewsArticle)
             .where(
                 NewsArticle.is_active.is_(True),
-                NewsArticle.category_id == category_id,
                 NewsArticle.published_at >= cutoff,
             )
             .order_by(NewsArticle.published_at.desc(), NewsArticle.collected_at.desc())
-            .limit(100)
+            .limit(150)
         )
         candidates_result = await session.execute(candidates_stmt)
         candidates = candidates_result.scalars().all()
@@ -1635,6 +1639,96 @@ class Database:
             }
             for article, source_name in rows
         ]
+
+    async def link_ai_detected_duplicates(
+        self, primary_article_id: int, duplicate_article_ids: list[int]
+    ) -> None:
+        """Enlaza articulos que el AIStoryDeduplicator identifico como la misma
+        historia (misma redaccion distinta) al cluster del articulo primario, para
+        que el listado y el detalle los traten como una sola historia.
+
+        Solo fusiona duplicados que sean "singleton" (sin otros articulos ya en su
+        propio cluster): si el duplicado ya comparte cluster con otros articulos,
+        fusionar clusters completos requeriria mover todos esos articulos tambien,
+        lo cual no es seguro de inferir solo a partir de una decision del LLM sobre
+        un articulo puntual, asi que ese caso se deja sin tocar."""
+
+        if not duplicate_article_ids:
+            return
+
+        async with self.session_maker() as session:
+            primary = await session.get(NewsArticle, primary_article_id)
+            if primary is None or not primary.story_cluster_id:
+                return
+
+            linked_any = False
+            for duplicate_id in duplicate_article_ids:
+                if duplicate_id == primary_article_id:
+                    continue
+                duplicate = await session.get(NewsArticle, duplicate_id)
+                if duplicate is None or not duplicate.story_cluster_id:
+                    continue
+                if duplicate.story_cluster_id == primary.story_cluster_id:
+                    continue
+
+                old_cluster_id = duplicate.story_cluster_id
+                sibling_count_stmt = select(func.count()).where(
+                    NewsArticle.story_cluster_id == old_cluster_id,
+                    NewsArticle.id != duplicate.id,
+                )
+                sibling_count = (await session.execute(sibling_count_stmt)).scalar_one()
+                if sibling_count > 0:
+                    logger.info(
+                        "AI dedup: no se fusiona articulo {} (cluster {} tiene {} "
+                        "articulos mas, fusion de clusters no soportada)",
+                        duplicate_id, old_cluster_id, sibling_count,
+                    )
+                    continue
+
+                old_story_article = await session.get(
+                    StoryArticle, {"story_id": old_cluster_id, "article_id": duplicate.id}
+                )
+                if old_story_article is not None:
+                    await session.delete(old_story_article)
+                old_story = await session.get(Story, old_cluster_id)
+                if old_story is not None:
+                    await session.delete(old_story)
+                await session.flush()
+
+                duplicate.story_cluster_id = primary.story_cluster_id
+                duplicate.duplicate_of_article_id = primary.id
+                duplicate.duplicate_reason = "ai_semantic"
+
+                existing_link = await session.get(
+                    StoryArticle,
+                    {"story_id": primary.story_cluster_id, "article_id": duplicate.id},
+                )
+                if existing_link is None:
+                    session.add(
+                        StoryArticle(
+                            story_id=primary.story_cluster_id,
+                            article_id=duplicate.id,
+                            relationship_type="duplicate",
+                            similarity_score=None,
+                        )
+                    )
+                linked_any = True
+
+            if not linked_any:
+                return
+
+            await session.flush()
+            counts_stmt = select(
+                func.count(),
+                func.count(func.distinct(NewsArticle.source_id)),
+            ).where(NewsArticle.story_cluster_id == primary.story_cluster_id)
+            article_count, source_count = (await session.execute(counts_stmt)).one()
+            primary_story = await session.get(Story, primary.story_cluster_id)
+            if primary_story is not None:
+                primary_story.article_count = int(article_count)
+                primary_story.source_count = int(source_count)
+
+            await session.commit()
 
     async def get_story_update_notes(self, story_cluster_ids: Iterable[str]) -> dict[str, str]:
         """Notas de actualizacion (Fase 1.4) para un lote de historias, para

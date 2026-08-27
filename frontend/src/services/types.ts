@@ -213,6 +213,21 @@ export type Article = {
   score?: number;
 };
 
+export type RelatedArticleItem = {
+  id: number;
+  title: string;
+  url: string;
+  source: string;
+  published_at: string;
+  duplicate_of_article_id?: number | null;
+};
+
+export type RelatedArticles = {
+  story_cluster_id: string | null;
+  canonical_article_id: number;
+  items: RelatedArticleItem[];
+};
+
 export type Summary = {
   id?: number;
   article_id?: number | null;

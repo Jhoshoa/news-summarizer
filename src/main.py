@@ -431,30 +431,33 @@ class NewsSummarizerApp:
             logger.info(f"Candidatos a resumir: {len(summary_candidates)}")
 
             llm_dedup_removed = 0
-            if summaries and summary_candidates:
+            if summary_candidates:
                 story_deduplicator = AIStoryDeduplicator(self.llm)
                 deduped: list[dict] = []
                 for cat in categories:
                     cat_articles = [a for a in summary_candidates if a.get("category") == cat]
                     if cat_articles:
+                        # cat_existing puede quedar vacio en la primera corrida del dia
+                        # (sin resumenes cacheados aun): eso es valido, deduplicate()
+                        # igual compara los candidatos de esta tanda entre si.
                         cat_existing = [s for s in summaries if s.get("category") == cat]
                         before_cat = len(cat_articles)
                         cat_deduped = await story_deduplicator.deduplicate(cat_articles, existing_summaries=cat_existing)
                         cat_removed = before_cat - len(cat_deduped)
                         if cat_removed:
-                            removed_titles = {
-                                (a.get("id"), (a.get("title","") or "")[:80])
-                                for a in cat_articles
-                                if a not in cat_deduped
-                            }
-                            for rid, rtitle in removed_titles:
-                                logger.info("  AI dedup descarta | id={:<5} cat={:<14} title={}", rid, cat, rtitle)
-                            kept_titles = {
-                                (a.get("id"), (a.get("title","") or "")[:80])
-                                for a in cat_deduped
-                            }
-                            for kid, ktitle in kept_titles:
-                                logger.info("  AI dedup conserva | id={:<5} cat={:<14} title={}", kid, cat, ktitle)
+                            kept_ids = {id(a) for a in cat_deduped}
+                            removed = [a for a in cat_articles if id(a) not in kept_ids]
+                            for a in removed:
+                                logger.info(
+                                    "  AI dedup descarta | id={:<5} cat={:<14} title={}",
+                                    a.get("id"), cat, (a.get("title","") or "")[:80],
+                                )
+                            for a in cat_deduped:
+                                logger.info(
+                                    "  AI dedup conserva | id={:<5} cat={:<14} title={}",
+                                    a.get("id"), cat, (a.get("title","") or "")[:80],
+                                )
+                            await self._link_ai_detected_duplicates(cat_deduped, removed)
                         deduped.extend(cat_deduped)
                 llm_dedup_removed = len(summary_candidates) - len(deduped)
                 summary_candidates = deduped
@@ -807,6 +810,33 @@ class NewsSummarizerApp:
                 continue
             if siblings:
                 article["corroborating_articles"] = siblings
+
+    async def _link_ai_detected_duplicates(
+        self, kept: list[dict], removed: list[dict]
+    ) -> None:
+        """Persiste en la DB los duplicados que detecto el AIStoryDeduplicator,
+        para que el listado y el detalle del articulo los traten como la misma
+        historia (no solo evitar re-resumirlos en esta corrida).
+
+        Solo se enlaza cuando queda exactamente un sobreviviente en la categoria:
+        con 2+ sobrevivientes no hay forma confiable de saber a cual de ellos
+        corresponde cada descarte (el LLM solo devuelve indices a descartar, no
+        pares descarte->match), asi que en ese caso se deja sin enlazar en vez de
+        adivinar mal."""
+
+        if not self.db or not removed or len(kept) != 1:
+            return
+
+        primary_id = kept[0].get("id")
+        duplicate_ids = [a["id"] for a in removed if a.get("id")]
+        if not primary_id or not duplicate_ids:
+            return
+
+        try:
+            await self.db.link_ai_detected_duplicates(primary_id, duplicate_ids)
+        except Exception as e:
+            logger.warning(f"No se pudo enlazar duplicados AI para {primary_id}: {e}")
+            sentry_sdk.capture_exception(e)
 
     async def _attach_story_update_notes(self, summaries: list[dict]) -> None:
         """Adjunta la nota de "que cambio" (Fase 1.4) a cada summary que la

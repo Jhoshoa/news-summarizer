@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
-import { useRouter } from "../app/router";
+import { Link, useRouter } from "../app/router";
 import {
   findByExactCode,
   findGoldIndicator,
@@ -20,6 +20,7 @@ import { trackEvent } from "../services/analytics";
 import {
   useGetArticleByIdQuery,
   useGetEconomicIndicatorsQuery,
+  useGetRelatedArticlesQuery,
   useGetStoryByIdQuery,
   useGetSummariesQuery,
   useGetWeatherQuery,
@@ -75,6 +76,9 @@ export const ArticleDetailPage = () => {
     isFetching: isFetchingStory,
     isError: isStoryError,
   } = useGetStoryByIdQuery(storyClusterId ?? "", { skip: !storyClusterId });
+  const { data: relatedArticlesData } = useGetRelatedArticlesQuery(articleId ?? 0, {
+    skip: articleId === null,
+  });
   const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery();
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
@@ -88,6 +92,10 @@ export const ArticleDetailPage = () => {
         .filter((summary) => summary.article_id !== articleId)
         .slice(0, 3),
     [articleId, latestSummariesData?.items],
+  );
+  const otherSourceArticles = useMemo(
+    () => (relatedArticlesData?.items ?? []).filter((item) => item.id !== articleId),
+    [articleId, relatedArticlesData?.items],
   );
   const officialRate = findOfficialUsdIndicator(indicators)?.value;
   const p2pBuy = findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value;
@@ -201,6 +209,20 @@ export const ArticleDetailPage = () => {
                 isError={isStoryError}
                 articleId={article.id}
               />
+
+              {otherSourceArticles.length > 0 && (
+                <section className="other-sources" aria-label="Otras fuentes que cubren esta noticia">
+                  <div className="panel-title">Otras fuentes que cubren esto</div>
+                  <ul className="other-sources-list">
+                    {otherSourceArticles.map((item) => (
+                      <li key={item.id}>
+                        <Link href={`/article/${item.id}`}>{item.title}</Link>
+                        <span className="other-sources-meta">{item.source}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
             </div>
 
             {hasArticleImage && (

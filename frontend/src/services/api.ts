@@ -9,6 +9,7 @@ import type {
   PreferenceOptionsResponse,
   PreferencePreviewRequest,
   PreferencePreviewResponse,
+  RelatedArticles,
   SourcesResponse,
   Story,
   Summary,
@@ -119,6 +120,10 @@ export const newsApi = createApi({
       query: (storyId) => `/api/stories/${storyId}`,
       providesTags: (_result, _error, storyId) => [{ type: "Stories", id: storyId }],
     }),
+    getRelatedArticles: builder.query<RelatedArticles, number>({
+      query: (articleId) => `/api/articles/${articleId}/related`,
+      providesTags: (_result, _error, articleId) => [{ type: "Articles", id: `${articleId}-related` }],
+    }),
     getSummaries: builder.query<PaginatedResponse<Summary>, GetSummariesArgs | void>({
       query: (args) => ({
         url: "/api/summaries",
@@ -209,6 +214,7 @@ export const {
   useGetArticlesQuery,
   useGetArticleByIdQuery,
   useGetStoryByIdQuery,
+  useGetRelatedArticlesQuery,
   useGetSummariesQuery,
   useGetImpactMetricsQuery,
   useGetPreferenceOptionsQuery,
