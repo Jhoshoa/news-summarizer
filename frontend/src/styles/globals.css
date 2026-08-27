@@ -2880,13 +2880,26 @@ p {
   }
 }
 
+/* Zona de aplastamiento: entre este ancho y el breakpoint mobile de abajo,
+   .detail-layout todavia es de 3 columnas (sidebar 190px + sidebar 244px de
+   piso fijo), asi que a .detail-article le queda muy poco ancho real. Si
+   .article-content-layout.has-image tambien intenta partir ese poco ancho en
+   texto + imagen (280px de piso fijo para la imagen), la columna de texto
+   puede quedar en ~120px -- texto cortado a una palabra por linea. Se apila
+   la imagen antes que el layout de 3 columnas de afuera, para no depender de
+   que ambos breakpoints coincidan. */
+@media (max-width: 1240px) {
+  .article-content-layout.has-image {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 980px) {
   .home-layout,
   .detail-layout,
   .data-hero,
   .data-context-layout,
   .lower-grid,
-  .article-content-layout.has-image,
   .subscribe-layout {
     grid-template-columns: 1fr;
   }
