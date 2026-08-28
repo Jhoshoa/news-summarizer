@@ -211,6 +211,7 @@ export type Article = {
   source: string;
   category: string;
   score?: number;
+  source_count?: number;
 };
 
 export type RelatedArticleItem = {
@@ -244,6 +245,7 @@ export type Summary = {
   summary_date?: string | null;
   created_at?: string | null;
   story_cluster_id?: string | null;
+  source_count?: number;
 };
 
 export type StoryConfidenceLevel =

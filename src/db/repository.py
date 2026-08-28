@@ -1851,9 +1851,11 @@ class Database:
             )
             result = await session.execute(stmt)
             rows = result.all()
+            items = [self._article_row_to_dict(row) for row in rows]
+            await self._attach_source_counts(session, items)
 
         return self._paginated_response(
-            items=[self._article_row_to_dict(row) for row in rows],
+            items=items,
             total=total,
             page=page,
             page_size=page_size,
@@ -1861,6 +1863,25 @@ class Database:
             requested_date=requested_date,
             is_fallback=is_fallback,
         )
+
+    async def _attach_source_counts(self, session: AsyncSession, items: list[dict]) -> None:
+        """Agrega source_count (de la Story del cluster) a cada item, para que
+        el listado pueda marcar "varias fuentes" sin una consulta por item.
+        No es el mismo campo que la Story completa -- solo el conteo, que ya
+        se mantiene actualizado en _upsert_story/link_ai_detected_duplicates."""
+
+        cluster_ids = {
+            item.get("story_cluster_id") for item in items if item.get("story_cluster_id")
+        }
+        if not cluster_ids:
+            for item in items:
+                item["source_count"] = 1
+            return
+
+        counts_stmt = select(Story.id, Story.source_count).where(Story.id.in_(cluster_ids))
+        counts = dict((await session.execute(counts_stmt)).all())
+        for item in items:
+            item["source_count"] = counts.get(item.get("story_cluster_id"), 1)
 
     def _article_filters(
         self,
@@ -2300,9 +2321,11 @@ class Database:
             )
             result = await session.execute(stmt)
             rows = result.all()
+            items = [self._summary_row_to_dict(row) for row in rows]
+            await self._attach_source_counts(session, items)
 
         return self._paginated_response(
-            items=[self._summary_row_to_dict(row) for row in rows],
+            items=items,
             total=total,
             page=page,
             page_size=page_size,

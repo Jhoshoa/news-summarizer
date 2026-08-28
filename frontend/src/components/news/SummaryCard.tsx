@@ -13,6 +13,7 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
   const title = cleanGeneratedText(summary.title);
   const summaryText = buildContextualSummary(summary.summary, summary.article_description);
   const fact = summary.fact ? cleanGeneratedText(summary.fact) : "";
+  const hasMultipleSources = (summary.source_count ?? 1) >= 2;
   const content = (
     <>
       <ArticleImage image={summary.image} alt={title} compact />
@@ -21,7 +22,12 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
           <span className="eyebrow">
             {summary.source ?? "EcoBrief Bolivia"} - {summary.category}
           </span>
-          <span className="status-badge summarized">Resumido IA</span>
+          <div className="card-badges">
+            {hasMultipleSources && (
+              <span className="status-badge confidence-multi">Varias fuentes</span>
+            )}
+            <span className="status-badge summarized">Resumido IA</span>
+          </div>
         </div>
         <time className="published-date" dateTime={summary.published_at ?? summary.created_at ?? undefined}>
           {formatPublishedDate(summary.published_at ?? summary.created_at)}
