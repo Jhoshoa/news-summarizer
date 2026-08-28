@@ -830,54 +830,49 @@ class Database:
         }
 
         if latest_run:
-            cumulative_collected = sum(
-                self._safe_int(r.raw_collected_count) for r in runs_with_metrics
-            )
-            cumulative_usable = sum(
-                self._safe_int(r.usable_count) for r in runs_with_metrics
-            )
-            cumulative_quality_dropped = sum(
-                self._safe_int(r.quality_dropped_count) for r in runs_with_metrics
-            )
-            cumulative_ranked = sum(
-                self._safe_int(r.ranked_count) for r in runs_with_metrics
-            )
-            cumulative_duplicate_dropped = sum(
-                self._safe_int(r.duplicate_dropped_count) for r in runs_with_metrics
-            )
-            cumulative_summaries = sum(
-                self._safe_int(r.summaries_count) for r in runs_with_metrics
-            )
+            # "Recolectadas"/"Unicas"/"Briefs" del dia usan los conteos reales
+            # de arriba (articulos/resumenes que de verdad quedaron en la DB),
+            # no la suma de lo que reporto cada corrida. Sumar entre corridas
+            # del mismo dia inflaba estos numeros varias veces: cada corrida
+            # vuelve a scrapear casi las mismas noticias del dia, asi que
+            # "raw_collected_count" se repite en cada una en vez de sumar
+            # articulos distintos (confirmado en vivo: un dia con 9 corridas
+            # reportaba 1819 "recolectadas" cuando en la DB habia 185 articulos
+            # reales para ese dia).
+            #
+            # "Utiles"/"Candidatas"/"Rankeadas"/descartes no tienen una
+            # columna equivalente en la DB (un articulo rechazado por calidad
+            # nunca se guarda), asi que ahi no hay forma de sacar un numero
+            # "real" distinto -- se usa el de la corrida mas reciente en vez
+            # de sumar, como una foto del estado actual del pipeline en vez
+            # de un total inflado.
             cumulative_inserted = sum(
                 self._safe_int(r.inserted_count) for r in runs_with_metrics
             )
             cumulative_updated = sum(
                 self._safe_int(r.updated_count) for r in runs_with_metrics
             )
-            cumulative_candidates = sum(
-                self._safe_int(r.summary_candidates_count) for r in runs_with_metrics
-            )
 
-            pipe_collected = cumulative_collected or collected_articles
-            pipe_usable = cumulative_usable or pipe_collected
-            pipe_ranked = cumulative_ranked or pipe_collected
-            pipe_unique = cumulative_inserted or unique_articles
-            pipe_summaries = cumulative_summaries or summaries
-            pipe_candidates = cumulative_candidates or pipe_unique
+            pipe_collected = collected_articles or self._safe_int(latest_run.raw_collected_count)
+            pipe_unique = unique_articles or cumulative_inserted
+            pipe_summaries = summaries or self._safe_int(latest_run.summaries_count)
+            pipe_usable = self._safe_int(latest_run.usable_count) or pipe_collected
+            pipe_ranked = self._safe_int(latest_run.ranked_count) or pipe_collected
+            pipe_candidates = self._safe_int(latest_run.summary_candidates_count) or pipe_unique
 
             return {
                 "data_source": "pipeline_run",
                 "collected_articles": pipe_collected,
                 "unique_articles": pipe_unique,
                 "summaries": pipe_summaries,
-                "quality_dropped_articles": cumulative_quality_dropped,
+                "quality_dropped_articles": self._safe_int(latest_run.quality_dropped_count),
                 "duplicate_articles": max(pipe_collected - pipe_unique, 0),
                 "summary_candidates": pipe_candidates,
                 "usable_articles": pipe_usable,
                 "ranked_articles": pipe_ranked,
                 "inserted_articles": cumulative_inserted,
                 "updated_articles": cumulative_updated,
-                "duplicate_dropped_articles": cumulative_duplicate_dropped,
+                "duplicate_dropped_articles": self._safe_int(latest_run.duplicate_dropped_count),
                 "has_data": pipe_collected > 0 or pipe_summaries > 0,
                 "cache_reused": bool(
                     latest_run.used_cached_articles or latest_run.used_cached_summaries
