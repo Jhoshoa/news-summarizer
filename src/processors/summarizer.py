@@ -3,6 +3,7 @@ import re
 import unicodedata
 from typing import Any
 
+import openai
 import sentry_sdk
 from loguru import logger
 
@@ -138,6 +139,15 @@ Devuelve solo JSON valido, sin markdown ni texto adicional."""
             logger.info(f"Resumidas {len(summaries)} noticias de categoria '{category}'")
             return summaries
 
+        except openai.RateLimitError as e:
+            # Cuota agotada en todos los proveedores del LLMRouter -- no es
+            # un bug, es un limite externo esperable mientras se use el tier
+            # gratis. Se registra como warning informativo, no como error de
+            # Sentry, para no generar ruido por algo que ya sabemos que pasa
+            # y se resuelve agregando/pagando mas capacidad, no arreglando
+            # codigo.
+            logger.warning(f"Cuota de LLM agotada en todos los proveedores: {e}")
+            return []
         except Exception as e:
             logger.error(f"Error resumiendo noticias: {e}")
             if _is_retry:

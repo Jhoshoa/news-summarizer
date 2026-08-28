@@ -1,3 +1,6 @@
+import httpx
+import openai
+
 from src.db.repository import DEFAULT_CATEGORIES
 from src.processors.summarizer import NewsSummarizer
 
@@ -598,3 +601,51 @@ async def test_summarize_uses_larger_max_tokens_for_bigger_batches():
     first_call_max_tokens = captured_calls[0]["max_tokens"]
     assert first_call_max_tokens > 3000
     assert first_call_max_tokens == 8 * NewsSummarizer.MAX_TOKENS_PER_ARTICLE
+
+
+def _rate_limit_error() -> openai.RateLimitError:
+    request = httpx.Request("POST", "https://example.com/v1/chat/completions")
+    response = httpx.Response(429, request=request)
+    return openai.RateLimitError("rate limit exceeded", response=response, body=None)
+
+
+async def test_summarize_does_not_report_exhausted_rate_limit_to_sentry(monkeypatch):
+    """Regression test: LLMRouter raises RateLimitError once every configured
+    provider is out of free-tier quota -- that's an expected, self-explanatory
+    condition (buy more capacity later), not a bug. It should log a warning,
+    not show up in Sentry alongside real errors."""
+
+    import src.processors.summarizer as summarizer_module
+
+    captured: list[Exception] = []
+    monkeypatch.setattr(summarizer_module.sentry_sdk, "capture_exception", captured.append)
+
+    class _RateLimitedLLM:
+        async def chat(self, prompt: str, **kwargs: object) -> str:
+            raise _rate_limit_error()
+
+    summarizer = NewsSummarizer(llm_provider=_RateLimitedLLM())
+
+    summaries = await summarizer.summarize([_article(1, "Noticia")], "economia", _is_retry=True)
+
+    assert summaries == []
+    assert captured == []
+
+
+async def test_summarize_still_reports_other_errors_to_sentry_on_retry(monkeypatch):
+    import src.processors.summarizer as summarizer_module
+
+    captured: list[Exception] = []
+    monkeypatch.setattr(summarizer_module.sentry_sdk, "capture_exception", captured.append)
+
+    class _BrokenLLM:
+        async def chat(self, prompt: str, **kwargs: object) -> str:
+            raise RuntimeError("something actually broke")
+
+    summarizer = NewsSummarizer(llm_provider=_BrokenLLM())
+
+    summaries = await summarizer.summarize([_article(1, "Noticia")], "economia", _is_retry=True)
+
+    assert summaries == []
+    assert len(captured) == 1
+    assert isinstance(captured[0], RuntimeError)
