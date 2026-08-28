@@ -250,7 +250,7 @@ async def test_unitel_listing_date_skips_non_today_detail_fetch():
         transport=httpx.MockTransport(handler),
         follow_redirects=True,
     ) as client:
-        articles = await scraper._scrape_source(client, source)
+        articles, _ = await scraper._scrape_source(client, source)
 
     assert [article["title"] for article in articles] == [
         "Noticia actual de Unitel con fecha de hoy"
@@ -858,7 +858,7 @@ async def test_lostiempos_url_date_skips_non_today_detail_fetch():
         transport=httpx.MockTransport(handler),
         follow_redirects=True,
     ) as client:
-        articles = await scraper._scrape_source(client, source)
+        articles, _ = await scraper._scrape_source(client, source)
 
     assert [article["title"] for article in articles] == [
         "Noticia actual de Los Tiempos con fecha de hoy"

@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     scraper_sources: str = Field(
         default="radiofides,unitel,reduno,redbolivision", alias="SCRAPER_SOURCES"
     )
+    # Un articulo ya scrapeado (con contenido guardado) no se vuelve a pedir
+    # completo si ya paso este numero de horas desde su publicacion -- antes
+    # de eso se sigue re-chequeando por si la nota se actualiza (comun en
+    # coberturas "en desarrollo").
+    scraper_detail_refresh_hours: int = Field(
+        default=3, alias="SCRAPER_DETAIL_REFRESH_HOURS"
+    )
 
     twilio_account_sid: str | None = Field(default=None, alias="TWILIO_ACCOUNT_SID")
     twilio_auth_token: str | None = Field(default=None, alias="TWILIO_AUTH_TOKEN")

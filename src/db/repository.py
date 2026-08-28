@@ -678,6 +678,38 @@ class Database:
                     break
             return items
 
+    async def get_recent_article_details(self, *, since: datetime) -> dict[str, dict]:
+        """Contenido ya scrapeado, indexado por url_hash, para que el scraper
+        pueda saltarse el detalle de un articulo que ya tiene contenido
+        guardado en vez de volver a pedir la pagina completa cada corrida.
+
+        Solo trae articulos con content ya poblado (sin eso no sirve para
+        reusar) y collected_at reciente (no tiene sentido cargar dias viejos
+        en memoria en cada corrida)."""
+
+        async with self.session_maker() as session:
+            stmt = select(
+                NewsArticle.url_hash,
+                NewsArticle.content,
+                NewsArticle.description,
+                NewsArticle.image_url,
+                NewsArticle.published_at,
+            ).where(
+                NewsArticle.collected_at >= since,
+                NewsArticle.content.is_not(None),
+            )
+            rows = (await session.execute(stmt)).all()
+
+        return {
+            url_hash: {
+                "content": content,
+                "description": description,
+                "image": self._public_image_url(image_url),
+                "published_at": published_at,
+            }
+            for url_hash, content, description, image_url, published_at in rows
+        }
+
     async def start_collection_run(self, requested_categories: list[str]) -> int:
         async with self.session_maker() as session:
             run = CollectionRun(requested_categories=requested_categories)

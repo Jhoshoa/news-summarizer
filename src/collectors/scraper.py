@@ -137,6 +137,7 @@ class NewsScraper:
         timeout: int = 30,
         config_path: str = None,
         timezone: str = "America/La_Paz",
+        detail_refresh_hours: int = 3,
     ):
         self.user_agent = (
             user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -145,6 +146,7 @@ class NewsScraper:
         self._config_path = config_path
         self._scraper_timezone = timezone
         self._tz = ZoneInfo(timezone)
+        self.detail_refresh_hours = max(int(detail_refresh_hours), 0)
 
         if sources:
             self.sources = [NewsSource.from_dict(s) if isinstance(s, dict) else s for s in sources]
@@ -173,8 +175,14 @@ class NewsScraper:
         except Exception as e:
             logger.warning(f"Error cargando config: {e}. Usando fuentes por defecto.")
 
-    async def fetch_all(self, categories: list[str] = None) -> list[dict]:
+    async def fetch_all(
+        self,
+        categories: list[str] = None,
+        known_articles: dict[str, dict] | None = None,
+    ) -> list[dict]:
         results = []
+        known_articles = known_articles or {}
+        reused_total = 0
 
         timeout = httpx.Timeout(float(self.timeout), connect=min(10.0, float(self.timeout)))
         async with httpx.AsyncClient(
@@ -184,15 +192,28 @@ class NewsScraper:
         ) as client:
             for source in self.sources:
                 try:
-                    news = await self._scrape_source(client, source)
+                    news, reused = await self._scrape_source(client, source, known_articles)
                     results.extend(news)
+                    reused_total += reused
                     logger.info(f"Scraped {len(news)} noticias de {source.name}")
                 except Exception as e:
                     logger.error(f"Error scraping {source.name}: {e}")
 
+        if reused_total:
+            logger.info(
+                f"Reutilizado contenido ya scrapeado para {reused_total} articulos "
+                f"(sin volver a pedir la pagina de detalle)"
+            )
+
         return self._deduplicate(results)
 
-    async def _scrape_source(self, client, source: NewsSource) -> list[dict]:
+    async def _scrape_source(
+        self,
+        client,
+        source: NewsSource,
+        known_articles: dict[str, dict] | None = None,
+    ) -> tuple[list[dict], int]:
+        known_articles = known_articles or {}
         try:
             response = await client.get(source.url)
             response.raise_for_status()
@@ -215,12 +236,13 @@ class NewsScraper:
 
             articles = self._deduplicate(articles)
             articles = self._filter_articles_for_detail_fetch(articles, source)
-            enriched = await self._enrich_articles(client, articles, source)
+            enriched = await self._enrich_articles(client, articles, source, known_articles)
             usable = self._filter_usable_articles(enriched, source)
-            return usable
+            reused = sum(1 for a in usable if a.get("detail_reused"))
+            return usable, reused
         except Exception as e:
             logger.error(f"Error fetching {source.name}: {e}")
-            return []
+            return [], 0
 
     def _extract_article(self, article_soup, source: NewsSource) -> dict | None:
         try:
@@ -299,12 +321,14 @@ class NewsScraper:
         client: httpx.AsyncClient,
         articles: list[dict],
         source: NewsSource,
+        known_articles: dict[str, dict] | None = None,
     ) -> list[dict]:
+        known_articles = known_articles or {}
         enriched = []
 
         for article in articles:
             try:
-                enriched.append(await self._enrich_article(client, article, source))
+                enriched.append(await self._enrich_article(client, article, source, known_articles))
             except Exception as e:
                 logger.warning(f"Error enriching article {article.get('url')}: {e}")
                 enriched.append(article)
@@ -353,10 +377,16 @@ class NewsScraper:
         client: httpx.AsyncClient,
         article: dict,
         source: NewsSource,
+        known_articles: dict[str, dict] | None = None,
     ) -> dict:
+        known_articles = known_articles or {}
         url = article.get("url")
         if not url:
             return article
+
+        known = known_articles.get(article.get("hash"))
+        if known and self._can_reuse_known_article(known):
+            return self._apply_known_article(article, known)
 
         try:
             response = await client.get(url)
@@ -397,6 +427,40 @@ class NewsScraper:
         if detail_image and not article.get("image"):
             article["image"] = detail_image
 
+        return article
+
+    def _can_reuse_known_article(self, known: dict) -> bool:
+        """True si ya tenemos contenido guardado de este articulo y es lo
+        bastante viejo como para asumir que ya no va a cambiar. Notas muy
+        recientes (coberturas "en desarrollo") se siguen re-chequeando
+        normalmente, para no perder actualizaciones reales."""
+
+        if not known.get("content"):
+            return False
+
+        published_at = known.get("published_at")
+        if not isinstance(published_at, datetime):
+            return False
+        if published_at.tzinfo is not None:
+            published_at = published_at.astimezone(self._tz).replace(tzinfo=None)
+
+        age = self._now() - published_at
+        return age >= timedelta(hours=self.detail_refresh_hours)
+
+    def _apply_known_article(self, article: dict, known: dict) -> dict:
+        article["content"] = known.get("content")
+        article["excerpt"] = self._build_excerpt(known.get("content"))
+        article["content_word_count"] = self._count_words(known.get("content") or "")
+        article["content_collected_at"] = self._now()
+        if known.get("description") and not article.get("description"):
+            article["description"] = known["description"]
+        if known.get("image") and not article.get("image"):
+            article["image"] = known["image"]
+        # published_at de la DB ya viene de un fetch de detalle anterior, mas
+        # confiable que la fecha adivinada del listado.
+        article["published_at"] = known.get("published_at") or article.get("published_at")
+        article["published_at_from_detail"] = True
+        article["detail_reused"] = True
         return article
 
     def _filter_articles_for_detail_fetch(

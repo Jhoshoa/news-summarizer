@@ -705,13 +705,23 @@ class NewsSummarizerApp:
         try:
             if self.settings.scraper_enabled:
                 try:
+                    known_articles: dict[str, dict] = {}
+                    if self.db:
+                        try:
+                            since = datetime.now(tz_bolivia).replace(tzinfo=None) - timedelta(hours=48)
+                            known_articles = await self.db.get_recent_article_details(since=since)
+                        except Exception as e:
+                            logger.warning(f"No se pudo cargar contenido ya scrapeado: {e}")
+                            sentry_sdk.capture_exception(e)
+
                     scraper = NewsScraper(
                         user_agent=self.settings.scraper_user_agent,
                         timeout=self.settings.scraper_timeout,
                         config_path=self.settings.scraper_config_path,
                         timezone=self.settings.schedule_timezone,
+                        detail_refresh_hours=self.settings.scraper_detail_refresh_hours,
                     )
-                    scraped = await scraper.fetch_all(categories=categories)
+                    scraped = await scraper.fetch_all(categories=categories, known_articles=known_articles)
                     news.extend(scraped)
                     stats["scraper"] = len(scraped)
                     logger.info(f"Scraped {len(scraped)} noticias")
