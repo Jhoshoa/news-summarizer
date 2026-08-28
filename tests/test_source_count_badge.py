@@ -168,3 +168,117 @@ async def test_list_summaries_marks_multi_source_stories(db: Database):
     by_title = {item["title"]: item["source_count"] for item in result["items"]}
     assert by_title["Resumen de historia con dos fuentes"] == 2
     assert by_title["Resumen de historia sin cluster"] == 1
+
+
+@pytest.mark.asyncio
+async def test_list_articles_hides_duplicates_but_keeps_the_primary(db: Database):
+    """El listado (news + home) no deberia mostrar la misma historia dos
+    veces solo porque dos fuentes la cubrieron -- el articulo marcado como
+    duplicado de otro (duplicate_of_article_id) queda afuera; el primario
+    sigue apareciendo, con su badge de "varias fuentes" ya probado arriba."""
+
+    async with db.session_maker() as session:
+        category, source_a = await _seed_category_and_source(session, source_name="RedUno")
+        source_b = NewsSource(name="Unitel", source_type="scraper")
+        session.add(source_b)
+        await session.flush()
+
+        now = datetime(2026, 8, 27, 12, 0, 0)
+        primary = await _make_article(
+            session, category_id=category.id, source_id=source_a.id,
+            title="Primario", url="https://example.com/primary",
+            story_cluster_id="cluster-a", published_at=now,
+        )
+        await session.flush()
+        duplicate = NewsArticle(
+            title="Duplicado",
+            url="https://example.com/duplicate",
+            url_hash="https://example.com/duplicate",
+            story_cluster_id="cluster-a",
+            duplicate_of_article_id=primary.id,
+            duplicate_reason="ai_semantic",
+            category_id=category.id,
+            source_id=source_b.id,
+            published_at=now,
+            collected_at=now,
+            is_active=True,
+        )
+        session.add(duplicate)
+        await session.commit()
+        duplicate_id = duplicate.id
+
+    result = await db.list_articles(article_date=date(2026, 8, 27), page_size=10)
+
+    titles = [item["title"] for item in result["items"]]
+    assert titles == ["Primario"]
+
+    # Acceso directo (ej. un link ya compartido a la nota duplicada) sigue
+    # funcionando -- solo se oculta del listado, no se borra ni se bloquea.
+    direct = await db.get_article_by_id(duplicate_id)
+    assert direct is not None
+    assert direct["title"] == "Duplicado"
+
+
+@pytest.mark.asyncio
+async def test_list_summaries_hides_summary_of_duplicate_article(db: Database):
+    async with db.session_maker() as session:
+        category, source_a = await _seed_category_and_source(session, source_name="RedUno")
+        source_b = NewsSource(name="Unitel", source_type="scraper")
+        session.add(source_b)
+        await session.flush()
+
+        now = datetime(2026, 8, 27, 12, 0, 0)
+        primary = await _make_article(
+            session, category_id=category.id, source_id=source_a.id,
+            title="Primario", url="https://example.com/primary-sum",
+            story_cluster_id="cluster-b", published_at=now,
+        )
+        await session.flush()
+        duplicate = NewsArticle(
+            title="Duplicado",
+            url="https://example.com/duplicate-sum",
+            url_hash="https://example.com/duplicate-sum",
+            story_cluster_id="cluster-b",
+            duplicate_of_article_id=primary.id,
+            duplicate_reason="ai_semantic",
+            category_id=category.id,
+            source_id=source_b.id,
+            published_at=now,
+            collected_at=now,
+            is_active=True,
+        )
+        session.add(duplicate)
+        await session.flush()
+        session.add(NewsSummary(
+            article_id=primary.id,
+            category_id=category.id,
+            story_cluster_id="cluster-b",
+            title="Resumen primario",
+            summary="Resumen valido.",
+            summary_date=date(2026, 8, 27),
+            created_at=now,
+        ))
+        # Caso defensivo: si por alguna razon existiera un resumen para el
+        # articulo duplicado, tampoco deberia listarse aparte.
+        session.add(NewsSummary(
+            article_id=duplicate.id,
+            category_id=category.id,
+            story_cluster_id="cluster-b",
+            title="Resumen duplicado",
+            summary="Resumen valido.",
+            summary_date=date(2026, 8, 27),
+            created_at=now,
+        ))
+        await session.commit()
+        duplicate_id = duplicate.id
+
+    result = await db.list_summaries(summary_date=date(2026, 8, 27), page_size=10)
+    titles = [item["title"] for item in result["items"]]
+    assert titles == ["Resumen primario"]
+
+    # Pero pedir el resumen de ese articulo puntualmente (article_id) sigue
+    # funcionando -- la pagina de detalle del duplicado no debe quedar vacia.
+    direct = await db.list_summaries(
+        summary_date=date(2026, 8, 27), article_id=duplicate_id, page_size=10
+    )
+    assert [item["title"] for item in direct["items"]] == ["Resumen duplicado"]

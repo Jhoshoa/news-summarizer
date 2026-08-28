@@ -1892,7 +1892,11 @@ class Database:
         article_date: date | None = None,
         exclude_summarized: bool = False,
     ) -> list[Any]:
-        filters = [NewsArticle.is_active.is_(True), self._article_not_unpublished_filter()]
+        filters = [
+            NewsArticle.is_active.is_(True),
+            NewsArticle.duplicate_of_article_id.is_(None),
+            self._article_not_unpublished_filter(),
+        ]
         if article_date:
             start_at, end_at = self._day_bounds(article_date)
             filters.extend(
@@ -2348,7 +2352,16 @@ class Database:
         if category:
             filters.append(NewsCategory.name == category.strip().lower())
         if article_id is not None:
+            # Busqueda directa por articulo (ej. la pagina de detalle pidiendo
+            # su propio resumen): no filtrar por duplicado, el usuario ya esta
+            # viendo ese articulo puntual.
             filters.append(NewsSummary.article_id == article_id)
+        else:
+            # Listado general: un resumen de un articulo marcado como
+            # duplicado de otro no deberia aparecer como tarjeta aparte.
+            filters.append(
+                or_(NewsArticle.id.is_(None), NewsArticle.duplicate_of_article_id.is_(None))
+            )
         return filters
 
     async def _latest_summary_date(
