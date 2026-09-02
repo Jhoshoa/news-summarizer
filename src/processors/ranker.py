@@ -233,10 +233,6 @@ class NewsRanker:
         ranked = sorted(news, key=lambda item: item.get("score", 0), reverse=True)
         return ranked[:limit] if limit else ranked
 
-    def _calculate_score(self, item: dict) -> float:
-        score, _, _ = self._calculate_score_details(item)
-        return score
-
     def _calculate_score_details(self, item: dict) -> tuple[float, dict[str, float], list[str]]:
         reasons: list[str] = []
         components = {

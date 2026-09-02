@@ -112,7 +112,7 @@ def test_classifier_falls_back_to_general_without_enough_signals():
     assert decision.confidence == 0.0
 
 
-def test_classify_batch_adds_auditable_metadata():
+async def test_classify_batch_adds_auditable_metadata():
     classifier = NewsClassifier()
     articles = [
         {
@@ -123,7 +123,7 @@ def test_classify_batch_adds_auditable_metadata():
         }
     ]
 
-    result = classifier.classify_batch(articles)
+    result = await classifier.classify_batch_async(articles)
 
     assert result[0]["category"] == "economia"
     assert result[0]["category_confidence"] > 0
@@ -132,10 +132,10 @@ def test_classify_batch_adds_auditable_metadata():
     assert result[0]["category_method"] == "rules"
 
 
-def test_classifier_maps_reduno_deportes_source_category():
+async def test_classifier_maps_reduno_deportes_source_category():
     classifier = NewsClassifier()
 
-    result = classifier.classify_batch(
+    result = await classifier.classify_batch_async(
         [
             {
                 "title": "Equipo local presenta nueva camiseta",
@@ -153,10 +153,10 @@ def test_classifier_maps_reduno_deportes_source_category():
     assert "source_category:categoria_fuente" in result[0]["category_reason"]
 
 
-def test_classifier_maps_reduno_nacionales_to_politics():
+async def test_classifier_maps_reduno_nacionales_to_politics():
     classifier = NewsClassifier()
 
-    result = classifier.classify_batch(
+    result = await classifier.classify_batch_async(
         [
             {
                 "title": "Autoridades anuncian reunion nacional",
@@ -173,10 +173,10 @@ def test_classifier_maps_reduno_nacionales_to_politics():
     assert result[0]["source_category_mapped"] == "politica"
 
 
-def test_classifier_uses_global_source_category_mapping_with_accents():
+async def test_classifier_uses_global_source_category_mapping_with_accents():
     classifier = NewsClassifier()
 
-    result = classifier.classify_batch(
+    result = await classifier.classify_batch_async(
         [
             {
                 "title": "Empresas reportan nueva actividad productiva",

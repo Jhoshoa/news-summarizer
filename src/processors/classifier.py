@@ -153,11 +153,6 @@ class NewsClassifier:
                 ", ".join(unknown_categories),
             )
 
-    def classify(self, article: dict) -> str:
-        """Devuelve solo la categoria para mantener compatibilidad."""
-
-        return self.classify_article(article).category
-
     def classify_article(self, article: dict) -> ClassificationDecision:
         """Clasifica una noticia y devuelve categoria, confianza y explicacion."""
 
@@ -234,31 +229,6 @@ class NewsClassifier:
             reason=reason,
             method=method,
         )
-
-    async def classify_with_ai(self, article: dict) -> str:
-        """Clasifica con IA cuando se invoque explicitamente."""
-
-        if not self.llm:
-            return self.classify(article)
-
-        decision = self.classify_article(article)
-        llm_decision = await self._classify_with_llm(article, decision)
-        if not llm_decision:
-            return decision.category
-
-        article["category_confidence"] = llm_decision.confidence
-        article["category_reason"] = llm_decision.reason
-        article["category_method"] = llm_decision.method
-        return llm_decision.category
-
-    def classify_batch(self, news: list[dict]) -> list[dict]:
-        """Clasifica una lista de noticias y agrega metadatos auditables."""
-
-        for article in news:
-            decision = self.classify_article(article)
-            self._apply_decision(article, decision)
-
-        return news
 
     async def classify_batch_async(self, news: list[dict]) -> list[dict]:
         """Clasifica noticias y usa LLM solo para casos ambiguos configurados."""

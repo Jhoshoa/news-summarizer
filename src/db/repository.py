@@ -438,24 +438,6 @@ class Database:
             logger.info(f"Obtenidos {len(subscribers)} subscribers activos")
             return subscribers
 
-    async def get_subscriber_by_phone(self, phone: str) -> Subscriber | None:
-        """Obtiene un subscriber por telefono."""
-
-        async with self.session_maker() as session:
-            stmt = select(Subscriber).where(Subscriber.phone == phone)
-            result = await session.execute(stmt)
-            return result.scalar_one_or_none()
-
-    async def get_subscriber_by_telegram(
-        self, telegram_id: str
-    ) -> Subscriber | None:
-        """Obtiene un subscriber por telegram ID."""
-
-        async with self.session_maker() as session:
-            stmt = select(Subscriber).where(Subscriber.telegram_id == telegram_id)
-            result = await session.execute(stmt)
-            return result.scalar_one_or_none()
-
     async def unsubscribe(self, identifier: str) -> bool:
         """Desactiva una suscripcion."""
 
@@ -990,21 +972,6 @@ class Database:
             return int(value)
         except (TypeError, ValueError):
             return None
-
-    async def _latest_collection_run_for_date(
-        self,
-        session: AsyncSession,
-        metrics_date: date,
-    ) -> CollectionRun | None:
-        start_at, end_at = self._day_bounds(metrics_date)
-        stmt = (
-            select(CollectionRun)
-            .where(CollectionRun.started_at >= start_at, CollectionRun.started_at < end_at)
-            .order_by(CollectionRun.started_at.desc(), CollectionRun.id.desc())
-            .limit(1)
-        )
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def _collection_runs_for_date(
         self,

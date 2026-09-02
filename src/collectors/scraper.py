@@ -143,7 +143,6 @@ class NewsScraper:
             user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
         self.timeout = timeout
-        self._config_path = config_path
         self._scraper_timezone = timezone
         self._tz = ZoneInfo(timezone)
         self.detail_refresh_hours = max(int(detail_refresh_hours), 0)
@@ -157,10 +156,6 @@ class NewsScraper:
             self._load_sources_from_config(config_path)
 
         logger.info(f"NewsScraper inicializado con {len(self.sources)} fuentes en timezone={timezone}")
-
-    def reload_config(self):
-        if self._config_path:
-            self._load_sources_from_config(self._config_path)
 
     def _load_sources_from_config(self, config_path: str):
         try:
@@ -951,9 +946,6 @@ class NewsScraper:
         if url:
             url = urljoin(source.url, url)
         return url
-
-    def _extract_date(self, article_soup, source: NewsSource) -> datetime:
-        return self._extract_optional_date(article_soup, source) or self._now()
 
     def _extract_optional_date(self, article_soup, source: NewsSource) -> datetime | None:
         if not source.date_selector:
