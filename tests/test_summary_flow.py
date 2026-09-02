@@ -93,7 +93,7 @@ class FakeWhatsApp:
     def __init__(self):
         self.sent = []
 
-    def send_message(self, phone, message):
+    async def send_message(self, phone, message):
         self.sent.append((phone, message))
         return True
 

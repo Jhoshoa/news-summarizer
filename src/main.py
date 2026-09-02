@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import sentry_sdk
 from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from loguru import logger
 
 from src.api import (
@@ -57,6 +58,13 @@ class NewsSummarizerApp:
         self.whatsapp: WhatsAppHandler | None = None
         self.telegram: TelegramHandler | None = None
         self.email: EmailHandler | None = None
+        # Fallback en memoria del candado contra /trigger/summary superpuestos,
+        # usado solo cuando no hay DB disponible (sin DB no se puede consultar
+        # el job compartido -- ver get_active_summary_refresh_job en
+        # repository.py, que es el candado real: la BD es lo unico visible
+        # para los 4 workers de gunicorn por igual, un flag en memoria de
+        # Python solo protegeria dentro de un mismo proceso).
+        self.summary_refresh_running: bool = False
 
     def _init_sentry(self) -> None:
         """Error tracking en produccion (Fase: robustecer antes de redeploy).
@@ -125,6 +133,7 @@ class NewsSummarizerApp:
             try:
                 self.llm = LLMRouter(
                     providers=self.settings.llm_providers_list,
+                    timeout=self.settings.llm_timeout,
                 )
                 logger.info(f"LLM Router: {self.llm}")
             except Exception as e:
@@ -165,6 +174,9 @@ class NewsSummarizerApp:
 
         if self.llm:
             await self.llm.close()
+
+        if self.whatsapp:
+            await self.whatsapp.close()
 
         if self.db:
             await self.db.close()
@@ -626,7 +638,9 @@ class NewsSummarizerApp:
 
                 if sub.channel == "whatsapp" and sub.phone:
                     message = self._format_summary(user_news)
-                    delivered = bool(self.whatsapp and self.whatsapp.send_message(sub.phone, message))
+                    delivered = bool(
+                        self.whatsapp and await self.whatsapp.send_message(sub.phone, message)
+                    )
                     if delivered:
                         sent_count += 1
                         delivery_stats["sent_by_channel"]["whatsapp"] += 1
@@ -1315,44 +1329,63 @@ async def health():
     }
 
 
+@app.get("/webhook/whatsapp")
+async def whatsapp_webhook_verify(request: Request):
+    """Handshake de suscripcion del webhook de Meta.
+
+    Cuando configuras la URL del webhook en el panel de Meta for Developers,
+    Meta manda un GET con `hub.mode=subscribe`, `hub.verify_token` (el valor
+    que vos elegiste, WHATSAPP_META_VERIFY_TOKEN) y `hub.challenge`. Si el
+    token coincide, hay que devolver `hub.challenge` tal cual como texto
+    plano -- si no, Meta no activa el webhook.
+    """
+
+    if not app_instance:
+        raise HTTPException(status_code=500, detail="App no inicializada")
+
+    params = request.query_params
+    expected_token = getattr(app_instance.settings, "whatsapp_meta_verify_token", None)
+
+    if (
+        params.get("hub.mode") == "subscribe"
+        and expected_token
+        and params.get("hub.verify_token") == expected_token
+    ):
+        return PlainTextResponse(params.get("hub.challenge", ""))
+
+    raise HTTPException(status_code=403, detail="Verificacion de webhook invalida")
+
+
 @app.post("/webhook/whatsapp")
 async def whatsapp_webhook(
     request: Request,
-    x_twilio_signature: str | None = Header(default=None, alias="X-Twilio-Signature"),
+    x_hub_signature_256: str | None = Header(default=None, alias="X-Hub-Signature-256"),
 ):
-    """Webhook for WhatsApp via Twilio.
+    """Webhook for WhatsApp via la Graph API directa de Meta.
 
-    Twilio manda el payload como form-urlencoded con los campos `From`/`Body`
-    (con mayuscula, no "sender"/"body") y espera de vuelta TwiML, no JSON —
-    si no, el mensaje de respuesta nunca le llega al usuario aunque
-    `handle_message` lo haya generado bien.
+    A diferencia de Twilio (form-urlencoded, `From`/`Body`, respuesta en
+    TwiML), Meta manda JSON anidado (`entry[].changes[].value.messages[]`,
+    ver `WhatsAppHandler.extract_inbound_message`) y no espera ninguna
+    respuesta en particular en el body -- la contestacion al usuario es una
+    llamada HTTP saliente aparte (`WhatsAppHandler.process_webhook_event`
+    hace las dos cosas).
 
-    Se valida `X-Twilio-Signature` (si `TWILIO_AUTH_TOKEN` y
-    `TWILIO_WEBHOOK_URL` estan configurados) para que nadie pueda mandar
-    mensajes falsos a este endpoint adivinando la URL — sin esto, cualquiera
-    podria dar de baja a cualquier numero de telefono con un POST directo.
+    Se valida `X-Hub-Signature-256` (si `WHATSAPP_META_APP_SECRET` esta
+    configurado) contra el cuerpo crudo del request para que nadie pueda
+    mandar eventos falsos adivinando la URL.
     """
 
     if not app_instance or not app_instance.whatsapp:
         raise HTTPException(status_code=500, detail="WhatsApp no configurado")
 
-    form = await request.form()
-    settings = app_instance.settings
-    auth_token = getattr(settings, "twilio_auth_token", None)
-    webhook_url = getattr(settings, "twilio_webhook_url", None)
-    if auth_token and webhook_url:
-        from twilio.request_validator import RequestValidator
+    raw_body = await request.body()
+    app_secret = getattr(app_instance.settings, "whatsapp_meta_app_secret", None)
+    if not WhatsAppHandler.verify_webhook_signature(app_secret, raw_body, x_hub_signature_256):
+        raise HTTPException(status_code=401, detail="Firma de Meta invalida")
 
-        validator = RequestValidator(auth_token)
-        if not validator.validate(webhook_url, dict(form), x_twilio_signature or ""):
-            raise HTTPException(status_code=401, detail="Firma de Twilio invalida")
-
-    sender = str(form.get("From", "")).removeprefix("whatsapp:")
-    body = str(form.get("Body", ""))
-    reply_text = await app_instance.whatsapp.handle_message(sender, body)
-    message_xml = f"<Message>{html.escape(reply_text)}</Message>" if reply_text else ""
-    twiml = f'<?xml version="1.0" encoding="UTF-8"?><Response>{message_xml}</Response>'
-    return Response(content=twiml, media_type="application/xml")
+    payload = await request.json()
+    await app_instance.whatsapp.process_webhook_event(payload)
+    return {"status": "ok"}
 
 
 @app.post("/webhook/telegram")
@@ -1398,16 +1431,62 @@ async def trigger_summary(
         raise HTTPException(status_code=500, detail="App no inicializada")
     await require_cron_key(app_instance, x_api_key)
 
-    if async_mode:
-        if not app_instance.db:
+    if not app_instance.db:
+        # Sin DB no hay forma confiable de detectar corridas superpuestas
+        # entre los 4 workers de gunicorn (cada uno es un proceso Python
+        # separado) -- se usa el flag en memoria como ultimo recurso, solo
+        # protege dentro de este worker.
+        if async_mode:
             raise HTTPException(status_code=503, detail="DB no disponible para registrar job")
+        if app_instance.summary_refresh_running:
+            raise HTTPException(status_code=409, detail="Ya hay un resumen en proceso.")
+        app_instance.summary_refresh_running = True
+        try:
+            result = await app_instance.send_summaries(time_of_day, refresh=refresh, deliver=False)
+            return {
+                "status": "success",
+                "message": f"Resumen {time_of_day} procesado",
+                "result": result,
+            }
+        except Exception as e:
+            logger.error(f"Error-trigger: {e}")
+            raise HTTPException(status_code=500, detail=str(e)) from e
+        finally:
+            app_instance.summary_refresh_running = False
 
-        job_id = str(uuid4())
-        job = await app_instance.db.create_summary_refresh_job(
-            job_id,
-            time_of_day=time_of_day,
-            refresh=refresh,
+    # Candado real: consulta la BD (compartida por todos los workers) en vez
+    # de un flag en memoria de un solo proceso. El cron y un trigger manual
+    # se llegaron a solapar en vivo -- cada uno lanzaba su propio pipeline
+    # completo compitiendo por el mismo cupo de LLM (3 corridas simultaneas
+    # agotando groq+gemini, encadenando rate-limits). stale_after_seconds
+    # evita que un job huerfano (worker caido a mitad de corrida) bloquee
+    # corridas nuevas para siempre.
+    active_job = await app_instance.db.get_active_summary_refresh_job()
+    if active_job:
+        if async_mode:
+            response.status_code = 200
+            return {
+                "status": "already_running",
+                "message": "Ya hay un resumen en proceso, se devuelve el job en curso",
+                "job": active_job,
+                "status_url": f"/trigger/summary/jobs/{active_job['id']}",
+            }
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Ya hay un resumen en proceso. Espera a que termine o usa "
+                "async_mode=true para consultar su estado sin lanzar otro."
+            ),
         )
+
+    job_id = str(uuid4())
+    job = await app_instance.db.create_summary_refresh_job(
+        job_id,
+        time_of_day=time_of_day,
+        refresh=refresh,
+    )
+
+    if async_mode:
         asyncio.create_task(_run_summary_refresh_job(job_id, time_of_day, refresh))
         response.status_code = 202
         return {
@@ -1418,11 +1497,13 @@ async def trigger_summary(
         }
 
     try:
+        await app_instance.db.mark_summary_refresh_job_running(job_id)
         result = await app_instance.send_summaries(
             time_of_day,
             refresh=refresh,
             deliver=False,
         )
+        await app_instance.db.finish_summary_refresh_job(job_id, result)
         logger.info(
             "Manual summary refresh completed: "
             f"collected={result.get('collected')} processed={result.get('processed')} "
@@ -1435,6 +1516,10 @@ async def trigger_summary(
         }
     except Exception as e:
         logger.error(f"Error-trigger: {e}")
+        try:
+            await app_instance.db.fail_summary_refresh_job(job_id, str(e))
+        except Exception as update_error:
+            logger.error(f"Error updating failed summary job {job_id}: {update_error}")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 

@@ -14,7 +14,7 @@ categories:
       - { term: "combustible", weight: 3 }
       - { term: "hidrocarburos", weight: 3 }
       - { term: "precio", weight: 2 }
-      - { term: "mercado", weight: 2 }
+      - { term: "mercado", weight: 2, ambiguous: true }  # tambien = mercado fisico (sociedad/policiales)
       - { term: "banco", weight: 2 }
       - { term: "credito", weight: 2 }
       - { term: "deuda", weight: 2 }
@@ -123,7 +123,7 @@ categories:
       - { term: "gobernador", weight: 3 }
       - { term: "asambleista", weight: 3 }
       - { term: "militante", weight: 2 }
-      - { term: "dirigente", weight: 2 }
+      - { term: "dirigente", weight: 2, ambiguous: true }  # tambien = dirigente de club deportivo
       - { term: "vocero", weight: 2 }
       - { term: "portavoz", weight: 2 }
       - { term: "comision", weight: 2 }
@@ -217,15 +217,26 @@ categories:
       - { term: "cancha", weight: 2 }
       - { term: "estadio", weight: 2 }
       - { term: "arbitro", weight: 2 }
-      - { term: "penal", weight: 2 }
+      # "penal"/"defensa" sueltos son ambiguos (penal=carcel, defensa=defensa
+      # legal en casos judiciales) -- peso bajo + frases especificas de
+      # peso alto para no perder deteccion real de futbol, y "ambiguous"
+      # fuerza revision por IA si terminan ganando la categoria igual.
+      - { term: "penal", weight: 1, ambiguous: true }
+      - { term: "tiro penal", weight: 3 }
+      - { term: "cobro de penal", weight: 3 }
+      - { term: "gol de penal", weight: 3 }
+      - { term: "penal atajado", weight: 3 }
       - { term: "arquero", weight: 2 }
       - { term: "portero", weight: 2 }
-      - { term: "defensa", weight: 2 }
+      - { term: "defensa", weight: 1, ambiguous: true }
+      - { term: "defensa central", weight: 2 }
+      - { term: "linea de defensa", weight: 2 }
+      - { term: "jugador de la defensa", weight: 2 }
       - { term: "delantero", weight: 2 }
       - { term: "mediocampista", weight: 2 }
       - { term: "volante", weight: 2 }
-      - { term: "titular", weight: 2 }
-      - { term: "suplente", weight: 2 }
+      - { term: "titular", weight: 1, ambiguous: true }
+      - { term: "suplente", weight: 1, ambiguous: true }
       - { term: "lesion", weight: 2 }
       - { term: "clasificacion", weight: 2 }
       - { term: "ascenso", weight: 2 }
@@ -313,6 +324,12 @@ categories:
       - { term: "ley", weight: 2 }
       - { term: "diputado", weight: 3 }
       - { term: "senador", weight: 3 }
+      # Caso real /article/4344: "penal"+"defensa" solos calificaron como
+      # deportes un caso judicial (traslado de un preso). Si el texto tiene
+      # vocabulario judicial fuerte, restar puntos a deportes.
+      - { term: "detencion preventiva", weight: 4 }
+      - { term: "recurso judicial", weight: 3 }
+      - { term: "orden judicial", weight: 3 }
 
   tecnologia:
     description: "Tecnologia, internet, software, ciberseguridad, inteligencia artificial y telecomunicaciones."
@@ -370,7 +387,7 @@ categories:
       - { term: "memoria", weight: 2 }
       - { term: "disco duro", weight: 2 }
       - { term: "gadget", weight: 2 }
-      - { term: "inteligencia", weight: 2 }
+      - { term: "inteligencia", weight: 2, ambiguous: true }  # tambien = servicio de inteligencia (politica/policiales)
       - { term: "chatbot", weight: 3 }
       - { term: "gpt", weight: 2 }
       - { term: "openai", weight: 3 }
@@ -486,7 +503,7 @@ categories:
       - { term: "festival de musica", weight: 3 }
       - { term: "alfombra roja", weight: 2 }
       - { term: "celebridad", weight: 2 }
-      - { term: "estrella", weight: 2 }
+      - { term: "estrella", weight: 2, ambiguous: true }  # tambien = astronomia (salud/ciencia)
       - { term: "influencer", weight: 2 }
       - { term: "tiktoker", weight: 2 }
       - { term: "youtuber", weight: 2 }
@@ -568,7 +585,7 @@ categories:
       - { term: "choque", weight: 2 }
       - { term: "incendio", weight: 2 }
       - { term: "rescate", weight: 2 }
-      - { term: "emergencia", weight: 2 }
+      - { term: "emergencia", weight: 2, ambiguous: true }  # tambien = emergencia climatica (clima)
       - { term: "siniestro", weight: 2 }
       - { term: "asalto", weight: 3 }
       - { term: "sicariato", weight: 4 }
@@ -587,6 +604,14 @@ categories:
       - { term: "imputado", weight: 2 }
       - { term: "investigacion penal", weight: 3 }
       - { term: "arresto", weight: 2 }
+      - { term: "detencion preventiva", weight: 3 }
+      - { term: "juez", weight: 2 }
+      - { term: "orden judicial", weight: 3 }
+      - { term: "recurso judicial", weight: 2 }
+      # Nombres de carceles reales en Bolivia: muy especificos, riesgo de
+      # falso positivo casi nulo.
+      - { term: "palmasola", weight: 3 }
+      - { term: "chonchocoro", weight: 3 }
       - { term: "apunalado", weight: 3 }
       - { term: "apuñalado", weight: 3 }
       - { term: "baleado", weight: 3 }
@@ -601,7 +626,6 @@ categories:
       - { term: "narcotraficante", weight: 3 }
       - { term: "microtrafico", weight: 3 }
       - { term: "sustancia controlada", weight: 3 }
-      - { term: "narcotrafico", weight: 4 }
       - { term: "laboratorio de droga", weight: 3 }
       - { term: "cocaina", weight: 4 }
       - { term: "marihuana", weight: 3 }
@@ -753,7 +777,7 @@ categories:
       - { term: "vacuna", weight: 3 }
       - { term: "vacunacion", weight: 3 }
       - { term: "enfermedad", weight: 2 }
-      - { term: "virus", weight: 2 }
+      - { term: "virus", weight: 2, ambiguous: true }  # tambien = virus informatico (tecnologia)
       - { term: "pandemia", weight: 3 }
       - { term: "epidemia", weight: 3 }
       - { term: "covid", weight: 3 }
@@ -922,6 +946,10 @@ thresholds:
   min_score: 2.0
   accept_margin: 2.0
   low_confidence_threshold: 0.62
+  # Si un solo termino explica esta fraccion (o mas) del score de la
+  # categoria ganadora, se fuerza revision por IA aunque el margen/confianza
+  # parezcan altos -- protege contra homonimos como "penal"/"defensa".
+  dominant_term_ratio: 0.5
 
 limits:
   content_chars: 1200

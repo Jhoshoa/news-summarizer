@@ -371,3 +371,87 @@ def test_category_mismatch_warning_does_not_raise_or_block_instantiation(tmp_pat
 
     assert classifier is not None
     assert "salud" in classifier.categories
+
+
+def test_classifier_does_not_mistake_prison_transfer_for_sports():
+    """Regression test for /article/4344: 'penal de Palmasola' (carcel) y
+    'Defensa de Cerimedo' (equipo de abogados) matcheaban las palabras
+    sueltas de futbol 'penal'/'defensa' y ganaban deportes con confianza
+    alta. Ahora 'penal'/'defensa' pesan menos, estan marcadas ambiguous, y
+    policiales tiene los terminos judiciales que le faltaban."""
+
+    classifier = NewsClassifier()
+
+    decision = classifier.classify_article(
+        {
+            "title": "Defensa de Cerimedo intenta evitar que su defendido sea llevado a Chonchocoro",
+            "description": "El abogado dice que su defendido esta muy descompensado.",
+            "content": (
+                "La defensa del exasesor confirmo que busca un recurso judicial para "
+                "impedir el traslado de su cliente del penal de Palmasola a la carcel "
+                "de Chonchocoro. La Justicia ordeno la detencion preventiva de su "
+                "cliente por el intento de feminicidio."
+            ),
+            "source": "ElDeber",
+            "category": "general",
+        }
+    )
+
+    assert decision.category == "policiales"
+    assert decision.scores["deportes"] == 0
+
+
+def test_classifier_forces_review_when_a_single_term_dominates_the_score():
+    """Amortiguador de termino dominante: aunque el margen/confianza salgan
+    altos, si una sola palabra explica la mayoria del score ganador no hay
+    que confiar ciegamente -- puede ser un homonimo bien ubicado."""
+
+    classifier = NewsClassifier()
+
+    decision = classifier.classify_article(
+        {
+            "title": "El estadio se llena para el gran evento",
+            "description": "",
+            "content": "El estadio recibio a miles de personas para el show.",
+            "category": "general",
+        }
+    )
+
+    # "estadio" (deportes) matchea en titulo y contenido; al no sumarse dos
+    # veces (dedupe por termino) es el unico termino que aporta score, asi
+    # que domina el 100% y se marca para revision aunque no haya competencia.
+    assert decision.category == "deportes"
+    assert decision.method == "rules_low_confidence"
+
+
+def test_classifier_ambiguous_term_forces_low_confidence_even_with_clear_margin():
+    classifier = NewsClassifier()
+
+    decision = classifier.classify_article(
+        {
+            "title": "El virus se propaga rapidamente por la red",
+            "description": "Expertos analizan el fenomeno con atencion.",
+            "content": "",
+            "category": "general",
+        }
+    )
+
+    # "virus" esta marcado ambiguous: true en salud (tambien significa virus
+    # informatico) -- gana solo, con margen y confianza altos, pero el
+    # override de terminos ambiguos igual lo manda a revision.
+    assert decision.category == "salud"
+    assert decision.method == "rules_low_confidence"
+
+
+def test_classifier_no_duplicate_terms_within_a_category():
+    """Un termino repetido por error en la misma categoria (ej. copy/paste)
+    infla su score sin agregar señal real -- ver bug real de 'narcotrafico'
+    duplicado en policiales, corregido en config/classification.yaml."""
+
+    classifier = NewsClassifier()
+
+    for category, rules in classifier.categories.items():
+        for key in ("positive", "negative"):
+            terms = [rule.get("term") for rule in rules.get(key, [])]
+            duplicates = {term for term in terms if terms.count(term) > 1}
+            assert not duplicates, f"{category}.{key} tiene terminos duplicados: {duplicates}"

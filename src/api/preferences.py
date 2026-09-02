@@ -184,7 +184,10 @@ class PreviewResponse(BaseModel):
 
 def _channel_options(app_instance: Any) -> list[PreferenceOption]:
     settings = getattr(app_instance, "settings", None)
-    whatsapp_enabled = bool(getattr(settings, "twilio_account_sid", None))
+    whatsapp_enabled = bool(
+        getattr(settings, "whatsapp_meta_access_token", None)
+        and getattr(settings, "whatsapp_meta_phone_number_id", None)
+    )
     telegram_enabled = bool(getattr(settings, "telegram_bot_token", None))
     email_enabled = bool(getattr(settings, "email_enabled", False))
     return [
@@ -199,7 +202,7 @@ def _channel_options(app_instance: Any) -> list[PreferenceOption]:
             label="WhatsApp",
             enabled=True,
             note=(
-                "Disponible para demo; envio real requiere Twilio configurado."
+                "Disponible para demo; envio real requiere WhatsApp Business API (Meta) configurado."
                 if not whatsapp_enabled
                 else "Disponible para demo inicial; puede requerir plan premium despues."
             ),

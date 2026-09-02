@@ -67,6 +67,7 @@ class LLMProvider:
         api_key: str = None,
         models: dict[str, str] | None = None,
         base_url: str | None = None,
+        timeout: float = 45.0,
     ):
         if provider not in self.PROVIDERS:
             raise ValueError(
@@ -80,7 +81,19 @@ class LLMProvider:
         config = self.PROVIDERS[provider]
         resolved_base_url = base_url or config["base_url"]
 
-        self._client = AsyncOpenAI(api_key=api_key, base_url=resolved_base_url)
+        # timeout explicito + max_retries=1: el SDK de OpenAI por defecto usa
+        # 600s de timeout y reintenta 2 veces por su cuenta, lo que puede
+        # dejar una sola llamada colgada mas de 20 minutos antes de fallar y
+        # dejarle el turno al siguiente proveedor del LLMRouter. Con esto,
+        # un proveedor lento/caido se descarta rapido en vez de trabar todo
+        # el pipeline (visto en vivo: /trigger/summary colgado ~11 min en
+        # un solo provider tras el fallback de Gemini).
+        self._client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=resolved_base_url,
+            timeout=timeout,
+            max_retries=1,
+        )
         self.models = config["models"].copy()
         if models:
             self.models.update(models)

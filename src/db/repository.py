@@ -2568,6 +2568,39 @@ class Database:
             job = result.scalar_one_or_none()
             return self._summary_refresh_job_to_dict(job) if job else None
 
+    async def get_active_summary_refresh_job(
+        self, *, stale_after_seconds: int = 3600
+    ) -> dict | None:
+        """Job de resumen en curso (queued/running), si hay alguno.
+
+        El backend corre con varios workers de gunicorn en procesos
+        separados (ver Dockerfile.backend, --workers 4): un flag en memoria
+        de Python solo protege contra corridas superpuestas dentro del
+        mismo proceso, no entre workers. Esto consulta la BD, que si es
+        compartida entre todos, para poder rechazar/reusar una corrida sin
+        importar que worker la reciba.
+
+        `stale_after_seconds` evita que un job huerfano (el proceso que lo
+        corria se cayo o el contenedor se reinicio a mitad de una corrida,
+        sin llegar a marcarlo success/failed) bloquee corridas nuevas para
+        siempre -- se ignora si `requested_at` es mas viejo que esta
+        ventana.
+        """
+
+        cutoff = _now_bolivia() - timedelta(seconds=stale_after_seconds)
+        async with self.session_maker() as session:
+            stmt = (
+                select(SummaryRefreshJob)
+                .where(
+                    SummaryRefreshJob.status.in_(["queued", "running"]),
+                    SummaryRefreshJob.requested_at >= cutoff,
+                )
+                .order_by(SummaryRefreshJob.requested_at.desc())
+                .limit(1)
+            )
+            job = (await session.execute(stmt)).scalar_one_or_none()
+            return self._summary_refresh_job_to_dict(job) if job else None
+
     async def close(self):
         """Cierra el pool de conexiones."""
         await self.engine.dispose()

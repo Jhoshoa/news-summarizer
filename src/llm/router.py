@@ -15,6 +15,7 @@ class LLMRouter:
         self,
         providers: list[dict],
         models: dict[str, str] | None = None,
+        timeout: float = 45.0,
     ):
         self._providers: list[LLMProvider] = []
         self._active_index = 0
@@ -34,6 +35,7 @@ class LLMRouter:
                     api_key=api_key,
                     models=models,
                     base_url=base_url,
+                    timeout=timeout,
                 )
                 self._providers.append(p)
             except Exception as e:

@@ -38,21 +38,29 @@ class BackendClient:
         await self.client.aclose()
 
     async def post_json(self, path: str, *, timeout_seconds: float) -> dict[str, Any]:
+        return await self._request_json("POST", path, timeout_seconds=timeout_seconds)
+
+    async def get_json(self, path: str, *, timeout_seconds: float) -> dict[str, Any]:
+        return await self._request_json("GET", path, timeout_seconds=timeout_seconds)
+
+    async def _request_json(self, method: str, path: str, *, timeout_seconds: float) -> dict[str, Any]:
         last_error: Exception | None = None
         attempts = self.settings.request_retries + 1
 
         for attempt in range(1, attempts + 1):
             started_at = utc_now()
             try:
-                LOGGER.info("request start path=%s attempt=%s/%s", path, attempt, attempts)
-                response = await self.client.post(
+                LOGGER.info("request start method=%s path=%s attempt=%s/%s", method, path, attempt, attempts)
+                response = await self.client.request(
+                    method,
                     path,
                     timeout=httpx.Timeout(timeout_seconds),
                 )
                 response.raise_for_status()
                 elapsed = (utc_now() - started_at).total_seconds()
                 LOGGER.info(
-                    "request finished path=%s status=%s elapsed=%.2fs",
+                    "request finished method=%s path=%s status=%s elapsed=%.2fs",
+                    method,
                     path,
                     response.status_code,
                     elapsed,
@@ -61,7 +69,8 @@ class BackendClient:
             except (httpx.HTTPError, ValueError) as exc:
                 last_error = exc
                 LOGGER.warning(
-                    "request failed path=%s attempt=%s/%s error=%s",
+                    "request failed method=%s path=%s attempt=%s/%s error=%s",
+                    method,
                     path,
                     attempt,
                     attempts,

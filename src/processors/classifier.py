@@ -86,6 +86,7 @@ class NewsClassifier:
         "min_score": 2.0,
         "accept_margin": 2.0,
         "low_confidence_threshold": 0.62,
+        "dominant_term_ratio": 0.5,
     }
     DEFAULT_LIMITS = {"content_chars": 1200}
     DEFAULT_SOURCE_CATEGORY_MAPPINGS = {"global": {}}
@@ -163,18 +164,25 @@ class NewsClassifier:
         field_text = self._article_fields(article)
         scores: dict[str, float] = {}
         reasons: dict[str, list[str]] = {}
+        contributions: dict[str, dict[str, float]] = {}
+        ambiguous_by_category: dict[str, set[str]] = {}
 
         for category, rules in self.categories.items():
-            score, category_reasons = self._score_category(category, rules, field_text)
+            score, category_reasons, positive_contributions, ambiguous_terms = self._score_category(
+                category, rules, field_text
+            )
             scores[category] = round(max(score, 0.0), 4)
             if category_reasons:
                 reasons[category] = category_reasons
+            contributions[category] = positive_contributions
+            ambiguous_by_category[category] = ambiguous_terms
 
         top_category, top_score = self._top_score(scores)
         second_score = self._second_score(scores, top_category)
         min_score = self.thresholds["min_score"]
         accept_margin = self.thresholds["accept_margin"]
         low_confidence_threshold = self.thresholds["low_confidence_threshold"]
+        dominant_term_ratio = self.thresholds.get("dominant_term_ratio", 0.5)
 
         if top_score < min_score:
             return ClassificationDecision(
@@ -189,6 +197,26 @@ class NewsClassifier:
         margin = top_score - second_score
         method = "rules"
         if margin < accept_margin or confidence < low_confidence_threshold:
+            method = "rules_low_confidence"
+
+        # Amortiguador de termino dominante: si un solo termino explica la
+        # mayor parte del score ganador, no confiar en el margen/confianza
+        # aunque parezcan altos -- un homonimo bien ubicado (ej. "penal" o
+        # "defensa" en un caso judicial) puede ganar solo con score y margen
+        # convincentes sin que ninguna otra categoria compita de verdad. Ver
+        # docs/mejorar-comportamiento-categorias si existe, o el caso real
+        # de /article/4344 (clasificado "deportes" por "defensa"+"penal").
+        top_contributions = contributions.get(top_category) or {}
+        if top_contributions and top_score > 0:
+            max_term_value = max(top_contributions.values())
+            if (max_term_value / top_score) >= dominant_term_ratio:
+                method = "rules_low_confidence"
+
+        # Terminos marcados `ambiguous: true` en el YAML: si alguno participo
+        # en el score ganador, forzar revision aunque no domine el score por
+        # si solo -- son casos ya identificados como riesgosos que conviene
+        # que el fallback de IA revise siempre.
+        if ambiguous_by_category.get(top_category):
             method = "rules_low_confidence"
 
         reason = self._build_reason(top_category, reasons.get(top_category, []), top_score, margin)
@@ -495,67 +523,80 @@ Formato:
         category: str,
         rules: dict[str, Any],
         field_text: dict[str, str],
-    ) -> tuple[float, list[str]]:
-        score = 0.0
+    ) -> tuple[float, list[str], dict[str, float], set[str]]:
+        """Puntua una categoria contra un articulo.
+
+        Cada termino cuenta una sola vez por categoria, tomando el campo donde
+        mejor puntua (no se suma titulo+contenido si el mismo termino aparece
+        en ambos) -- evita que una sola palabra repetida infle el score y el
+        margen artificialmente. `positive_contributions` (termino -> puntos)
+        y `ambiguous_terms` (terminos marcados `ambiguous: true` en el YAML
+        que matchearon) alimentan el amortiguador de termino dominante y el
+        override de terminos ambiguos en classify_article.
+        """
+
         reasons: list[str] = []
+        positive_contributions: dict[str, float] = {}
+        ambiguous_terms: set[str] = set()
 
-        for field, text in field_text.items():
-            if not text:
+        for rule in rules.get("positive", []):
+            best_value, best_field = self._best_term_match(rule, field_text, self._safe_float(rule.get("weight"), 1.0))
+            if best_value <= 0:
                 continue
-
-            field_weight = self.field_weights.get(field, 1.0)
-            if field == "source_category":
-                if text == category:
-                    score += field_weight
-                    reasons.append(f"{field}:categoria_fuente(+{field_weight:g})")
-                continue
-
-            positive_score, positive_reasons = self._score_rules(
-                rules.get("positive", []),
-                text,
-                field,
-                field_weight,
-                positive=True,
-            )
-            negative_score, negative_reasons = self._score_rules(
-                rules.get("negative", []),
-                text,
-                field,
-                field_weight,
-                positive=False,
-            )
-            score += positive_score - negative_score
-            reasons.extend(positive_reasons)
-            reasons.extend(negative_reasons)
-
-        return score, reasons
-
-    def _score_rules(
-        self,
-        rules: list[dict[str, Any]],
-        text: str,
-        field: str,
-        field_weight: float,
-        *,
-        positive: bool,
-    ) -> tuple[float, list[str]]:
-        score = 0.0
-        reasons: list[str] = []
-        sign = "+" if positive else "-"
-
-        for rule in rules:
             term = str(rule.get("term") or "").strip()
-            if not term:
+            positive_contributions[term] = best_value
+            reasons.append(f"{best_field}:{term}(+{best_value:g})")
+            if rule.get("ambiguous"):
+                ambiguous_terms.add(term)
+
+        negative_total = 0.0
+        for rule in rules.get("negative", []):
+            best_value, best_field = self._best_term_match(rule, field_text, self._safe_float(rule.get("weight"), 1.0))
+            if best_value <= 0:
                 continue
+            term = str(rule.get("term") or "").strip()
+            negative_total += best_value
+            reasons.append(f"{best_field}:{term}(-{best_value:g})")
 
-            if not self._matches_rule(text, term, bool(rule.get("regex"))):
+        source_text = field_text.get("source_category")
+        if source_text and source_text == category:
+            field_weight = self.field_weights.get("source_category", 1.0)
+            positive_contributions["source_category:categoria_fuente"] = field_weight
+            reasons.append(f"source_category:categoria_fuente(+{field_weight:g})")
+
+        score = sum(positive_contributions.values()) - negative_total
+        return score, reasons, positive_contributions, ambiguous_terms
+
+    def _best_term_match(
+        self,
+        rule: dict[str, Any],
+        field_text: dict[str, str],
+        weight: float,
+    ) -> tuple[float, str]:
+        """Mejor puntaje de un termino entre campos (titulo/descripcion/contenido).
+
+        No usa el campo 'source_category' aqui: ese se maneja aparte en
+        _score_category como bonus de categoria-fuente, no como termino.
+        """
+
+        term = str(rule.get("term") or "").strip()
+        if not term:
+            return 0.0, ""
+
+        is_regex = bool(rule.get("regex"))
+        best_value = 0.0
+        best_field = ""
+        for field, text in field_text.items():
+            if field == "source_category" or not text:
                 continue
+            if not self._matches_rule(text, term, is_regex):
+                continue
+            value = weight * self.field_weights.get(field, 1.0)
+            if value > best_value:
+                best_value = value
+                best_field = field
 
-            value = self._safe_float(rule.get("weight"), 1.0) * field_weight
-            score += value
-            reasons.append(f"{field}:{term}({sign}{value:g})")
-
-        return score, reasons
+        return best_value, best_field
 
     def _matches_rule(self, text: str, term: str, is_regex: bool) -> bool:
         if is_regex:

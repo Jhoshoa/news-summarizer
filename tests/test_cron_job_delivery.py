@@ -37,28 +37,129 @@ def test_cron_settings_defaults_keep_summary_and_delivery_separate(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_cron_summary_refresh_uses_summary_endpoint(monkeypatch):
+async def test_cron_summary_refresh_uses_async_mode_and_polls_until_success(monkeypatch):
+    """El refresh de resumenes ahora dispara en async_mode y sondea el job
+    hasta que termine, en vez de un solo POST bloqueante -- un pipeline que
+    tarda mas que SUMMARY_REQUEST_TIMEOUT_SECONDS ya no se marca como fallo
+    y reintentado (lo que antes lanzaba una segunda corrida encima de la que
+    seguia viva en el backend)."""
+
     settings = SimpleNamespace(
-        summary_candidates_per_category=8,
-        summary_candidates_extended_limit=8,
-        summary_candidates_extended_categories="politica, economia",
         summary_time_of_day="night",
         summary_trigger_path="/trigger/summary",
         summary_request_timeout_seconds=30,
+        summary_poll_interval_seconds=0,
+        summary_job_max_wait_seconds=60,
     )
     runner = RefreshJobRunner.__new__(RefreshJobRunner)
     runner.settings = settings
     calls = []
 
     async def post_json(path, *, timeout_seconds):
-        calls.append((path, timeout_seconds))
-        return {"result": {"summaries": 2, "sent": 1}}
+        calls.append(("POST", path, timeout_seconds))
+        return {
+            "status": "accepted",
+            "job": {"id": "job-1", "status": "queued"},
+            "status_url": "/trigger/summary/jobs/job-1",
+        }
 
-    runner.backend = SimpleNamespace(post_json=post_json)
+    statuses = iter(["running", "success"])
+
+    async def get_json(path, *, timeout_seconds):
+        calls.append(("GET", path, timeout_seconds))
+        status = next(statuses)
+        job = {"id": "job-1", "status": status}
+        if status == "success":
+            job["result"] = {"summaries": 2, "sent": 1}
+        return {"status": status, "job": job}
+
+    runner.backend = SimpleNamespace(post_json=post_json, get_json=get_json)
 
     await runner.run_summary_refresh()
 
-    assert calls == [("/trigger/summary?time_of_day=night&refresh=true", 30)]
+    assert calls[0] == ("POST", "/trigger/summary?time_of_day=night&refresh=true&async_mode=true", 30)
+    assert calls[1] == ("GET", "/trigger/summary/jobs/job-1", 30)
+    assert calls[2] == ("GET", "/trigger/summary/jobs/job-1", 30)
+
+
+@pytest.mark.asyncio
+async def test_cron_summary_refresh_raises_when_job_fails(monkeypatch):
+    settings = SimpleNamespace(
+        summary_time_of_day="manual",
+        summary_trigger_path="/trigger/summary",
+        summary_request_timeout_seconds=30,
+        summary_poll_interval_seconds=0,
+        summary_job_max_wait_seconds=60,
+    )
+    runner = RefreshJobRunner.__new__(RefreshJobRunner)
+    runner.settings = settings
+
+    async def post_json(path, *, timeout_seconds):
+        return {
+            "job": {"id": "job-2", "status": "queued"},
+            "status_url": "/trigger/summary/jobs/job-2",
+        }
+
+    async def get_json(path, *, timeout_seconds):
+        return {"job": {"id": "job-2", "status": "failed", "error_message": "boom"}}
+
+    runner.backend = SimpleNamespace(post_json=post_json, get_json=get_json)
+
+    with pytest.raises(BackendRequestError) as exc_info:
+        await runner.run_summary_refresh()
+
+    assert "boom" in str(exc_info.value.last_error)
+
+
+@pytest.mark.asyncio
+async def test_poll_summary_job_fetches_result_when_already_finished():
+    """Si el job ya termino cuando llega la respuesta del POST inicial (por
+    ejemplo, el candado de concurrencia del backend devolvio un job en
+    curso que resulto terminar casi de inmediato), no hay que sondear -- pero
+    igual hay que traer el resultado completo con un GET."""
+
+    settings = SimpleNamespace(
+        summary_poll_interval_seconds=0,
+        summary_job_max_wait_seconds=60,
+        summary_request_timeout_seconds=30,
+    )
+    runner = RefreshJobRunner.__new__(RefreshJobRunner)
+    runner.settings = settings
+    calls = []
+
+    async def get_json(path, *, timeout_seconds):
+        calls.append(path)
+        return {"job": {"id": "job-4", "status": "success", "result": {"summaries": 5}}}
+
+    runner.backend = SimpleNamespace(get_json=get_json)
+
+    result = await runner._poll_summary_job("/trigger/summary/jobs/job-4", initial_status="success")
+
+    assert result == {"summaries": 5}
+    assert calls == ["/trigger/summary/jobs/job-4"]
+
+
+@pytest.mark.asyncio
+async def test_poll_summary_job_raises_when_max_wait_exceeded(monkeypatch):
+    settings = SimpleNamespace(summary_poll_interval_seconds=0, summary_job_max_wait_seconds=10)
+    runner = RefreshJobRunner.__new__(RefreshJobRunner)
+    runner.settings = settings
+
+    times = iter(
+        [
+            datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
+            datetime(2026, 1, 1, 12, 0, 20, tzinfo=UTC),
+        ]
+    )
+    monkeypatch.setattr(runner_module, "utc_now", lambda: next(times))
+
+    async def get_json(path, *, timeout_seconds):
+        raise AssertionError("no deberia sondear si ya paso el tiempo maximo")
+
+    runner.backend = SimpleNamespace(get_json=get_json)
+
+    with pytest.raises(BackendRequestError):
+        await runner._poll_summary_job("/trigger/summary/jobs/job-3", initial_status="running")
 
 
 @pytest.mark.asyncio

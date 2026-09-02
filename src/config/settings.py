@@ -32,6 +32,11 @@ class Settings(BaseSettings):
         default="groq,gemini,github,nvidia,openai", alias="LLM_FALLBACK_ORDER"
     )
     llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
+    # Timeout por llamada a un proveedor LLM, en segundos. El SDK de OpenAI
+    # por defecto usa 600s + 2 reintentos propios, lo que puede dejar un
+    # proveedor lento/caido (nvidia, ver comentario arriba) colgado 20+
+    # minutos antes de pasarle el turno al siguiente del LLMRouter.
+    llm_timeout: float = Field(default=45.0, alias="LLM_TIMEOUT")
 
     news_api_key: str | None = Field(default=None, alias="NEWS_API_KEY")
     news_api_country: str = Field(default="bo", alias="NEWS_API_COUNTRY")
@@ -58,10 +63,17 @@ class Settings(BaseSettings):
         default=3, alias="SCRAPER_DETAIL_REFRESH_HOURS"
     )
 
-    twilio_account_sid: str | None = Field(default=None, alias="TWILIO_ACCOUNT_SID")
-    twilio_auth_token: str | None = Field(default=None, alias="TWILIO_AUTH_TOKEN")
-    twilio_phone_number: str | None = Field(default=None, alias="TWILIO_PHONE_NUMBER")
-    twilio_webhook_url: str | None = Field(default=None, alias="TWILIO_WEBHOOK_URL")
+    # WhatsApp via la API directa de Meta (WhatsApp Cloud API), sin Twilio
+    # ni otro intermediario -- Twilio exigia auto-recharge obligatorio o
+    # suspendia la cuenta, ademas de cobrar su propio markup encima de la
+    # tarifa de Meta.
+    whatsapp_meta_access_token: str | None = Field(default=None, alias="WHATSAPP_META_ACCESS_TOKEN")
+    whatsapp_meta_phone_number_id: str | None = Field(default=None, alias="WHATSAPP_META_PHONE_NUMBER_ID")
+    whatsapp_meta_api_version: str = Field(default="v21.0", alias="WHATSAPP_META_API_VERSION")
+    # Verifica la suscripcion del webhook (handshake GET de Meta).
+    whatsapp_meta_verify_token: str | None = Field(default=None, alias="WHATSAPP_META_VERIFY_TOKEN")
+    # Firma los eventos entrantes del webhook (X-Hub-Signature-256).
+    whatsapp_meta_app_secret: str | None = Field(default=None, alias="WHATSAPP_META_APP_SECRET")
 
     telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_url: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_URL")

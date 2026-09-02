@@ -17,6 +17,8 @@ class CronSettings:
     summary_request_timeout_seconds: float
     delivery_request_timeout_seconds: float
     request_retries: int
+    summary_poll_interval_seconds: float
+    summary_job_max_wait_seconds: float
     summary_time_of_day: str
     summary_trigger_path: str
     delivery_trigger_path: str
@@ -73,6 +75,12 @@ class CronSettings:
                 )
             ),
             request_retries=_env_int("REQUEST_RETRIES", default=2, minimum=0),
+            summary_poll_interval_seconds=float(
+                _env_int("SUMMARY_POLL_INTERVAL_SECONDS", default=15, minimum=5)
+            ),
+            summary_job_max_wait_seconds=float(
+                _env_int("SUMMARY_JOB_MAX_WAIT_SECONDS", default=1800, minimum=60)
+            ),
             summary_time_of_day=os.getenv("SUMMARY_TIME_OF_DAY", "manual").strip() or "manual",
             summary_trigger_path=_env_path("SUMMARY_TRIGGER_PATH", default="/trigger/summary"),
             delivery_trigger_path=_env_path("DELIVERY_TRIGGER_PATH", default="/trigger/delivery"),

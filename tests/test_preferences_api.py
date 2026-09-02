@@ -45,7 +45,8 @@ def fake_app_instance():
             summary_candidates_extended_limit=8,
             summary_candidates_extended_categories="politica, economia",
             telegram_bot_token=None,
-            twilio_account_sid=None,
+            whatsapp_meta_access_token=None,
+            whatsapp_meta_phone_number_id=None,
             email_enabled=False,
         ),
     )
@@ -300,7 +301,8 @@ def flaky_app_instance():
             summary_candidates_extended_limit=8,
             summary_candidates_extended_categories="politica, economia",
             telegram_bot_token=None,
-            twilio_account_sid=None,
+            whatsapp_meta_access_token=None,
+            whatsapp_meta_phone_number_id=None,
             email_enabled=False,
         ),
     )

@@ -124,12 +124,38 @@ class RefreshJobRunner:
         )
 
     async def run_summary_refresh(self) -> None:
-        query = urlencode({"time_of_day": self.settings.summary_time_of_day, "refresh": "true"})
+        """Lanza el refresh de resumenes en modo asincrono y sondea su estado.
+
+        Antes esto era un solo POST bloqueante con un timeout fijo
+        (SUMMARY_REQUEST_TIMEOUT_SECONDS): si el pipeline tardaba mas que
+        eso -- algo que pasa seguido, se vio en vivo una corrida de 573s
+        contra un timeout de 300s -- httpx lo marcaba como fallido y
+        REQUEST_RETRIES volvia a lanzar el mismo trigger encima del que
+        seguia corriendo en el backend, sin que nada lo cancelara. Con
+        async_mode=true el backend devuelve un job_id de inmediato (o el
+        job ya en curso, gracias al candado de concurrencia agregado en
+        main.py) y este metodo solo consulta su estado hasta que termine,
+        sin volver a disparar el pipeline.
+        """
+
+        query = urlencode(
+            {
+                "time_of_day": self.settings.summary_time_of_day,
+                "refresh": "true",
+                "async_mode": "true",
+            }
+        )
         payload = await self.backend.post_json(
             f"{self.settings.summary_trigger_path}?{query}",
             timeout_seconds=self.settings.summary_request_timeout_seconds,
         )
-        result = payload.get("result") or {}
+        status_url = payload.get("status_url")
+        job = payload.get("job") or {}
+        if not status_url:
+            LOGGER.warning("summary refresh: respuesta sin status_url, payload=%s", payload)
+            return
+
+        result = await self._poll_summary_job(status_url, initial_status=job.get("status"))
         LOGGER.info(
             "summary refresh ok collected=%s processed=%s summaries=%s sent=%s",
             result.get("collected"),
@@ -137,6 +163,37 @@ class RefreshJobRunner:
             result.get("summaries"),
             result.get("sent"),
         )
+
+    async def _poll_summary_job(self, status_url: str, *, initial_status: str | None) -> dict:
+        deadline = utc_now() + timedelta(seconds=self.settings.summary_job_max_wait_seconds)
+        status = initial_status
+        job: dict[str, Any] = {}
+
+        while status not in ("success", "failed"):
+            if utc_now() >= deadline:
+                raise BackendRequestError(
+                    status_url, 1, TimeoutError("summary job did not finish before max wait")
+                )
+            await asyncio.sleep(self.settings.summary_poll_interval_seconds)
+            payload = await self.backend.get_json(
+                status_url,
+                timeout_seconds=self.settings.summary_request_timeout_seconds,
+            )
+            job = payload.get("job") or {}
+            status = job.get("status")
+
+        if not job:
+            # initial_status ya era terminal (job ya habia terminado cuando lo
+            # devolvio el POST inicial) -- traer el job completo con su result.
+            payload = await self.backend.get_json(
+                status_url,
+                timeout_seconds=self.settings.summary_request_timeout_seconds,
+            )
+            job = payload.get("job") or {}
+
+        if status == "failed":
+            raise BackendRequestError(status_url, 1, RuntimeError(job.get("error_message") or "job failed"))
+        return job.get("result") or {}
 
     async def run_delivery_window(self, hour: int) -> None:
         query = urlencode({"hour": hour})
