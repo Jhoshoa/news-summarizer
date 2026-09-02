@@ -38,10 +38,6 @@ class Settings(BaseSettings):
     # minutos antes de pasarle el turno al siguiente del LLMRouter.
     llm_timeout: float = Field(default=45.0, alias="LLM_TIMEOUT")
 
-    news_api_key: str | None = Field(default=None, alias="NEWS_API_KEY")
-    news_api_country: str = Field(default="bo", alias="NEWS_API_COUNTRY")
-    news_api_language: str = Field(default="es", alias="NEWS_API_LANGUAGE")
-
     scraper_enabled: bool = Field(default=True, alias="SCRAPER_ENABLED")
     scraper_concurrency: int = Field(default=3, alias="SCRAPER_CONCURRENCY")
     scraper_timeout: int = Field(default=30, alias="SCRAPER_TIMEOUT")

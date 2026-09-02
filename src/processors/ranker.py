@@ -47,7 +47,6 @@ class NewsRanker:
             "opinion": 82,
             "el_deber": 84,
             "la_razon": 82,
-            "newsapi": 62,
             "default": 55,
         },
         "source_aliases": {

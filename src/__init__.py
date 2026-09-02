@@ -1,4 +1,4 @@
-from src.collectors import NewsAPICollector, NewsScraper
+from src.collectors import NewsScraper
 from src.db import Database
 from src.distributors import TelegramHandler, WhatsAppHandler
 from src.llm import LLMProvider
@@ -11,7 +11,6 @@ from src.processors import (
 )
 
 __all__ = [
-    "NewsAPICollector",
     "NewsScraper",
     "Deduplicator",
     "NewsClassifier",

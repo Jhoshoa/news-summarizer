@@ -31,7 +31,7 @@ from src.api import (
 )
 from src.api.preferences import MAX_PREFERRED_HOUR, MIN_PREFERRED_HOUR
 from src.api.security import require_cron_key
-from src.collectors import NewsAPICollector, NewsScraper
+from src.collectors import NewsScraper
 from src.config import Settings, get_settings
 from src.db import Database
 from src.distributors import EmailHandler, TelegramHandler, WhatsAppHandler
@@ -743,20 +743,6 @@ class NewsSummarizerApp:
                 except Exception as e:
                     logger.error(f"Error en scraper: {e}")
                     logger.error(f"Traceback: {traceback.format_exc()}")
-
-            if self.settings.news_api_key:
-                try:
-                    newsapi = NewsAPICollector(
-                        api_key=self.settings.news_api_key,
-                        country=self.settings.news_api_country,
-                        language=self.settings.news_api_language,
-                    )
-                    api_news = await newsapi.fetch(categories=categories)
-                    news.extend(api_news)
-                    stats["newsapi"] = len(api_news)
-                    logger.info(f"NewsAPI {len(api_news)} noticias")
-                except Exception as e:
-                    logger.error(f"Error en NewsAPI: {e}")
 
             logger.info(f"Total news collected: {len(news)}")
 

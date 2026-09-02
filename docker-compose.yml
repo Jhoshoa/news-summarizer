@@ -43,9 +43,6 @@ services:
       # definido en codigo (src/config/settings.py), que ya incluye gemini.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-45}
-      NEWS_API_KEY: ${NEWS_API_KEY:-}
-      NEWS_API_COUNTRY: ${NEWS_API_COUNTRY:-bo}
-      NEWS_API_LANGUAGE: ${NEWS_API_LANGUAGE:-es}
       SCRAPER_ENABLED: ${SCRAPER_ENABLED:-true}
       SCRAPER_CONCURRENCY: ${SCRAPER_CONCURRENCY:-3}
       SCRAPER_TIMEOUT: ${SCRAPER_TIMEOUT:-30}

@@ -107,7 +107,7 @@ type StageDef = { label: string; count: number; color: string; icon: string };
 type DropDef = { fromIdx: number; count: number; label: string };
 
 const DESC = {
-  Recolectadas: "Artículos de scrapers + NewsAPI de 6 fuentes bolivianas (Unitel, RedUno, El Deber, Los Tiempos, Red Bolivisión, Radio Fides)",
+  Recolectadas: "Artículos de scrapers de 6 fuentes bolivianas (Unitel, RedUno, El Deber, Los Tiempos, Red Bolivisión, Radio Fides)",
   Útiles: "Filtro de calidad: se descartan artículos sin título, sin imagen o con contenido insuficiente",
   Únicas: "Artículos nuevos insertados en base de datos (no existían previamente)",
   Candidatas: "Selección diversa por categoría para generar resúmenes (top 5 por categoría, máx 2 por fuente)",
