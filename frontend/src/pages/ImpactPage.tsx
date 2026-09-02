@@ -129,22 +129,32 @@ const PipelineFlowSVG = ({ metrics, selectedRun }: { metrics: ImpactMetricsRespo
   const ranked = run ? (run.ranked_count ?? unicas) : (metrics.ranked_articles ?? 0);
   const summaries = run ? (run.briefs_count ?? metrics.summaries) : metrics.summaries;
 
+  // "Utiles"/"Rankeadas"/"Candidatas" no tienen un total real y distinto del
+  // dia completo (un articulo rechazado por calidad nunca se guarda en la
+  // BD) -- en el acumulado, esos numeros son solo la foto de la corrida mas
+  // reciente, mientras que "Recolectadas"/"Unicas"/"Briefs" si son conteos
+  // reales de todo el dia. Mezclarlos en el mismo embudo podia mostrar
+  // "Unicas" mayor que "Utiles" cuando hubo varias corridas en el dia. Con
+  // una corrida especifica seleccionada, en cambio, todos estos numeros
+  // salen de esa misma corrida y si son consistentes entre si.
   const stages: StageDef[] = [
     { label: "Recolectadas", count: total, color: "#6b7280", icon: "📥" },
   ];
 
-  if (usable > 0 && usable !== total) {
+  if (run && usable > 0 && usable !== total) {
     stages.push({ label: "Útiles", count: usable, color: "#d97706", icon: "🔍" });
   }
 
   stages.push({ label: "Únicas", count: unicas, color: "#006d77", icon: "🧹" });
 
-  if (ranked > 0) {
-    stages.push({ label: "Rankeadas", count: ranked, color: "#16a34a", icon: "⭐" });
-  }
+  if (run) {
+    if (ranked > 0) {
+      stages.push({ label: "Rankeadas", count: ranked, color: "#16a34a", icon: "⭐" });
+    }
 
-  if (candidatas > 0 && candidatas !== (stages[stages.length - 1]?.count ?? 0)) {
-    stages.push({ label: "Candidatas", count: candidatas, color: "#7c3aed", icon: "📋" });
+    if (candidatas > 0 && candidatas !== (stages[stages.length - 1]?.count ?? 0)) {
+      stages.push({ label: "Candidatas", count: candidatas, color: "#7c3aed", icon: "📋" });
+    }
   }
 
   if (summaries > 0 && summaries !== (stages[stages.length - 1]?.count ?? 0)) {
@@ -158,12 +168,15 @@ const PipelineFlowSVG = ({ metrics, selectedRun }: { metrics: ImpactMetricsRespo
   for (let i = 0; i < stages.length - 1; i++) {
     const diff = stages[i].count - stages[i + 1].count;
     if (diff <= 0) continue;
+    const fromLabel = stages[i].label;
+    const toLabel = stages[i + 1].label;
     let label = "descartadas";
-    if (i === 0) label = "baja calidad";
-    else if (i === 1 && stages[i].label === "Útiles") label = "duplicados";
-    else if (stages[i].label === "Únicas" && stages[i + 1].label === "Rankeadas") label = "no priorizadas";
-    else if (stages[i].label === "Rankeadas" && stages[i + 1].label === "Candidatas") label = "no candidatas";
-    else if (stages[i + 1].label === "Briefs") label = "no resumidas";
+    if (fromLabel === "Recolectadas" && toLabel === "Útiles") label = "baja calidad";
+    else if (fromLabel === "Recolectadas" && toLabel === "Únicas") label = "descartadas o duplicadas";
+    else if (fromLabel === "Útiles" && toLabel === "Únicas") label = "duplicados";
+    else if (fromLabel === "Únicas" && toLabel === "Rankeadas") label = "no priorizadas";
+    else if (fromLabel === "Rankeadas" && toLabel === "Candidatas") label = "no candidatas";
+    else if (toLabel === "Briefs") label = "no resumidas";
     drops.push({ fromIdx: i, count: diff, label });
   }
 
@@ -370,8 +383,14 @@ export const ImpactPage = () => {
       return result;
     }
 
+    // En el acumulado (sin corrida seleccionada), "Utiles"/"Candidatas" no
+    // tienen un total real del dia completo -- solo se sabe la foto de la
+    // ultima corrida, que puede ser menor que "Unicas" (el conteo real del
+    // dia) si hubo varias corridas. Mostrar solo las 3 etapas que si son
+    // conteos reales y consistentes entre si evita un embudo que parezca
+    // roto (una etapa "de mas adelante" con mas articulos que una anterior).
     const rows = getImpactPipelineRows(metrics);
-    result.rows = rows.filter((row) => ["Recolectadas", "Utiles", "Unicas", "Candidatas", "Briefs"].includes(row.label));
+    result.rows = rows.filter((row) => ["Recolectadas", "Unicas", "Briefs"].includes(row.label));
     return result;
   }, [metrics, selectedRunIdx]);
   const summaries = summariesData?.items ?? [];
@@ -430,6 +449,12 @@ export const ImpactPage = () => {
                 </select>
               )}
               <p>De {formatNumber(formulaCollected)} noticias recolectadas a {formatNumber(formulaBriefs)} briefs.</p>
+              {!pipelineData.activeRun && metrics.runs && metrics.runs.length > 1 && (
+                <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.15rem" }}>
+                  Vista simplificada del día completo. Selecciona una corrida en el menú para ver el detalle
+                  completo (útiles, rankeadas, candidatas).
+                </p>
+              )}
             </div>
             <div className="pipeline-layout" style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", flexWrap: "wrap" }}>
               <div className="pipeline-donut">
