@@ -449,13 +449,13 @@ export const ImpactPage = () => {
                 </select>
               )}
               <p>De {formatNumber(formulaCollected)} noticias recolectadas a {formatNumber(formulaBriefs)} briefs.</p>
-              {!pipelineData.activeRun && metrics.runs && metrics.runs.length > 1 && (
-                <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.15rem" }}>
-                  Vista simplificada del día completo. Selecciona una corrida en el menú para ver el detalle
-                  completo (útiles, rankeadas, candidatas).
-                </p>
-              )}
             </div>
+            {!pipelineData.activeRun && metrics.runs && metrics.runs.length > 1 && (
+              <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", margin: "0.35rem 0 0" }}>
+                Vista simplificada del día completo. Selecciona una corrida en el menú para ver el detalle
+                completo (útiles, rankeadas, candidatas).
+              </p>
+            )}
             <div className="pipeline-layout" style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", flexWrap: "wrap" }}>
               <div className="pipeline-donut">
                 <PipelineDonut pct={formulaCollected > 0 ? formulaBriefs / formulaCollected : 0} />
