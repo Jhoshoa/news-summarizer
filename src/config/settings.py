@@ -39,7 +39,14 @@ class Settings(BaseSettings):
     llm_timeout: float = Field(default=45.0, alias="LLM_TIMEOUT")
 
     scraper_enabled: bool = Field(default=True, alias="SCRAPER_ENABLED")
+    # Cuantas fuentes se scrapean a la vez (antes esta variable existia pero
+    # no se conectaba a nada -- el scraping corria una fuente a la vez).
     scraper_concurrency: int = Field(default=3, alias="SCRAPER_CONCURRENCY")
+    # Cuantas paginas de detalle de UNA MISMA fuente se piden a la vez.
+    # Limite aparte y mas chico a proposito: no queremos mandarle a un solo
+    # sitio decenas de requests simultaneos aunque varias fuentes corran
+    # juntas -- eso se veria como trafico abusivo del lado de esa fuente.
+    scraper_detail_concurrency: int = Field(default=5, alias="SCRAPER_DETAIL_CONCURRENCY")
     scraper_timeout: int = Field(default=30, alias="SCRAPER_TIMEOUT")
     scraper_config_path: str | None = Field(
         default="config/sources.yaml", alias="SCRAPER_CONFIG_PATH"

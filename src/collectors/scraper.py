@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import re
@@ -138,6 +139,8 @@ class NewsScraper:
         config_path: str = None,
         timezone: str = "America/La_Paz",
         detail_refresh_hours: int = 3,
+        concurrency: int = 3,
+        detail_concurrency: int = 5,
     ):
         self.user_agent = (
             user_agent or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -146,6 +149,14 @@ class NewsScraper:
         self._scraper_timezone = timezone
         self._tz = ZoneInfo(timezone)
         self.detail_refresh_hours = max(int(detail_refresh_hours), 0)
+        # concurrency: cuantas fuentes se scrapean a la vez (antes corrian una
+        # por una, con SCRAPER_CONCURRENCY definido pero sin conectar a nada).
+        # detail_concurrency: cuantas paginas de detalle de UNA MISMA fuente
+        # se piden a la vez -- limite aparte y mas chico a proposito, para no
+        # mandarle a un solo sitio decenas de requests simultaneos (se veria
+        # como trafico abusivo) aunque haya varias fuentes corriendo juntas.
+        self.concurrency = max(int(concurrency), 1)
+        self.detail_concurrency = max(int(detail_concurrency), 1)
 
         if sources:
             self.sources = [NewsSource.from_dict(s) if isinstance(s, dict) else s for s in sources]
@@ -175,9 +186,18 @@ class NewsScraper:
         categories: list[str] = None,
         known_articles: dict[str, dict] | None = None,
     ) -> list[dict]:
-        results = []
         known_articles = known_articles or {}
-        reused_total = 0
+        source_semaphore = asyncio.Semaphore(self.concurrency)
+
+        async def _scrape_with_limit(client: httpx.AsyncClient, source: NewsSource) -> tuple[list[dict], int]:
+            async with source_semaphore:
+                try:
+                    news, reused = await self._scrape_source(client, source, known_articles)
+                    logger.info(f"Scraped {len(news)} noticias de {source.name}")
+                    return news, reused
+                except Exception as e:
+                    logger.error(f"Error scraping {source.name}: {e}")
+                    return [], 0
 
         timeout = httpx.Timeout(float(self.timeout), connect=min(10.0, float(self.timeout)))
         async with httpx.AsyncClient(
@@ -185,14 +205,20 @@ class NewsScraper:
             timeout=timeout,
             follow_redirects=True,
         ) as client:
-            for source in self.sources:
-                try:
-                    news, reused = await self._scrape_source(client, source, known_articles)
-                    results.extend(news)
-                    reused_total += reused
-                    logger.info(f"Scraped {len(news)} noticias de {source.name}")
-                except Exception as e:
-                    logger.error(f"Error scraping {source.name}: {e}")
+            # gather corre las fuentes con hasta `self.concurrency` a la vez
+            # (no todas de golpe), pero devuelve los resultados en el mismo
+            # orden que self.sources sin importar cual termino primero --
+            # _deduplicate() se sigue comportando igual que con el loop
+            # secuencial de antes.
+            per_source_results = await asyncio.gather(
+                *(_scrape_with_limit(client, source) for source in self.sources)
+            )
+
+        results: list[dict] = []
+        reused_total = 0
+        for news, reused in per_source_results:
+            results.extend(news)
+            reused_total += reused
 
         if reused_total:
             logger.info(
@@ -319,16 +345,21 @@ class NewsScraper:
         known_articles: dict[str, dict] | None = None,
     ) -> list[dict]:
         known_articles = known_articles or {}
-        enriched = []
+        detail_semaphore = asyncio.Semaphore(self.detail_concurrency)
 
-        for article in articles:
-            try:
-                enriched.append(await self._enrich_article(client, article, source, known_articles))
-            except Exception as e:
-                logger.warning(f"Error enriching article {article.get('url')}: {e}")
-                enriched.append(article)
+        async def _enrich_with_limit(article: dict) -> dict:
+            async with detail_semaphore:
+                try:
+                    return await self._enrich_article(client, article, source, known_articles)
+                except Exception as e:
+                    logger.warning(f"Error enriching article {article.get('url')}: {e}")
+                    return article
 
-        return enriched
+        # gather preserva el orden de `articles` en el resultado (no el orden
+        # de llegada de cada request) -- mismo orden que el loop secuencial
+        # de antes, solo que hasta `self.detail_concurrency` paginas de esta
+        # fuente se piden a la vez en vez de una por una.
+        return await asyncio.gather(*(_enrich_with_limit(article) for article in articles))
 
     def _filter_usable_articles(self, articles: list[dict], source: NewsSource) -> list[dict]:
         usable = [

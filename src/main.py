@@ -734,6 +734,8 @@ class NewsSummarizerApp:
                         config_path=self.settings.scraper_config_path,
                         timezone=self.settings.schedule_timezone,
                         detail_refresh_hours=self.settings.scraper_detail_refresh_hours,
+                        concurrency=self.settings.scraper_concurrency,
+                        detail_concurrency=self.settings.scraper_detail_concurrency,
                     )
                     scraped = await scraper.fetch_all(categories=categories, known_articles=known_articles)
                     news.extend(scraped)
