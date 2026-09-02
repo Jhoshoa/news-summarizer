@@ -540,44 +540,44 @@ export const SubscribePage = () => {
             </div>
             {previewState.data && !previewState.isLoading && <small>{previewState.data.message}</small>}
           </section>
-
-          <section className="unsubscribe-panel">
-            <div className="panel-heading">
-              <span className="panel-title">Cancelar suscripcion</span>
-              <p>Usa el mismo canal con el que te registraste.</p>
-            </div>
-            <div className="unsubscribe-row">
-              <input
-                placeholder={
-                  form.channel === "whatsapp"
-                    ? "+59170000000"
-                    : form.channel === "email"
-                      ? "tu-correo@gmail.com"
-                      : "Telegram ID"
-                }
-                type="text"
-                value={unsubscribeIdentifier}
-                onChange={(event) =>
-                  setUnsubscribeIdentifier(
-                    form.channel === "whatsapp"
-                      ? sanitizePhoneInput(event.target.value)
-                      : event.target.value,
-                  )
-                }
-              />
-              <button
-                className="secondary-button"
-                disabled={unsubscribeState.isLoading}
-                type="button"
-                onClick={handleUnsubscribe}
-              >
-                {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
-              </button>
-            </div>
-            {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
-          </section>
         </aside>
       </div>
+
+      <section className="data-panel unsubscribe-panel">
+        <div className="panel-heading">
+          <span className="panel-title">Cancelar suscripcion</span>
+          <p>Usa el mismo canal con el que te registraste.</p>
+        </div>
+        <div className="unsubscribe-row">
+          <input
+            placeholder={
+              form.channel === "whatsapp"
+                ? "+59170000000"
+                : form.channel === "email"
+                  ? "tu-correo@gmail.com"
+                  : "Telegram ID"
+            }
+            type="text"
+            value={unsubscribeIdentifier}
+            onChange={(event) =>
+              setUnsubscribeIdentifier(
+                form.channel === "whatsapp"
+                  ? sanitizePhoneInput(event.target.value)
+                  : event.target.value,
+              )
+            }
+          />
+          <button
+            className="secondary-button"
+            disabled={unsubscribeState.isLoading}
+            type="button"
+            onClick={handleUnsubscribe}
+          >
+            {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
+          </button>
+        </div>
+        {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
+      </section>
 
       {isConfirmingSubscribe && (
         <div className="modal-backdrop" role="presentation">
