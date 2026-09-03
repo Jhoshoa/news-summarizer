@@ -271,6 +271,7 @@ export const SubscribePage = () => {
       )}
 
       <div className="subscribe-layout">
+        <div className="subscribe-main-column">
         <section className="data-panel subscribe-form-panel">
           <div className="panel-heading">
             <span className="panel-title">Suscripcion</span>
@@ -474,6 +475,43 @@ export const SubscribePage = () => {
           </div>
         </section>
 
+        <section className="data-panel unsubscribe-panel">
+          <div className="panel-heading">
+            <span className="panel-title">Cancelar suscripcion</span>
+            <p>Usa el mismo canal con el que te registraste.</p>
+          </div>
+          <div className="unsubscribe-row">
+            <input
+              placeholder={
+                form.channel === "whatsapp"
+                  ? "+59170000000"
+                  : form.channel === "email"
+                    ? "tu-correo@gmail.com"
+                    : "Telegram ID"
+              }
+              type="text"
+              value={unsubscribeIdentifier}
+              onChange={(event) =>
+                setUnsubscribeIdentifier(
+                  form.channel === "whatsapp"
+                    ? sanitizePhoneInput(event.target.value)
+                    : event.target.value,
+                )
+              }
+            />
+            <button
+              className="secondary-button"
+              disabled={unsubscribeState.isLoading}
+              type="button"
+              onClick={handleUnsubscribe}
+            >
+              {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
+            </button>
+          </div>
+          {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
+        </section>
+        </div>
+
         <aside className="data-context-sidebar subscribe-side-panel">
           <section className="subscribe-preview-panel">
             <div className="panel-heading">
@@ -542,42 +580,6 @@ export const SubscribePage = () => {
           </section>
         </aside>
       </div>
-
-      <section className="data-panel unsubscribe-panel">
-        <div className="panel-heading">
-          <span className="panel-title">Cancelar suscripcion</span>
-          <p>Usa el mismo canal con el que te registraste.</p>
-        </div>
-        <div className="unsubscribe-row">
-          <input
-            placeholder={
-              form.channel === "whatsapp"
-                ? "+59170000000"
-                : form.channel === "email"
-                  ? "tu-correo@gmail.com"
-                  : "Telegram ID"
-            }
-            type="text"
-            value={unsubscribeIdentifier}
-            onChange={(event) =>
-              setUnsubscribeIdentifier(
-                form.channel === "whatsapp"
-                  ? sanitizePhoneInput(event.target.value)
-                  : event.target.value,
-              )
-            }
-          />
-          <button
-            className="secondary-button"
-            disabled={unsubscribeState.isLoading}
-            type="button"
-            onClick={handleUnsubscribe}
-          >
-            {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
-          </button>
-        </div>
-        {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
-      </section>
 
       {isConfirmingSubscribe && (
         <div className="modal-backdrop" role="presentation">

@@ -1959,6 +1959,12 @@ p {
   align-items: start;
 }
 
+.subscribe-main-column {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
 .subscribe-form-panel,
 .unsubscribe-panel {
   display: grid;
