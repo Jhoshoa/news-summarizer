@@ -202,14 +202,26 @@ categories:
       - { term: "copa", weight: 2 }
       - { term: "torneo", weight: 2 }
       - { term: "campeonato", weight: 3 }
-      - { term: "mundial", weight: 4 }
+      # "mundial" solo (Guerra Mundial, a nivel mundial, etc.) es tan ambiguo
+      # como "penal"/"defensa" -- ver caso real /article/5097 (nota de la
+      # BBC sobre la Segunda Guerra Mundial clasificada como deportes).
+      # Frases especificas de peso alto cubren el sentido real de futbol.
+      - { term: "mundial", weight: 2, ambiguous: true }
+      - { term: "copa mundial", weight: 4 }
+      - { term: "mundial de futbol", weight: 4 }
+      - { term: "clasificatorias al mundial", weight: 4 }
+      - { term: "rumbo al mundial", weight: 3 }
       - { term: "jugador", weight: 2 }
       - { term: "entrenador", weight: 2 }
       - { term: "partido de futbol", weight: 5 }
       - { term: "minuto a minuto", weight: 1 }
       - { term: "goleada", weight: 3 }
       - { term: "debut", weight: 2 }
-      - { term: "bolivar", weight: 2 }
+      # "bolivar" solo tambien nombra al Regimiento Bolivar, Simon Bolivar,
+      # calles/plazas, etc. -- ver caso real /article/5109 (explosiones en
+      # un regimiento militar clasificada como deportes por esta palabra).
+      - { term: "bolivar", weight: 1, ambiguous: true }
+      - { term: "club bolivar", weight: 3 }
       - { term: "the strongest", weight: 3 }
       - { term: "oriente petrolero", weight: 3 }
       - { term: "wilstermann", weight: 3 }

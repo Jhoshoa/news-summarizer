@@ -18,6 +18,14 @@ class ClassificationDecision:
     scores: dict[str, float]
     reason: str
     method: str
+    # Que tan probable es que esta decision este mal, para priorizar el cupo
+    # limitado del fallback de IA (ver classify_batch_async) cuando hay mas
+    # articulos "rules_low_confidence" que cupo disponible en la corrida.
+    # Un termino marcado `ambiguous: true` que gano la categoria fuerza esto
+    # al maximo (10.0); si no, es el mayor entre "un termino domina el
+    # score" y "el margen/confianza es bajo". 0.0 en confianza alta y sin
+    # dominancia de un solo termino.
+    risk_score: float = 0.0
 
 
 class NewsClassifier:
@@ -186,6 +194,7 @@ class NewsClassifier:
                 scores=scores,
                 reason="sin_senales_suficientes",
                 method="rules",
+                risk_score=0.0,
             )
 
         confidence = self._confidence(top_score, second_score)
@@ -202,17 +211,31 @@ class NewsClassifier:
         # docs/mejorar-comportamiento-categorias si existe, o el caso real
         # de /article/4344 (clasificado "deportes" por "defensa"+"penal").
         top_contributions = contributions.get(top_category) or {}
+        max_term_ratio = 0.0
         if top_contributions and top_score > 0:
-            max_term_value = max(top_contributions.values())
-            if (max_term_value / top_score) >= dominant_term_ratio:
+            max_term_ratio = max(top_contributions.values()) / top_score
+            if max_term_ratio >= dominant_term_ratio:
                 method = "rules_low_confidence"
 
         # Terminos marcados `ambiguous: true` en el YAML: si alguno participo
         # en el score ganador, forzar revision aunque no domine el score por
         # si solo -- son casos ya identificados como riesgosos que conviene
         # que el fallback de IA revise siempre.
-        if ambiguous_by_category.get(top_category):
+        is_known_ambiguous_term = bool(ambiguous_by_category.get(top_category))
+        if is_known_ambiguous_term:
             method = "rules_low_confidence"
+
+        # risk_score prioriza el cupo limitado del fallback de IA
+        # (classify_batch_async) cuando hay mas articulos "rules_low_confidence"
+        # que cupo en la corrida -- un termino ya identificado como ambiguo
+        # (ej. "mundial"/"bolivar") va primero siempre, despues el que mas
+        # dependa de un solo termino, despues el margen/confianza mas bajo.
+        # Sin esto, el cupo se gastaba por orden de aparicion en la lista y
+        # los casos mas riesgosos podian quedarse sin revisar (ver casos
+        # reales /article/5097 y /article/5109).
+        risk_score = max(max_term_ratio, 1.0 - confidence)
+        if is_known_ambiguous_term:
+            risk_score = max(risk_score, 10.0)
 
         reason = self._build_reason(top_category, reasons.get(top_category, []), top_score, margin)
         logger.debug(
@@ -228,25 +251,53 @@ class NewsClassifier:
             scores=scores,
             reason=reason,
             method=method,
+            risk_score=round(risk_score, 4),
         )
 
     async def classify_batch_async(self, news: list[dict]) -> list[dict]:
-        """Clasifica noticias y usa LLM solo para casos ambiguos configurados."""
+        """Clasifica noticias y usa LLM solo para casos ambiguos configurados.
 
-        eligible_count = 0
+        El cupo de revision con IA (`max_articles_per_batch`) es limitado por
+        corrida. Antes se gastaba en el orden en que aparecian los articulos
+        en la corrida (primero en llegar, primero en revisarse), asi que un
+        articulo realmente riesgoso podia quedarse sin revision solo por mala
+        suerte de orden -- paso con los casos reales /article/5097 y
+        /article/5109 ("mundial"/"bolivar"), ya marcados `rules_low_confidence`
+        pero descartados con `ai_fallback_batch_limit_reached` porque otros
+        articulos menos riesgosos agotaron el cupo primero. Por eso se
+        clasifica todo con reglas primero, y el cupo de IA se reparte por
+        `risk_score` descendente en vez de por orden de aparicion.
+        """
+
         max_ai_articles = int(self.ai_fallback["max_articles_per_batch"])
 
+        eligible: list[tuple[dict, ClassificationDecision]] = []
         for article in news:
             rule_decision = self.classify_article(article)
             self._apply_decision(article, rule_decision)
 
-            if not self._should_use_llm(rule_decision):
-                continue
-            if eligible_count >= max_ai_articles:
-                article["category_llm_error"] = "ai_fallback_batch_limit_reached"
-                continue
+            if self._should_use_llm(rule_decision):
+                eligible.append((article, rule_decision))
 
-            eligible_count += 1
+        eligible.sort(key=lambda pair: pair[1].risk_score, reverse=True)
+
+        to_review = eligible[:max_ai_articles]
+        skipped = eligible[max_ai_articles:]
+
+        if skipped:
+            logger.warning(
+                "Cupo de fallback de IA agotado: {} articulos elegibles, "
+                "{} revisados, {} descartados por cupo (max_articles_per_batch={})",
+                len(eligible),
+                len(to_review),
+                len(skipped),
+                max_ai_articles,
+            )
+
+        for article, _rule_decision in skipped:
+            article["category_llm_error"] = "ai_fallback_batch_limit_reached"
+
+        for article, rule_decision in to_review:
             llm_decision = await self._classify_with_llm(article, rule_decision)
             if llm_decision:
                 self._apply_llm_decision(article, llm_decision, rule_decision)

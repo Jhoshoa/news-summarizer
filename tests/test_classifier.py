@@ -256,6 +256,80 @@ async def test_classify_batch_async_keeps_rules_when_llm_returns_invalid_categor
     assert result[0]["category_llm_error"] == "invalid_category:gastronomia"
 
 
+def test_ambiguous_term_forces_maximum_risk_score():
+    """"mundial"/"bolivar" son terminos marcados `ambiguous: true` en
+    config/classification.yaml tras los casos reales /article/5097 (Segunda
+    Guerra Mundial mal clasificada como deportes) y /article/5109 (Regimiento
+    Bolivar mal clasificado como deportes). Deben quedar con el risk_score
+    maximo para que nunca pierdan el cupo de revision de IA frente a un
+    articulo "rules_low_confidence" comun."""
+
+    classifier = NewsClassifier()
+
+    ambiguous_case = classifier.classify_article(
+        {
+            "title": "Bolivia conmemora el fin de la Segunda Guerra Mundial",
+            "description": "Historiadores repasan el impacto del conflicto en la region.",
+            "content": "",
+            "category": "general",
+        }
+    )
+    ordinary_low_confidence_case = classifier.classify_article(
+        {
+            "title": "Comision de penal y memoria del sistema",
+            "description": "La autoridad reporto perdida de datos",
+            "content": "",
+            "category": "general",
+        }
+    )
+
+    assert ambiguous_case.method == "rules_low_confidence"
+    assert ambiguous_case.risk_score == 10.0
+    assert ambiguous_case.risk_score > ordinary_low_confidence_case.risk_score
+
+
+async def test_classify_batch_async_prioritizes_higher_risk_score_when_ai_quota_is_exhausted():
+    """Antes el cupo de fallback de IA se gastaba por orden de llegada, asi
+    que un articulo realmente riesgoso (ej. el homonimo "mundial") podia
+    quedarse sin revision solo porque otro articulo menos riesgoso aparecio
+    antes en la lista -- exactamente lo que paso con /article/5097 y
+    /article/5109. Con cupo para solo 1 de 2 elegibles, debe ganar el de
+    mayor risk_score sin importar el orden de entrada."""
+
+    llm = FakeClassifierLLM(
+        '{"category": "mundo", "confidence": 0.9, "reason": "Es sobre la guerra mundial"}'
+    )
+    classifier = NewsClassifier(llm_provider=llm)
+    classifier.ai_fallback["max_articles_per_batch"] = 1
+
+    ordinary_low_confidence_article = {
+        "title": "Comision de penal y memoria del sistema",
+        "description": "La autoridad reporto perdida de datos",
+        "content": "",
+        "category": "general",
+    }
+    ambiguous_article = {
+        "title": "Bolivia conmemora el fin de la Segunda Guerra Mundial",
+        "description": "Historiadores repasan el impacto del conflicto en la region.",
+        "content": "",
+        "category": "general",
+    }
+
+    messages, sink_id = _capture_warnings()
+    try:
+        result = await classifier.classify_batch_async(
+            [ordinary_low_confidence_article, ambiguous_article]
+        )
+    finally:
+        logger.remove(sink_id)
+
+    assert len(llm.calls) == 1
+    assert result[0]["category_llm_error"] == "ai_fallback_batch_limit_reached"
+    assert result[1]["category"] == "mundo"
+    assert result[1]["category_method"] == "llm_fallback"
+    assert any("Cupo de fallback de IA agotado" in message for message in messages)
+
+
 async def test_classify_batch_async_parses_llm_json_inside_markdown_fence():
     llm = FakeClassifierLLM(
         '```json\n{"category": "politica", "confidence": 0.77, "reason": "Contexto politico"}\n```'
