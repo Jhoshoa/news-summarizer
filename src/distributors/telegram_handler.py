@@ -208,25 +208,3 @@ class TelegramHandler:
             sentry_sdk.capture_exception(e)
             return False
 
-    async def send_daily_summary(self, chat_id: str, news: list[dict]) -> bool:
-        """Envia el resumen diario."""
-
-        message = self._format_summary(news)
-        return await self.send_message(chat_id, message)
-
-    def _format_summary(self, news: list[dict]) -> str:
-        """Formatea el resumen para Telegram."""
-
-        text = "*EcoBrief Bolivia - Brief del dia*\n\n"
-        text += "Noticias locales resumidas con menos ruido.\n\n"
-
-        for i, article in enumerate(news[:10], 1):
-            text += f"{i}. *{article.get('title', '')}*\n"
-            text += f"   {article.get('summary', '')}\n"
-            if article.get("fact"):
-                text += f"   Dato: {article.get('fact')}\n"
-            text += "\n"
-
-        text += "---\n"
-        text += "/preferencias | /cancelar"
-        return text

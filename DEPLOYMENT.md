@@ -95,22 +95,23 @@ committed or shared. Gmail can rate-limit or spam-flag bulk sends without SPF/DK
 custom domain — consider a transactional provider (SES, Postmark, Resend) before scaling
 past a handful of daily subscribers.
 
-**WhatsApp** — set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`, and
-point the Twilio WhatsApp sender's webhook at `https://<domain>/webhook/whatsapp`. Twilio's
-WhatsApp sandbox only reaches numbers that manually joined it — for real subscribers you
-need a Meta-approved WhatsApp Business sender, which requires business verification and
-approved message templates for anything sent outside a 24h user-initiated window. There is
-no "send to a WhatsApp group" API on the WhatsApp Business Platform — only one-to-one
-messages to opted-in numbers, which is what `send_daily_summary` already does per
-subscriber (a broadcast list, not a group).
+**WhatsApp** — the app talks directly to the Meta WhatsApp Cloud API (no Twilio or other
+BSP in between; Twilio required mandatory auto-recharge or suspended the account, plus its
+own markup on top of Meta's rate). Set `WHATSAPP_META_ACCESS_TOKEN` and
+`WHATSAPP_META_PHONE_NUMBER_ID` from your Meta app's WhatsApp product. In dev mode you're
+limited to 5 test numbers; for real subscribers you need a Meta-approved WhatsApp Business
+sender, which requires business verification and approved message templates for anything
+sent outside a 24h user-initiated window. There is no "send to a WhatsApp group" API on the
+WhatsApp Business Platform — only one-to-one messages to opted-in numbers (a broadcast
+list, not a group).
 
-Also set `TWILIO_WEBHOOK_URL` to the exact webhook URL configured in the Twilio console
-(`https://<domain>/webhook/whatsapp`, matching scheme/host/path exactly). The app uses it
-together with `TWILIO_AUTH_TOKEN` to validate the `X-Twilio-Signature` header on every
-incoming request — without it, anyone who finds the URL could POST fake messages (e.g.
-unsubscribe any phone number by faking "cancelar"). If `TWILIO_WEBHOOK_URL` is left empty
-the endpoint still works but skips signature validation entirely, so set it before
-pointing real traffic at the webhook.
+Also set `WHATSAPP_META_VERIFY_TOKEN` (a string you choose, used for Meta's webhook
+subscription handshake) and `WHATSAPP_META_APP_SECRET` (from the Meta app's Basic
+Settings). The app uses the app secret to validate the `X-Hub-Signature-256` header on
+every incoming request — without it, anyone who finds the URL could POST fake messages
+(e.g. unsubscribe any phone number by faking "cancelar"). If `WHATSAPP_META_APP_SECRET` is
+left empty the endpoint still works but skips signature validation entirely, so set it
+before pointing real traffic at the webhook.
 
 **Telegram** — set `TELEGRAM_BOT_TOKEN` (from @BotFather) and `TELEGRAM_WEBHOOK_URL` to
 the backend's public HTTPS origin (no path — the app appends `/webhook/telegram` and

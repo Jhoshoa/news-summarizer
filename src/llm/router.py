@@ -109,43 +109,6 @@ class LLMRouter:
             raise last_error
         raise RuntimeError("No se pudo completar la operacion con ningun provider")
 
-    async def chat_batch(
-        self,
-        prompts: list[str],
-        quality: str = "balanced",
-        system_prompt: str | None = None,
-        temperature: float = 0.3,
-    ) -> list[str]:
-        """Ejecuta un batch completo, con failover al siguiente provider si falla."""
-        last_error: BaseException | None = None
-        start_index = self._active_index
-
-        for attempt in range(len(self._providers)):
-            idx = (start_index + attempt) % len(self._providers)
-            provider = self._providers[idx]
-            try:
-                result = await provider.chat_batch(
-                    prompts,
-                    quality=quality,
-                    system_prompt=system_prompt,
-                    temperature=temperature,
-                )
-                self._active_index = idx
-                return result
-            except openai.RateLimitError as e:
-                logger.warning(
-                    f"Rate limit en batch provider={provider.provider}, "
-                    f"failover al siguiente..."
-                )
-                last_error = e
-            except Exception as e:
-                logger.error(f"Error en batch provider={provider.provider}: {e}")
-                last_error = e
-
-        if last_error is not None:
-            raise last_error
-        raise RuntimeError("No se pudo completar el batch con ningun provider")
-
     async def close(self):
         for p in self._providers:
             with suppress(Exception):

@@ -55,9 +55,6 @@ class Settings(BaseSettings):
         default="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         alias="SCRAPER_USER_AGENT",
     )
-    scraper_sources: str = Field(
-        default="radiofides,unitel,reduno,redbolivision", alias="SCRAPER_SOURCES"
-    )
     # Un articulo ya scrapeado (con contenido guardado) no se vuelve a pedir
     # completo si ya paso este numero de horas desde su publicacion -- antes
     # de eso se sigue re-chequeando por si la nota se actualiza (comun en
@@ -83,14 +80,12 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_SECRET")
 
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
-    email_provider: str = Field(default="smtp", alias="EMAIL_PROVIDER")
     smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
     smtp_username: str | None = Field(default=None, alias="SMTP_USERNAME")
     smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
     smtp_from_email: str | None = Field(default=None, alias="SMTP_FROM_EMAIL")
     smtp_from_name: str = Field(default="EcoBrief Bolivia", alias="SMTP_FROM_NAME")
-    email_require_verification: bool = Field(default=False, alias="EMAIL_REQUIRE_VERIFICATION")
 
     database_url: str = Field(
         default="postgresql+asyncpg://user:pass@localhost:5433/news_summarizer",
@@ -106,9 +101,6 @@ class Settings(BaseSettings):
 
     schedule_timezone: str = Field(default="America/La_Paz", alias="SCHEDULE_TIMEZONE")
     schedule_summary_morning: str = Field(default="09:00", alias="SCHEDULE_SUMMARY_MORNING")
-    schedule_summary_afternoon: str = Field(default="16:00", alias="SCHEDULE_SUMMARY_AFTERNOON")
-    schedule_summary_night: str = Field(default="20:00", alias="SCHEDULE_SUMMARY_NIGHT")
-    schedule_summary_evening: str | None = Field(default=None, alias="SCHEDULE_SUMMARY_EVENING")
     api_auth_key: str | None = Field(default=None, alias="API_AUTH_KEY")
     cors_origins: str = Field(
         default="http://localhost:5173", alias="CORS_ORIGINS"
@@ -139,10 +131,6 @@ class Settings(BaseSettings):
     @property
     def categories_list(self) -> list[str]:
         return [c.strip() for c in self.default_categories.split(",")]
-
-    @property
-    def scraper_sources_list(self) -> list[str]:
-        return [s.strip() for s in self.scraper_sources.split(",")]
 
     @property
     def llm_providers_list(self) -> list[dict]:

@@ -1,5 +1,3 @@
-import asyncio
-
 from loguru import logger
 from openai import AsyncOpenAI
 
@@ -135,18 +133,6 @@ class LLMProvider:
         except Exception as e:
             logger.error(f"Error en LLM chat: {e}")
             raise
-
-    async def chat_batch(
-        self,
-        prompts: list[str],
-        quality: str = "balanced",
-        system_prompt: str | None = None,
-        temperature: float = 0.3,
-    ) -> list[str]:
-        """Múltiples prompts en paralelo."""
-
-        tasks = [self.chat(p, quality, system_prompt, temperature) for p in prompts]
-        return await asyncio.gather(*tasks)
 
     async def close(self):
         """Cierra el cliente."""
