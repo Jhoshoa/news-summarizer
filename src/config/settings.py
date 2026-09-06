@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # proveedor lento/caido (nvidia, ver comentario arriba) colgado 20+
     # minutos antes de pasarle el turno al siguiente del LLMRouter.
     llm_timeout: float = Field(default=45.0, alias="LLM_TIMEOUT")
+    # Cuantas categorias se resumen a la vez en _build_summaries (antes se
+    # resumia una categoria a la vez, cada una un round-trip completo al
+    # LLM). El LLMRouter ya reparte la carga con failover propio entre sus
+    # providers, asi que esto solo acota cuantos de esos round-trips estan
+    # en vuelo a la vez.
+    summary_concurrency: int = Field(default=4, alias="SUMMARY_CONCURRENCY")
 
     scraper_enabled: bool = Field(default=True, alias="SCRAPER_ENABLED")
     # Cuantas fuentes se scrapean a la vez (antes esta variable existia pero
@@ -86,6 +92,12 @@ class Settings(BaseSettings):
     smtp_password: str | None = Field(default=None, alias="SMTP_PASSWORD")
     smtp_from_email: str | None = Field(default=None, alias="SMTP_FROM_EMAIL")
     smtp_from_name: str = Field(default="EcoBrief Bolivia", alias="SMTP_FROM_NAME")
+
+    # Cuantos subscriptores se entregan a la vez en /trigger/delivery (antes
+    # se enviaba uno por uno). Un solo limite para los 3 canales -- a
+    # diferencia del scraper, cada subscriptor le pega a un solo proveedor
+    # (Meta, Telegram o SMTP) segun su canal, no a la misma fuente repetida.
+    delivery_concurrency: int = Field(default=5, alias="DELIVERY_CONCURRENCY")
 
     database_url: str = Field(
         default="postgresql+asyncpg://user:pass@localhost:5433/news_summarizer",

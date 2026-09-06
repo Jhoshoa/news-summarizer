@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import unicodedata
@@ -106,6 +107,9 @@ class NewsClassifier:
         "max_tokens": 300,
         "min_confidence": 0.55,
         "max_articles_per_batch": 12,
+        # Cuantos articulos del cupo de arriba se revisan con IA a la vez
+        # (antes se hacia uno a la vez, cada uno un round-trip al LLM).
+        "concurrency": 4,
     }
 
     def __init__(
@@ -297,10 +301,22 @@ class NewsClassifier:
         for article, _rule_decision in skipped:
             article["category_llm_error"] = "ai_fallback_batch_limit_reached"
 
-        for article, rule_decision in to_review:
-            llm_decision = await self._classify_with_llm(article, rule_decision)
-            if llm_decision:
-                self._apply_llm_decision(article, llm_decision, rule_decision)
+        # Cada articulo revisado implica un round-trip al LLM -- antes se
+        # revisaba uno a la vez aunque el cupo (`to_review`) ya estuviera
+        # acotado. Mismo patron que en el scraper/summarizer/delivery: un
+        # semaforo limita cuantas revisiones estan en vuelo a la vez.
+        concurrency = max(int(self.ai_fallback.get("concurrency", 4)), 1)
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _review_with_limit(article: dict, rule_decision: ClassificationDecision) -> None:
+            async with semaphore:
+                llm_decision = await self._classify_with_llm(article, rule_decision)
+                if llm_decision:
+                    self._apply_llm_decision(article, llm_decision, rule_decision)
+
+        await asyncio.gather(
+            *(_review_with_limit(article, rule_decision) for article, rule_decision in to_review)
+        )
 
         return news
 

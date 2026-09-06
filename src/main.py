@@ -601,7 +601,6 @@ class NewsSummarizerApp:
             logger.warning("DB no disponible, no se envia nada")
             return 0, self._empty_delivery_stats()
 
-        sent_count = 0
         delivery_stats = self._empty_delivery_stats()
 
         await self._attach_story_update_notes(summaries)
@@ -616,67 +615,98 @@ class NewsSummarizerApp:
 
         logger.info(f"Active subscribers: {len(subscribers)}")
 
-        for sub in subscribers:
-            try:
-                if not self._should_send_to_subscriber(sub, hour):
-                    logger.info(
-                        "Skipping subscriber outside preferences: "
-                        f"channel={getattr(sub, 'channel', None)} "
-                        f"preferred_hour={getattr(sub, 'preferred_hour', None)} "
-                        f"frequency={getattr(sub, 'frequency', None)}"
-                    )
-                    continue
+        # Cada subscriptor implica un round-trip de red real (Graph API de
+        # Meta, Bot API de Telegram, o SMTP via asyncio.to_thread) -- antes
+        # se enviaba a uno por uno, asi que con muchos suscriptores la
+        # ventana total de /trigger/delivery crecia linealmente. Mismo
+        # patron ya usado en el scraper (ver SCRAPER_CONCURRENCY): un
+        # semaforo acota cuantos envios estan en vuelo a la vez sin
+        # saturar ningun proveedor.
+        concurrency = max(int(getattr(self.settings, "delivery_concurrency", 5)), 1)
+        semaphore = asyncio.Semaphore(concurrency)
 
-                user_categories = sub.categories or categories
-                user_news = [n for n in summaries if n.get("category") in user_categories]
-                user_news = self._deduplicate_summaries_for_delivery(user_news)
+        async def _deliver_with_limit(sub: Any) -> tuple[str, bool] | None:
+            async with semaphore:
+                return await self._deliver_to_subscriber(sub, hour, summaries, categories)
 
-                if not user_news:
-                    continue
+        results = await asyncio.gather(*(_deliver_with_limit(sub) for sub in subscribers))
 
-                user_news = user_news[:10]
-
-                if sub.channel == "whatsapp" and sub.phone:
-                    message = self._format_summary(user_news)
-                    delivered = bool(
-                        self.whatsapp and await self.whatsapp.send_message(sub.phone, message)
-                    )
-                    if delivered:
-                        sent_count += 1
-                        delivery_stats["sent_by_channel"]["whatsapp"] += 1
-                    else:
-                        delivery_stats["failed_by_channel"]["whatsapp"] += 1
-                elif sub.channel == "telegram" and sub.telegram_id:
-                    message = self._format_summary(user_news)
-                    delivered = bool(
-                        self.telegram and await self.telegram.send_message(sub.telegram_id, message)
-                    )
-                    if delivered:
-                        sent_count += 1
-                        delivery_stats["sent_by_channel"]["telegram"] += 1
-                    else:
-                        delivery_stats["failed_by_channel"]["telegram"] += 1
-                elif sub.channel == "email" and getattr(sub, "email", None):
-                    subject, body, html_body = self._format_email_summary(user_news)
-                    delivered = bool(
-                        self.email
-                        and await self.email.send_message(
-                            sub.email,
-                            subject,
-                            body,
-                            html_body,
-                        )
-                    )
-                    if delivered:
-                        sent_count += 1
-                        delivery_stats["sent_by_channel"]["email"] += 1
-                    else:
-                        delivery_stats["failed_by_channel"]["email"] += 1
-            except Exception as e:
-                logger.error(f"Error enviando a {sub}: {e}")
-                sentry_sdk.capture_exception(e)
+        sent_count = 0
+        for result in results:
+            if result is None:
+                continue
+            channel, delivered = result
+            if delivered:
+                sent_count += 1
+                delivery_stats["sent_by_channel"][channel] += 1
+            else:
+                delivery_stats["failed_by_channel"][channel] += 1
 
         return sent_count, delivery_stats
+
+    async def _deliver_to_subscriber(
+        self,
+        sub: Any,
+        hour: int | None,
+        summaries: list[dict],
+        categories: list[str],
+    ) -> tuple[str, bool] | None:
+        """Entrega el brief a un solo subscriptor.
+
+        Cualquier excepcion se atrapa aca mismo (se loguea y se manda a
+        Sentry) en vez de propagarse -- asi una falla de un subscriptor no
+        cancela el `asyncio.gather` ni afecta a los demas, igual que hacia
+        el `try/except` por-iteracion del loop secuencial que reemplaza."""
+
+        try:
+            if not self._should_send_to_subscriber(sub, hour):
+                logger.info(
+                    "Skipping subscriber outside preferences: "
+                    f"channel={getattr(sub, 'channel', None)} "
+                    f"preferred_hour={getattr(sub, 'preferred_hour', None)} "
+                    f"frequency={getattr(sub, 'frequency', None)}"
+                )
+                return None
+
+            user_categories = sub.categories or categories
+            user_news = [n for n in summaries if n.get("category") in user_categories]
+            user_news = self._deduplicate_summaries_for_delivery(user_news)
+
+            if not user_news:
+                return None
+
+            user_news = user_news[:10]
+
+            if sub.channel == "whatsapp" and sub.phone:
+                message = self._format_summary(user_news)
+                delivered = bool(
+                    self.whatsapp and await self.whatsapp.send_message(sub.phone, message)
+                )
+                return "whatsapp", delivered
+            elif sub.channel == "telegram" and sub.telegram_id:
+                message = self._format_summary(user_news)
+                delivered = bool(
+                    self.telegram and await self.telegram.send_message(sub.telegram_id, message)
+                )
+                return "telegram", delivered
+            elif sub.channel == "email" and getattr(sub, "email", None):
+                subject, body, html_body = self._format_email_summary(user_news)
+                delivered = bool(
+                    self.email
+                    and await self.email.send_message(
+                        sub.email,
+                        subject,
+                        body,
+                        html_body,
+                    )
+                )
+                return "email", delivered
+
+            return None
+        except Exception as e:
+            logger.error(f"Error enviando a {sub}: {e}")
+            sentry_sdk.capture_exception(e)
+            return None
 
     def _empty_delivery_stats(self) -> dict[str, dict[str, int]]:
         return {
@@ -767,37 +797,61 @@ class NewsSummarizerApp:
 
     async def _build_summaries(self, news: list[dict], categories: list[str]) -> list[dict]:
         summarizer = NewsSummarizer(self.llm)
-        summaries: list[dict] = []
 
-        for category in categories:
-            category_news = [n for n in news if n.get("category") == category]
-            if not category_news:
-                continue
-            cat_limit = self._per_category_limit(category)
-            to_summarize = category_news[:cat_limit]
-            if len(category_news) > 5:
-                        logger.info(
-                            "  categoria {:<14} | {} candidatos, limitado a {} (descarta {} con menor score)",
-                            category, len(category_news), cat_limit, len(category_news) - cat_limit,
-                        )
-            for a in to_summarize:
-                logger.info(
-                    "  a resumir       | id={:<5} cat={:<14} score={:<6} title={}",
-                    a.get("id"), a.get("category",""), a.get("score",""),
-                    (a.get("title","") or "")[:100],
-                )
-            await self._attach_corroborating_articles(to_summarize)
-            try:
-                cat_summaries = await summarizer.summarize(to_summarize, category)
-                logger.info(
-                    "  categoria {:<14} | {} enviados, {} resumenes generados",
-                    category, len(to_summarize), len(cat_summaries),
-                )
-                summaries.extend(cat_summaries)
-            except Exception as e:
-                logger.error(f"Error resumiendo {category}: {e}")
+        # Cada categoria implica un round-trip completo al LLM (tier
+        # "quality", hasta MIN_MAX_TOKENS+ tokens, con posible reintento en
+        # dos mitades) -- antes se resumia una categoria a la vez, asi que
+        # con ~10 categorias esto serializaba 10+ llamadas LLM por corrida.
+        # Mismo patron ya usado en el scraper y en la entrega a
+        # suscriptores: un semaforo acota cuantas categorias se resumen a
+        # la vez sin saturar los providers del LLMRouter (que ya reparten
+        # la carga con failover propio entre ellos).
+        concurrency = max(int(getattr(self.settings, "summary_concurrency", 4)), 1)
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def _summarize_with_limit(category: str) -> list[dict]:
+            async with semaphore:
+                return await self._summarize_category(summarizer, news, category)
+
+        results = await asyncio.gather(*(_summarize_with_limit(c) for c in categories))
+
+        summaries: list[dict] = []
+        for cat_summaries in results:
+            summaries.extend(cat_summaries)
 
         return summaries
+
+    async def _summarize_category(
+        self, summarizer: NewsSummarizer, news: list[dict], category: str
+    ) -> list[dict]:
+        category_news = [n for n in news if n.get("category") == category]
+        if not category_news:
+            return []
+
+        cat_limit = self._per_category_limit(category)
+        to_summarize = category_news[:cat_limit]
+        if len(category_news) > 5:
+            logger.info(
+                "  categoria {:<14} | {} candidatos, limitado a {} (descarta {} con menor score)",
+                category, len(category_news), cat_limit, len(category_news) - cat_limit,
+            )
+        for a in to_summarize:
+            logger.info(
+                "  a resumir       | id={:<5} cat={:<14} score={:<6} title={}",
+                a.get("id"), a.get("category", ""), a.get("score", ""),
+                (a.get("title", "") or "")[:100],
+            )
+        await self._attach_corroborating_articles(to_summarize)
+        try:
+            cat_summaries = await summarizer.summarize(to_summarize, category)
+            logger.info(
+                "  categoria {:<14} | {} enviados, {} resumenes generados",
+                category, len(to_summarize), len(cat_summaries),
+            )
+            return cat_summaries
+        except Exception as e:
+            logger.error(f"Error resumiendo {category}: {e}")
+            return []
 
     async def _attach_corroborating_articles(self, articles: list[dict]) -> None:
         """Adjunta otros articulos de la misma historia como contexto multi-fuente

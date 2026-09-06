@@ -975,3 +975,5 @@ ai_fallback:
   max_tokens: 300
   min_confidence: 0.55
   max_articles_per_batch: 12
+  # Cuantos de esos 12 se revisan con IA a la vez (antes uno a la vez).
+  concurrency: 4
