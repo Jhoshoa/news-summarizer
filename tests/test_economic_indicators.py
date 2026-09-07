@@ -187,7 +187,14 @@ def test_parse_official_usd_report_uses_latest_daily_row_as_fallback():
 
 
 @pytest.mark.asyncio
-async def test_fetch_binance_p2p_uses_lowest_bob_price_for_buy_and_sell():
+async def test_fetch_binance_p2p_picks_best_price_per_side():
+    """buy (comprando USDT) quiere el precio mas bajo que alguien pide;
+    sell (vendiendo USDT) quiere el precio mas alto que alguien ofrece
+    pagar -- ver caso real donde Binance mostraba venta a Bs 12,46 (el mas
+    alto de los anuncios) y nosotros guardabamos Bs 12,44 (el mas bajo)
+    por tomar siempre el minimo sin importar el lado.
+    """
+
     responses = {
         "BUY": {
             "data": [
@@ -220,8 +227,10 @@ async def test_fetch_binance_p2p_uses_lowest_bob_price_for_buy_and_sell():
 
     assert by_side["buy"].value == Decimal("9.93")
     assert by_side["buy"].raw_payload["advertisement"]["adv"]["advNo"] == "low-buy"
-    assert by_side["sell"].value == Decimal("9.90")
-    assert by_side["sell"].raw_payload["advertisement"]["adv"]["advNo"] == "low-sell"
+    assert by_side["buy"].raw_payload["selection"] == "lowest_price"
+    assert by_side["sell"].value == Decimal("9.91")
+    assert by_side["sell"].raw_payload["advertisement"]["adv"]["advNo"] == "high-sell"
+    assert by_side["sell"].raw_payload["selection"] == "highest_price"
 
 
 def test_indicator_repository_same_day_requires_same_observed_or_collected_day():

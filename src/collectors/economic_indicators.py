@@ -176,7 +176,7 @@ class EconomicIndicatorCollector:
             response = await client.post(self.BINANCE_P2P_URL, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
-            price, raw_ad = self._lowest_binance_price(data)
+            price, raw_ad, selection = self._best_binance_price(data, trade_type)
             if price is None:
                 logger.warning(f"No Binance P2P price found for tradeType={trade_type}")
                 continue
@@ -197,7 +197,7 @@ class EconomicIndicatorCollector:
                     snapshot_key=snapshot_key,
                     raw_payload={
                         "trade_type": trade_type,
-                        "selection": "lowest_price",
+                        "selection": selection,
                         "request": payload,
                         "advertisement": raw_ad,
                     },
@@ -395,7 +395,22 @@ class EconomicIndicatorCollector:
         values = [self._clean_text(value) for value in card.select(".bcb-val")]
         return list(zip(labels, values, strict=False))
 
-    def _lowest_binance_price(self, data: dict[str, Any]) -> tuple[Decimal | None, dict[str, Any]]:
+    def _best_binance_price(
+        self, data: dict[str, Any], trade_type: str
+    ) -> tuple[Decimal | None, dict[str, Any], str]:
+        """Mejor precio P2P segun el lado de la operacion.
+
+        tradeType=BUY (compramos USDT) -> el mejor precio es el mas BAJO que
+        alguien pide por vender. tradeType=SELL (vendemos USDT) -> el mejor
+        precio es el mas ALTO que alguien ofrece pagar. Tomar siempre el
+        minimo (como se hacia antes) daba el peor precio posible del lado
+        sell -- ver caso real: Binance mostraba venta a Bs 12,46 (el precio
+        mas alto, el correcto) mientras nosotros guardabamos Bs 12,44 (el
+        mas bajo de los 20 anuncios). La propia API ya devuelve los anuncios
+        ordenados "mejor primero" por lado, pero calculamos el extremo
+        explicitamente en vez de confiar en el orden.
+        """
+
         candidates = []
         for item in data.get("data") or []:
             adv = item.get("adv") or {}
@@ -405,10 +420,16 @@ class EconomicIndicatorCollector:
             candidates.append((price, item))
 
         if not candidates:
-            return None, {}
+            return None, {}, "none"
 
-        price, item = min(candidates, key=lambda candidate: candidate[0])
-        return price, item
+        if trade_type == "SELL":
+            price, item = max(candidates, key=lambda candidate: candidate[0])
+            selection = "highest_price"
+        else:
+            price, item = min(candidates, key=lambda candidate: candidate[0])
+            selection = "lowest_price"
+
+        return price, item, selection
 
     def _infer_bcb_unit(self, group_name: str, subtitle: str) -> str | None:
         text = self._strip_accents(f"{group_name} {subtitle}".lower())
