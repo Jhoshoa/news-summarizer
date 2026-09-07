@@ -111,8 +111,14 @@ class EconomicIndicatorCollector:
             return []
 
         indicators = []
+        official_rate = None
         for card in section.select(".bcb-kpi2-card"):
             if card.select_one(".bcb-tco-amount") or self._is_bcb_exchange_rate_card(card):
+                official_rate = self._parse_bcb_official_rate_card(
+                    card,
+                    snapshot_key=snapshot_key,
+                    collected_at=collected_at,
+                )
                 continue
             indicators.extend(
                 self._parse_bcb_card(
@@ -122,13 +128,25 @@ class EconomicIndicatorCollector:
                 )
             )
 
-        indicators.extend(
-            await self._fetch_official_usd_rate(
-                client,
-                snapshot_key=snapshot_key,
-                collected_at=collected_at,
+        if official_rate is not None:
+            # El home muestra el tipo de cambio oficial vigente directamente
+            # (tarjeta .bcb-tco-amount); solo se recurre al reporte aparte
+            # (tco_reporte_ultima_cotizacion.php) si esa tarjeta no aparece.
+            # Ese reporte es un indicador distinto -- el promedio ponderado de
+            # transacciones bancarias reportadas a BCB, que se publica con
+            # dias/semanas de rezago -- y usarlo como si fuera el oficial
+            # mostraba un valor desactualizado (caso real: home informaba
+            # 12,58 vigente para el 5-7 de septiembre 2026 mientras el
+            # reporte aun mostraba 11,52 con vigencia del 21 de agosto).
+            indicators.append(official_rate)
+        else:
+            indicators.extend(
+                await self._fetch_official_usd_rate(
+                    client,
+                    snapshot_key=snapshot_key,
+                    collected_at=collected_at,
+                )
             )
-        )
 
         return indicators
 
@@ -230,6 +248,64 @@ class EconomicIndicatorCollector:
             )
         ]
 
+    def _parse_bcb_official_rate_card(
+        self,
+        card,
+        *,
+        snapshot_key: str | None,
+        collected_at: datetime | None,
+    ) -> EconomicIndicator | None:
+        value_text = self._clean_text(
+            card.select_one(".bcb-tco-num") or card.select_one(".bcb-tco-amount")
+        )
+        value = self._parse_decimal(value_text)
+        if value is None:
+            return None
+
+        asof_element = card.select_one(".bcb-kpi2-asof")
+        observed_label = self._clean_text(asof_element)
+        observed_at = self._parse_asof_date(asof_element, observed_label)
+
+        return EconomicIndicator(
+            source="bcb",
+            indicator_code="bcb_tipo_de_cambio_oficial",
+            indicator_name="Dolar oficial",
+            indicator_group="Tipo de cambio oficial",
+            value=value,
+            unit="BOB per USD",
+            currency="BOB",
+            asset="USD",
+            side=None,
+            observed_at=observed_at,
+            collected_at=collected_at or datetime.now(TZ_BOLIVIA).replace(tzinfo=None),
+            snapshot_key=snapshot_key,
+            raw_payload={
+                "value_text": value_text,
+                "validity_label": observed_label,
+                "source_url": self.BCB_URL,
+            },
+        )
+
+    def _parse_asof_date(self, element: Any, fallback_text: str) -> date | None:
+        """Fecha de vigencia de una tarjeta BCB.
+
+        Preferimos el atributo `datetime` del `<time>` (ISO, inequivoco) sobre
+        parsear el texto en espanol: para rangos "vigente para el sabado 5,
+        domingo 6 y lunes 7 de septiembre" el regex de `_parse_spanish_date`
+        solo encuentra la ultima fecha por casualidad de formato (es la unica
+        seguida de "de <mes>"), y ese acoplamiento se rompe si BCB cambia el
+        orden o la redaccion del rango.
+        """
+
+        time_tag = element.select_one("time[datetime]") if element is not None else None
+        if time_tag is not None:
+            try:
+                return date.fromisoformat(time_tag["datetime"][:10])
+            except (KeyError, ValueError):
+                pass
+
+        return self._parse_spanish_date(fallback_text)
+
     def _is_bcb_exchange_rate_card(self, card) -> bool:
         title = self._clean_text(card.select_one(".bcb-kpi2-name"))
         subtitle = self._clean_text(card.select_one(".bcb-kpi2-sub"))
@@ -266,8 +342,9 @@ class EconomicIndicatorCollector:
     ) -> list[EconomicIndicator]:
         group_name = self._clean_text(card.select_one(".bcb-kpi2-name"))
         subtitle = self._clean_text(card.select_one(".bcb-kpi2-sub"))
-        observed_label = self._clean_text(card.select_one(".bcb-kpi2-asof"))
-        observed_at = self._parse_spanish_date(observed_label)
+        asof_element = card.select_one(".bcb-kpi2-asof")
+        observed_label = self._clean_text(asof_element)
+        observed_at = self._parse_asof_date(asof_element, observed_label)
         indicators = []
         for label, value_text in self._iter_bcb_values(card):
             value = self._parse_decimal(value_text)

@@ -79,6 +79,29 @@ BCB_OFFICIAL_USD_HTML = """
 </section>
 """
 
+BCB_HTML_WITH_OFFICIAL_RATE_CARD = """
+<section class="bcb-kpi2" aria-label="Indicadores clave - BCB">
+  <div class="bcb-kpi2-row">
+    <article class="bcb-kpi2-card is-tc-oficial has-range-label">
+      <div class="bcb-kpi2-hd">
+        <p class="bcb-kpi2-name">Tipo de cambio oficial</p>
+        <div class="bcb-kpi2-sub">Bolivianos por dólar estadounidense</div>
+        <div class="bcb-kpi2-asof">
+          <time datetime="2026-09-07">VIGENTE PARA EL SÁBADO 5, DOMINGO 6 Y LUNES 7 DE SEPTIEMBRE, 2026</time>
+        </div>
+      </div>
+      <div class="bcb-kpi2-body">
+        <div class="bcb-tco-value">
+          <div class="bcb-tco-amount">
+            <span class="bcb-tco-num">12,58</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>
+"""
+
 BCB_OFFICIAL_USD_TABLE_ONLY_HTML = """
 <section class="bcb-vrd-wrap" aria-label="Tipo de Cambio Oficial del Dolar Estadounidense">
   <table class="tco-daily-table">
@@ -120,6 +143,36 @@ async def test_fetch_bcb_parses_key_indicator_cards():
     assert by_code["bcb_unidad_de_fomento_a_la_vivienda_ufv"].asset == "UFV"
     assert by_code["bcb_cotizacion_internacional_del_oro_valor"].value == Decimal("4269.71")
     assert by_code["bcb_cotizacion_internacional_del_oro_valor"].asset == "GOLD"
+
+
+@pytest.mark.asyncio
+async def test_fetch_bcb_uses_home_official_rate_card_over_stale_report_page():
+    """El home publica el tipo de cambio oficial vigente en la propia tarjeta
+    (.bcb-tco-amount); el reporte aparte (tco_reporte_ultima_cotizacion.php)
+    es un indicador distinto (promedio de transacciones bancarias) que se
+    actualiza con rezago. Caso real /article regression: el home informaba
+    Bs 12,58 vigente para el 5-7 de septiembre de 2026 mientras el reporte
+    aun mostraba Bs 11,52 con vigencia del 21 de agosto -- se debe usar el
+    valor del home y ni siquiera consultar el reporte cuando la tarjeta
+    trae el valor.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url) == "https://www.bcb.gob.bo/":
+            return httpx.Response(200, text=BCB_HTML_WITH_OFFICIAL_RATE_CARD)
+
+        raise AssertionError(
+            f"no deberia consultarse {request.url} cuando el home ya trae el valor oficial"
+        )
+
+    collector = EconomicIndicatorCollector()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        indicators = await collector.fetch_bcb(client, snapshot_key="snapshot", collected_at=None)
+
+    by_code = {indicator.indicator_code: indicator for indicator in indicators}
+
+    assert by_code["bcb_tipo_de_cambio_oficial"].value == Decimal("12.58")
+    assert by_code["bcb_tipo_de_cambio_oficial"].observed_at.isoformat() == "2026-09-07"
 
 
 def test_parse_official_usd_report_uses_latest_daily_row_as_fallback():
