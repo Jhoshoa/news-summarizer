@@ -198,7 +198,14 @@ categories:
       - { term: "gol", weight: 3 }
       - { term: "club", weight: 3 }
       - { term: "liga profesional", weight: 4 }
-      - { term: "seleccion", weight: 3 }
+      # "seleccion" sola tambien nombra seleccion de personal por concurso de
+      # meritos, seleccion natural, etc. -- ver caso real /article/5252 (nota
+      # sobre eleccion de directores de hospitales por concurso de meritos
+      # clasificada como deportes por esta palabra).
+      - { term: "seleccion", weight: 1, ambiguous: true }
+      - { term: "seleccion boliviana", weight: 4 }
+      - { term: "seleccion nacional", weight: 4 }
+      - { term: "seleccion de futbol", weight: 4 }
       - { term: "copa", weight: 2 }
       - { term: "torneo", weight: 2 }
       - { term: "campeonato", weight: 3 }
