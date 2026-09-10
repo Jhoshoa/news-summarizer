@@ -1,5 +1,7 @@
 # Capítulo 7 — Estado Actual y Roadmap
 
+Este capítulo ya no es una lista de entregables para una fecha de concurso: es la hoja de ruta de un producto en desarrollo continuo, con features en distintas etapas de madurez — algunas ya en producción, otras en progreso, otras todavía en evaluación. La pregunta que guía esta sección no es "¿cumplimos los requisitos?", sino "¿qué necesita este producto para seguir mejorando?".
+
 ## 7.1 MVP funcional — qué se agregó desde la versión 1
 
 El MVP descrito en junio de 2026 ya funcionaba. Lo que cambió es la profundidad de varias de sus piezas:
@@ -32,9 +34,11 @@ El MVP descrito en junio de 2026 ya funcionaba. Lo que cambió es la profundidad
 | CI/CD | GitHub Actions (3 jobs) |
 | Control de versiones | Git, GitHub |
 
-## 7.3 Trabajo pendiente y hoja de ruta
+## 7.3 En progreso y próximas features
 
-### Comprometido (corto plazo)
+### En progreso ahora
+
+Deuda técnica y ajustes ya identificados, con trabajo activo o inminente:
 
 - Ejecutar `mypy` en CI — está configurado como dependencia y en `pyproject.toml`, pero el workflow actual no lo invoca.
 - Agregar el archivo de configuración de `pre-commit` — la dependencia ya está declarada, falta el `.pre-commit-config.yaml`.
@@ -42,19 +46,24 @@ El MVP descrito en junio de 2026 ya funcionaba. Lo que cambió es la profundidad
 - Limpiar los pesos de fuente obsoletos (`la_razon`, `opinion`) en `config/scoring.yaml`, que ya no tienen fuente correspondiente activa.
 - Evaluar si conviene reincorporar Página Siete y/o ATB a `config/sources.yaml`, o documentar formalmente el motivo de su baja.
 
-### Planificado (mediano plazo)
+### Próximas features (mediano plazo)
+
+Funcionalidades planificadas para hacer crecer el producto más allá del piloto actual:
 
 - Monitorear la tasa de corroboración entre fuentes (`source_article_count` promedio) durante varias semanas para evaluar si el umbral de similitud de historias (0.85) es demasiado conservador con solo 6 fuentes activas.
 - Ampliar la base de suscriptores activos más allá del piloto cerrado actual, y usar datos reales de entrega (no solo de generación) para refinar las métricas de impacto.
 - Medir datos reales descargados y evitados (no solo estimaciones), aprovechando que ya existe telemetría de eventos de uso (`analytics_events`).
 - Evaluar la detección de contradicciones entre fuentes con una señal semántica más confiable que la descartada en la iteración actual.
 
-### Aspiracional (largo plazo)
+### Visión a futuro (largo plazo)
+
+Ideas de mayor alcance, sin compromiso de fecha — se evalúan a medida que el producto y su base de usuarios crecen:
 
 - Detección por entidades, personas y lugares sobre las historias ya agrupadas.
 - Planes de suscripción para usuarios avanzados, organizaciones y analistas.
 - Panel institucional para monitoreo de noticias, comunicados y alertas públicas.
 - Monitoreo automático de cambios estructurales en las fuentes de scraping, para detectar selectores rotos antes de que dejen de recolectar silenciosamente.
+- Evaluar programas de aceleración para startups (Y Combinator u otros) una vez exista tracción real que lo respalde. Con el piloto actual (un puñado de suscriptores), convertir esto en un objetivo formal del proyecto sería prematuro — queda anotado como posibilidad a revisar más adelante, no como plan.
 
 ## 7.4 Riesgos técnicos y mitigación
 

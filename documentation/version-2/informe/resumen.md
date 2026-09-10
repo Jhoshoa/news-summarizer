@@ -2,6 +2,8 @@
 
 EcoBrief Bolivia es una plataforma que utiliza inteligencia artificial de forma responsable para reducir el desperdicio digital informativo. El sistema recolecta noticias de medios bolivianos, elimina duplicados, agrupa coberturas de una misma historia entre distintas fuentes, prioriza el contenido relevante y genera resúmenes con evidencia trazable, para que las personas no tengan que abrir múltiples páginas, leer la misma historia varias veces o consumir datos innecesarios.
 
+EcoBrief nació en 2025 como propuesta para el concurso Green Tech. Esta versión ya no se mide contra los requisitos de aquella convocatoria: se mide contra su propia hoja de ruta de producto, la misma vara con la que se evalúa a cualquier startup en desarrollo — qué funciona en producción, qué está en progreso, y qué se planea a futuro (Capítulo 7).
+
 Desde el informe de junio 2026 (versión 1), el sistema pasó de ser un MVP funcional a una plataforma con varias capas de robustez operativa que no existían antes:
 
 - Deduplicación **multi-nivel real**: hash de URL, similitud de título, huella de contenido histórica, agrupación de historias por ventana temporal (*story clustering*) y una capa adicional de deduplicación **semántica con IA** antes de resumir.
