@@ -1,0 +1,65 @@
+%% EcoBrief Bolivia - Arquitectura tecnica (version-2, septiembre 2026)
+%% 4 servicios Docker Compose independientes: postgres, backend, frontend, cron-job.
+flowchart TB
+    Usuario((Usuario))
+
+    subgraph FE["Frontend - React 19 + Vite 6 + TypeScript"]
+        Home[Home]
+        Noticias[Noticias]
+        Detalle[Detalle]
+        Impacto[Impacto]
+        Datos["Datos (nuevo)"]
+        Fuentes["Fuentes (nuevo)"]
+        Suscripcion[Suscripcion]
+    end
+
+    subgraph BE["Backend - FastAPI (contenedor unico)"]
+        API[API REST]
+        Collectors[Collectors\nhttpx + BeautifulSoup + lxml]
+        EconCollector["Economic Indicators\nCollector (BCB, Binance P2P)"]
+        Processors["Processors\nDedup + Story Clustering\nClasificacion + Ranking\nResumen IA"]
+        Router["LLM Router\nfailover automatico"]
+        Distributors[Distributors]
+    end
+
+    subgraph Cron["cron-job (contenedor separado)"]
+        Runner["RefreshJobRunner\n3 loops async independientes"]
+    end
+
+    subgraph LLMs["Proveedores LLM (orden de fallback)"]
+        Groq[Groq]
+        Gemini[Gemini]
+        GitHubM[GitHub Models]
+        Nvidia[NVIDIA]
+        OpenAI[OpenAI]
+    end
+
+    Sources[("Medios bolivianos\nRadioFides, Unitel, RedUno,\nRedBolivision, LosTiempos, ElDeber")]
+    BCB[("BCB\nhome + reporte TCO")]
+    Binance[("Binance P2P API")]
+    DB[(PostgreSQL)]
+
+    Usuario --> Home & Noticias & Detalle & Impacto & Datos & Fuentes & Suscripcion
+    FE --> API
+    API --> DB
+
+    Runner -- "POST /trigger/summary (async + polling)" --> API
+    Runner -- "POST /trigger/delivery?hour=N" --> API
+    Runner -- "POST /api/economic-indicators/refresh" --> API
+
+    Collectors --> Sources
+    EconCollector --> BCB
+    EconCollector --> Binance
+    Collectors --> Processors
+    EconCollector --> Processors
+    Processors --> Router
+    Router --> Groq & Gemini & GitHubM & Nvidia & OpenAI
+    Processors --> DB
+    Distributors --> Usuario
+
+    subgraph Canales["Canales de distribucion"]
+        WA["WhatsApp\nMeta Cloud API directa"]
+        TG["Telegram\nBot API via webhook"]
+        Mail["Email\nSMTP"]
+    end
+    Distributors --> WA & TG & Mail

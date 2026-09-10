@@ -1,0 +1,8 @@
+%% EcoBrief Bolivia - Funnel de impacto digital, corrida real del 7 de septiembre de 2026
+flowchart LR
+    A["Recolectadas\n115 (100%)"] -->|"filtro de calidad"| B["Utiles\n110"]
+    B -->|"dedup. lote + fingerprint"| C["Unicas / agrupadas\npor historia"]
+    C -->|"ranking + cupo por categoria"| D["Candidatas a IA\n41 en la corrida principal"]
+    D -->|"dedup. semantica + resumen IA"| E["Briefs\n52 (45.2%)"]
+
+    E --- Note["63 paginas evitadas\n31.5 min de lectura ahorrados\n54.8% de reduccion del flujo"]

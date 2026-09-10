@@ -1,0 +1,35 @@
+%% EcoBrief Bolivia - Pipeline tecnico (version-2, septiembre 2026)
+%% Incluye las capas que no existian en version-1: amortiguador de terminos
+%% ambiguos + risk_score en clasificacion, story clustering persistente y
+%% deduplicacion semantica por LLM antes de resumir.
+flowchart TD
+    Start([Trigger: cron cada 30-60 min\no manual via API]) --> Cache{Hay resumenes\ncacheados vigentes?}
+    Cache -- si --> Reuse[Reutilizar resumenes\nexistentes]
+    Cache -- no --> Scrape[Scraping de 6 fuentes\nselectores CSS + fallback generico]
+
+    Scrape --> Quality[Filtrar articulos\nsin contenido suficiente]
+    Quality --> BatchDedup["Dedup por lote\nhash MD5 de URL +\nSequenceMatcher titulo (0.85)"]
+    BatchDedup --> Classify["Clasificar por reglas ponderadas\ntitulo x3, descripcion x2,\ncontenido x1, fuente x2.5"]
+
+    Classify --> Ambiguous{Termino dominante\no marcado ambiguous?}
+    Ambiguous -- si --> RiskScore["Calcular risk_score\nordenar cupo de revision IA"]
+    RiskScore --> LLMReview["Reclasificar con LLM\n(hasta 12 articulos/corrida,\nconcurrencia 4)"]
+    Ambiguous -- no --> Rank
+    LLMReview --> Rank["Rankear por relevancia\n7 factores ponderados"]
+
+    Rank --> Persist[Persistir articulos\nen PostgreSQL]
+    Persist --> StoryMatch["Fingerprint de URL +\nsimilitud titulo/contenido\nvs. ventana de 3 dias"]
+    StoryMatch --> Cluster{Coincide con\nhistoria existente?}
+    Cluster -- si --> Join["Unir a story_cluster_id\nexistente, sumar fuente"]
+    Cluster -- no --> NewCluster["Crear story_cluster_id\nnuevo"]
+
+    Join --> Candidates
+    NewCluster --> Candidates["Seleccionar candidatos\npor categoria (5, o 8 en\npolitica/economia)"]
+    Candidates --> AIDedup["Deduplicacion semantica\ncon LLM (AIStoryDeduplicator)\nmismo hecho vs. mismo tema"]
+    AIDedup --> Summarize["Generar resumenes con IA\ntitle + summary + fact + claims"]
+    Summarize --> Extend["Extender resumenes cortos\nsin repetir informacion"]
+    Extend --> Validate["Validar claims contra\narticle_id real (sin inventar URLs)"]
+    Validate --> Save[Guardar resumenes\ny metricas de la corrida]
+
+    Reuse --> Serve
+    Save --> Serve([Servir en frontend /\npreparar entrega por hora])
