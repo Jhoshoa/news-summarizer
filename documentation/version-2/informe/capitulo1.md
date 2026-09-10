@@ -8,7 +8,7 @@ El **desperdicio digital informativo** se manifiesta de varias formas: tiempo pe
 
 Esta problemática se alinea directamente con los principios de **Green Tech**: promover un uso más eficiente, responsable y sostenible de la tecnología, la inteligencia artificial, el *cloud*, los datos y los procesos internos. No se trata solo de ahorrar tiempo, sino de repensar cómo consumimos y procesamos información digital.
 
-> **Origen del proyecto.** EcoBrief Bolivia nació en 2025 como propuesta para el concurso Green Tech. Esta versión del informe conserva esa referencia únicamente como antecedente histórico: el desarrollo ya no se guía por los requisitos de aquella convocatoria ni tiene una fecha de entrega que cumplir, sino por una hoja de ruta de producto propia — la de un proyecto en crecimiento continuo, con features en distintas etapas de madurez (Capítulo 7), no la de una lista de entregables de concurso.
+> **Origen del proyecto.** EcoBrief Bolivia surgió como propuesta para el concurso Green Tech; el desarrollo del código comenzó el 2 de mayo de 2026 (primer commit del repositorio). Esta versión del informe conserva esa referencia únicamente como antecedente histórico: el desarrollo ya no se guía por los requisitos de aquella convocatoria ni tiene una fecha de entrega que cumplir, sino por una hoja de ruta de producto propia — la de un proyecto en crecimiento continuo, con features en distintas etapas de madurez (Capítulo 7), no la de una lista de entregables de concurso.
 
 ## 1.2 El problema del desperdicio digital informativo
 
