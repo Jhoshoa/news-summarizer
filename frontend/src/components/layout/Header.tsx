@@ -18,7 +18,7 @@ const HeaderComponent = ({
   onRefresh,
 }: HeaderProps) => (
   <header className={compact ? "topbar compact" : "topbar"}>
-    <Link className="brand" href="/panel" aria-label="EcoBrief Bolivia inicio">
+    <Link className="brand" href="/" aria-label="EcoBrief Bolivia inicio">
       <BoliviaFlag />
       <span>EcoBrief Bolivia</span>
       <span className="tz-indicator">Hora Bolivia</span>
