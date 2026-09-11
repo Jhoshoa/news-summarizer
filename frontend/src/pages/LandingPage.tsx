@@ -36,56 +36,71 @@ export const LandingPage = () => {
   const { data: impact } = useGetImpactMetricsQuery({ fallback_to_latest: true });
 
   const summaries = summariesData?.items ?? [];
+  const [heroStory, ...restStories] = summaries;
 
   return (
     <section className="landing-page">
       <section className="landing-hero">
-        <span className="landing-kicker">
-          <IconNews size={16} />
-          Bolivia, sin repetir la misma historia dos veces
-        </span>
-        <h1>Las noticias de Bolivia, verificadas y sin ruido.</h1>
-        <p className="landing-lede">
-          EcoBrief lee los principales medios bolivianos, junta las versiones de un mismo hecho en una sola historia,
-          y te entrega un resumen con la fuente de cada dato a un clic.
-        </p>
-        <div className="landing-ctas">
-          <Link className="button" href="/panel">
-            Ver las noticias de hoy
-          </Link>
-          <Link className="button secondary" href="/suscribirse">
-            Suscribirme gratis
-          </Link>
+        <div className="landing-hero-copy">
+          <span className="landing-kicker">
+            <IconNews size={16} />
+            Bolivia, sin repetir la misma historia dos veces
+          </span>
+          <h1>Las noticias de Bolivia, verificadas y sin ruido.</h1>
+          <p className="landing-lede">
+            EcoBrief lee los principales medios bolivianos, junta las versiones de un mismo hecho en una sola
+            historia, y te entrega un resumen con la fuente de cada dato a un clic.
+          </p>
+          <div className="landing-ctas">
+            <Link className="button" href="/panel">
+              Ver las noticias de hoy
+            </Link>
+            <Link className="button secondary" href="/suscribirse">
+              Suscribirme gratis
+            </Link>
+          </div>
+
+          {impact?.has_data && (
+            <div className="landing-stat-row">
+              <div>
+                <strong>{formatNumber(impact.reduction_rate, 0)}%</strong>
+                <span>reduccion del flujo</span>
+              </div>
+              <div>
+                <strong>{formatNumber(impact.estimated_pages_avoided, 0)}</strong>
+                <span>paginas evitadas hoy</span>
+              </div>
+              <div>
+                <strong>{formatNumber(impact.estimated_minutes_saved, 0)} min</strong>
+                <span>de lectura ahorrados</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {impact?.has_data && (
-          <div className="landing-stat-row">
-            <div>
-              <strong>{formatNumber(impact.reduction_rate, 0)}%</strong>
-              <span>reduccion del flujo</span>
+        <div className="landing-hero-visual">
+          {isFetchingSummaries ? (
+            <SummaryCardSkeleton />
+          ) : heroStory ? (
+            <SummaryCard summary={heroStory} />
+          ) : (
+            <div className="empty-state compact">
+              <span className="panel-title">Sin briefs disponibles todavia</span>
             </div>
-            <div>
-              <strong>{formatNumber(impact.estimated_pages_avoided, 0)}</strong>
-              <span>paginas evitadas hoy</span>
-            </div>
-            <div>
-              <strong>{formatNumber(impact.estimated_minutes_saved, 0)} min</strong>
-              <span>de lectura ahorrados</span>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
       <section className="landing-section">
         <div className="section-label">Lo ultimo, resumido y verificado</div>
-        <div className="briefs-grid">
+        <div className="landing-news-grid">
           {isFetchingSummaries
-            ? Array.from({ length: 4 }, (_, index) => <SummaryCardSkeleton key={index} />)
-            : summaries.map((summary) => <SummaryCard key={summary.id ?? summary.title} summary={summary} />)}
+            ? Array.from({ length: 3 }, (_, index) => <SummaryCardSkeleton key={index} />)
+            : restStories.map((summary) => <SummaryCard key={summary.id ?? summary.title} summary={summary} />)}
         </div>
-        {!isFetchingSummaries && summaries.length === 0 && (
+        {!isFetchingSummaries && restStories.length === 0 && (
           <section className="empty-state compact">
-            <span className="panel-title">Sin briefs disponibles todavia</span>
+            <span className="panel-title">Sin mas briefs disponibles todavia</span>
             <p>Volve mas tarde, el sistema procesa noticias durante todo el dia.</p>
           </section>
         )}
