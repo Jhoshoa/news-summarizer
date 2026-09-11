@@ -1995,6 +1995,110 @@ class Database:
 
         return self._article_row_to_dict(row) if row else None
 
+    async def get_articles_needing_category_review(
+        self,
+        since_minutes: int,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Articulos recientes cuya categoria quedo marcada como dudosa por el
+        clasificador (`rules_low_confidence`, o un intento de revision con IA
+        que fallo -- `category_llm_error`). Pensado para una revision externa
+        periodica (ver /admin/classification/*), no para el pipeline mismo.
+
+        Recibe `since_minutes` (no un datetime ya calculado) para que la
+        comparacion se haga con `_now_bolivia()` -- la misma convencion
+        naive-Bolivia con la que se guarda `collected_at` -- y no con UTC,
+        que desfasaria la ventana ~4 horas y dejaria pasar o perder
+        articulos segun la hora del dia.
+
+        El filtro por contenido de `raw_payload` se hace en Python en vez de
+        con un operador JSON de Postgres: la columna es `JSON` generico (no
+        JSONB), el volumen esperado por ventana (desde la ultima corrida) es
+        chico, y evita depender de sintaxis especifica del motor de DB."""
+
+        since = _now_bolivia() - timedelta(minutes=since_minutes)
+
+        async with self.session_maker() as session:
+            stmt = (
+                select(NewsArticle, NewsCategory.name, NewsSource.name, NewsSource.source_type)
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(
+                    NewsArticle.is_active.is_(True),
+                    NewsArticle.collected_at >= since,
+                )
+                .order_by(NewsArticle.collected_at.desc())
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+
+        candidates = []
+        for row in rows:
+            article = row[0]
+            raw_payload = article.raw_payload or {}
+            method = raw_payload.get("category_method")
+            llm_error = raw_payload.get("category_llm_error")
+            if method == "rules_low_confidence" or llm_error:
+                candidates.append(self._article_row_to_dict(row))
+                if len(candidates) >= limit:
+                    break
+
+        return candidates
+
+    async def correct_article_category(
+        self,
+        article_id: int,
+        new_category: str,
+        *,
+        reason: str,
+        corrected_by: str,
+    ) -> dict | None:
+        """Aplica una correccion manual/externa de categoria, dejando un
+        registro de auditoria en raw_payload (misma convencion usada para
+        las correcciones hechas a mano en /article/5097 y /article/5109:
+        categoria anterior, motivo, quien la aplico, cuando)."""
+
+        async with self.session_maker() as session:
+            article = await session.get(NewsArticle, article_id)
+            if not article or not article.is_active:
+                return None
+
+            category = await self._get_category(session, new_category)
+            if not category:
+                raise ValueError(f"Categoria desconocida: {new_category}")
+
+            previous_category_id = article.category_id
+            payload = dict(article.raw_payload or {})
+            payload["category_manual_correction"] = {
+                "previous_category_id": previous_category_id,
+                "new_category": new_category,
+                "reason": reason,
+                "corrected_by": corrected_by,
+                "corrected_at": _now_bolivia().isoformat(),
+            }
+            # Limpia las señales que lo metieron a la cola de revision
+            # (`get_articles_needing_category_review`) -- sin esto, un
+            # articulo ya corregido se queda marcado `rules_low_confidence`
+            # para siempre y una revision programada lo volveria a traer en
+            # cada corrida, indefinidamente.
+            payload["category_method"] = "manual_correction"
+            payload.pop("category_llm_error", None)
+            article.category_id = category.id
+            article.raw_payload = payload
+
+            await session.commit()
+            await session.refresh(article)
+
+            stmt = (
+                select(NewsArticle, NewsCategory.name, NewsSource.name, NewsSource.source_type)
+                .join(NewsCategory, NewsArticle.category_id == NewsCategory.id)
+                .join(NewsSource, NewsArticle.source_id == NewsSource.id)
+                .where(NewsArticle.id == article_id)
+            )
+            row = (await session.execute(stmt)).first()
+
+        return self._article_row_to_dict(row) if row else None
+
     async def get_related_articles(self, article_id: int) -> dict | None:
         async with self.session_maker() as session:
             article = await session.get(NewsArticle, article_id)
