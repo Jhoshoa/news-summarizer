@@ -13,41 +13,47 @@ const assertNavigationState = (actual, expected) => {
 assertNavigationState(getNavigationState("/"), {
   activePath: "/",
   backFallback: "/",
-  breadcrumbs: [{ href: "/", label: "Inicio" }],
+  breadcrumbs: [{ href: "/", label: "EcoBrief Bolivia" }],
+});
+
+assertNavigationState(getNavigationState("/panel"), {
+  activePath: "/panel",
+  backFallback: "/panel",
+  breadcrumbs: [{ href: "/panel", label: "Inicio" }],
 });
 
 assertNavigationState(getNavigationState("/news"), {
   activePath: "/news",
-  backFallback: "/",
+  backFallback: "/panel",
   breadcrumbs: [
-    { href: "/", label: "Inicio" },
+    { href: "/panel", label: "Inicio" },
     { href: "/news", label: "Noticias" },
   ],
 });
 
 assertNavigationState(getNavigationState("/datos"), {
   activePath: "/datos",
-  backFallback: "/",
+  backFallback: "/panel",
   breadcrumbs: [
-    { href: "/", label: "Inicio" },
+    { href: "/panel", label: "Inicio" },
     { href: "/datos", label: "Datos" },
   ],
 });
 
 assertNavigationState(getNavigationState("/impacto"), {
   activePath: "/impacto",
-  backFallback: "/",
+  backFallback: "/panel",
   breadcrumbs: [
-    { href: "/", label: "Inicio" },
+    { href: "/panel", label: "Inicio" },
     { href: "/impacto", label: "Impacto" },
   ],
 });
 
 assertNavigationState(getNavigationState("/suscribirse"), {
   activePath: "/suscribirse",
-  backFallback: "/",
+  backFallback: "/panel",
   breadcrumbs: [
-    { href: "/", label: "Inicio" },
+    { href: "/panel", label: "Inicio" },
     { href: "/suscribirse", label: "Suscribirse" },
   ],
 });
@@ -56,7 +62,7 @@ assertNavigationState(getNavigationState("/article/42"), {
   activePath: "/article",
   backFallback: "/news",
   breadcrumbs: [
-    { href: "/", label: "Inicio" },
+    { href: "/panel", label: "Inicio" },
     { href: "/news", label: "Noticias" },
     { href: "/article/42", label: "Detalle" },
   ],

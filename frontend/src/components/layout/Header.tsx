@@ -18,12 +18,15 @@ const HeaderComponent = ({
   onRefresh,
 }: HeaderProps) => (
   <header className={compact ? "topbar compact" : "topbar"}>
-    <Link className="brand" href="/" aria-label="EcoBrief Bolivia inicio">
+    <Link className="brand" href="/panel" aria-label="EcoBrief Bolivia inicio">
       <BoliviaFlag />
       <span>EcoBrief Bolivia</span>
       <span className="tz-indicator">Hora Bolivia</span>
     </Link>
     <nav className="nav" aria-label="Navegacion principal">
+      <Link aria-current={activePath === "/panel" ? "page" : undefined} href="/panel">
+        Inicio
+      </Link>
       <Link aria-current={activePath === "/news" || activePath === "/article" ? "page" : undefined} href="/news">
         Noticias
       </Link>
