@@ -81,9 +81,6 @@ export const DataPage = () => {
         <section className="data-context-layout">
           <div className="data-context-main">
             <section className="data-section">
-              <div className="panel-heading">
-                <span className="panel-title">Economia esencial</span>
-              </div>
               <EconomicHistoryChart />
             </section>
 
