@@ -3573,13 +3573,57 @@ p {
 .landing-news-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  gap: 16px;
   margin-top: 14px;
+  align-items: stretch;
 }
 
 .landing-news-grid .summary-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 0;
   margin: 0;
-  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.landing-news-grid .summary-card:has(.article-image) {
+  grid-template-columns: 1fr;
+}
+
+.landing-news-grid .article-image.compact {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+
+.landing-news-grid .summary-card > div {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 12px 14px 14px;
+}
+
+.landing-news-grid .summary-card h3 {
+  margin-top: 4px;
+  font-size: var(--text-base);
+  line-height: 1.22;
+}
+
+.landing-news-grid .summary-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 6px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.landing-news-grid .summary-card small {
+  display: none;
 }
 
 .landing-steps {
