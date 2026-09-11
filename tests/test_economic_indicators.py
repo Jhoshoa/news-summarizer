@@ -7,8 +7,10 @@ import httpx
 import pytest
 from bs4 import BeautifulSoup
 
+import src.main as main_module
 from src.collectors.economic_indicators import EconomicIndicatorCollector
 from src.db.indicators import EconomicIndicatorRepository
+from src.main import app
 
 BCB_HTML = """
 <section class="bcb-kpi2" aria-label="Indicadores clave - BCB">
@@ -261,3 +263,144 @@ def test_indicator_repository_same_value_normalizes_decimal_scale():
 
     assert repository._same_value(Decimal("6.860000"), Decimal("6.86"))
     assert not repository._same_value(Decimal("6.86"), Decimal("6.87"))
+
+
+class _FakeSessionCtx:
+    def __init__(self, session):
+        self._session = session
+
+    async def __aenter__(self):
+        return self._session
+
+    async def __aexit__(self, *exc_info):
+        return False
+
+
+class _FakeScalars:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return self._rows
+
+
+class _FakeResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def scalars(self):
+        return _FakeScalars(self._rows)
+
+
+class _FakeSession:
+    def __init__(self, rows):
+        self._rows = rows
+        self.executed_statements = []
+
+    async def execute(self, stmt):
+        self.executed_statements.append(stmt)
+        return _FakeResult(self._rows)
+
+
+def _compiled_sql(stmt) -> str:
+    return str(stmt.compile(compile_kwargs={"literal_binds": True}))
+
+
+def _make_value_row(code: str, value: Decimal, collected_at: datetime, observed_at=None):
+    from src.db.indicators import EconomicIndicatorValue
+
+    return EconomicIndicatorValue(
+        source="bcb",
+        indicator_code=code,
+        indicator_name=code,
+        indicator_group="grupo",
+        value=value,
+        observed_at=observed_at,
+        collected_at=collected_at,
+        snapshot_key="snap",
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_history_filters_by_codes_and_since():
+    repository = object.__new__(EconomicIndicatorRepository)
+    session = _FakeSession(rows=[])
+    repository.session_maker = lambda: _FakeSessionCtx(session)
+
+    since = datetime(2026, 6, 1, 0, 0, 0)
+    await repository.get_history(["bcb_tipo_de_cambio_oficial", "binance_p2p_usdt_bob_buy"], since)
+
+    assert len(session.executed_statements) == 1
+    sql = _compiled_sql(session.executed_statements[0])
+    assert "indicator_code IN ('bcb_tipo_de_cambio_oficial', 'binance_p2p_usdt_bob_buy')" in sql
+    assert "collected_at >= '2026-06-01 00:00:00'" in sql
+    assert "ORDER BY economic_indicator_values.collected_at ASC" in sql
+
+
+@pytest.mark.asyncio
+async def test_get_history_groups_rows_by_indicator_code_in_chronological_order():
+    repository = object.__new__(EconomicIndicatorRepository)
+    rows = [
+        _make_value_row("bcb_tipo_de_cambio_oficial", Decimal("11.52"), datetime(2026, 8, 17, 10, 0)),
+        _make_value_row("binance_p2p_usdt_bob_buy", Decimal("11.60"), datetime(2026, 8, 17, 10, 5)),
+        _make_value_row("binance_p2p_usdt_bob_buy", Decimal("11.62"), datetime(2026, 8, 17, 10, 10)),
+    ]
+    session = _FakeSession(rows=rows)
+    repository.session_maker = lambda: _FakeSessionCtx(session)
+
+    history = await repository.get_history(
+        ["bcb_tipo_de_cambio_oficial", "binance_p2p_usdt_bob_buy", "binance_p2p_usdt_bob_sell"],
+        since=datetime(2026, 1, 1),
+    )
+
+    assert [p["value"] for p in history["bcb_tipo_de_cambio_oficial"]] == [11.52]
+    assert [p["value"] for p in history["binance_p2p_usdt_bob_buy"]] == [11.60, 11.62]
+    assert history["binance_p2p_usdt_bob_sell"] == []
+
+
+@pytest.fixture
+def fake_app_instance_with_history():
+    original = main_module.app_instance
+    rows = [
+        _make_value_row("bcb_tipo_de_cambio_oficial", Decimal("12.04"), datetime(2026, 9, 10, 9, 0)),
+        _make_value_row("binance_p2p_usdt_bob_buy", Decimal("11.82"), datetime(2026, 9, 10, 9, 5)),
+    ]
+    session = _FakeSession(rows=rows)
+    db = SimpleNamespace(session_maker=lambda: _FakeSessionCtx(session))
+    main_module.app_instance = SimpleNamespace(db=db, settings=SimpleNamespace())
+    try:
+        yield session
+    finally:
+        main_module.app_instance = original
+
+
+@pytest.mark.asyncio
+async def test_economic_indicators_history_endpoint_returns_series(fake_app_instance_with_history):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(
+            "/api/economic-indicators/history",
+            params={"codes": "bcb_tipo_de_cambio_oficial,binance_p2p_usdt_bob_buy", "days": 30},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["days"] == 30
+    assert [p["value"] for p in payload["series"]["bcb_tipo_de_cambio_oficial"]] == [12.04]
+    assert [p["value"] for p in payload["series"]["binance_p2p_usdt_bob_buy"]] == [11.82]
+
+
+@pytest.mark.asyncio
+async def test_economic_indicators_history_defaults_to_bcb_and_binance_codes(
+    fake_app_instance_with_history,
+):
+    session = fake_app_instance_with_history
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/economic-indicators/history")
+
+    assert response.status_code == 200
+    sql = _compiled_sql(session.executed_statements[0])
+    assert "bcb_tipo_de_cambio_oficial" in sql
+    assert "binance_p2p_usdt_bob_buy" in sql
+    assert "binance_p2p_usdt_bob_sell" in sql

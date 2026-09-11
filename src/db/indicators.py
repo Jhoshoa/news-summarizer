@@ -130,6 +130,41 @@ class EconomicIndicatorRepository:
 
         return [self._row_to_dict(row) for row in rows]
 
+    async def get_history(
+        self,
+        indicator_codes: list[str],
+        since: datetime,
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Serie temporal de uno o mas indicadores desde `since`, para graficar
+        (ej. oficial vs. paralelo). A diferencia de `get_latest_values` (un
+        snapshot del ultimo valor conocido por indicador), esto devuelve
+        todas las filas guardadas en el rango -- el historial real, no un
+        punto por corrida.
+        """
+
+        async with self.session_maker() as session:
+            stmt = (
+                select(EconomicIndicatorValue)
+                .where(
+                    EconomicIndicatorValue.indicator_code.in_(indicator_codes),
+                    EconomicIndicatorValue.collected_at >= since,
+                )
+                .order_by(EconomicIndicatorValue.collected_at.asc())
+            )
+            result = await session.execute(stmt)
+            rows = list(result.scalars().all())
+
+        history: dict[str, list[dict[str, Any]]] = {code: [] for code in indicator_codes}
+        for row in rows:
+            history.setdefault(row.indicator_code, []).append(
+                {
+                    "value": float(row.value) if isinstance(row.value, Decimal) else row.value,
+                    "observed_at": row.observed_at,
+                    "collected_at": row.collected_at,
+                }
+            )
+        return history
+
     async def _get_latest_matching_value(
         self,
         session,

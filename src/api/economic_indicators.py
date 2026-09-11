@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -7,12 +7,50 @@ from loguru import logger
 
 from src.api.db_errors import call_db
 from src.api.security import require_cron_key
-from src.collectors.economic_indicators import EconomicIndicatorCollector
+from src.collectors.economic_indicators import TZ_BOLIVIA, EconomicIndicatorCollector
 from src.db import EconomicIndicatorRepository
+
+DEFAULT_HISTORY_CODES = [
+    "bcb_tipo_de_cambio_oficial",
+    "binance_p2p_usdt_bob_buy",
+    "binance_p2p_usdt_bob_sell",
+]
+MAX_HISTORY_DAYS = 365
 
 
 def create_economic_indicators_router(get_app_instance: Callable[[], Any]) -> APIRouter:
     router = APIRouter(prefix="/api/economic-indicators", tags=["economic-indicators"])
+
+    @router.get("/history")
+    async def get_economic_indicators_history(
+        codes: Annotated[
+            str | None,
+            Query(
+                description=(
+                    "Codigos de indicador separados por coma. Por defecto: dolar "
+                    "oficial del BCB y compra/venta de Binance P2P."
+                ),
+            ),
+        ] = None,
+        days: Annotated[
+            int,
+            Query(ge=1, le=MAX_HISTORY_DAYS, description="Dias de historial hacia atras."),
+        ] = 120,
+    ):
+        app_instance = get_app_instance()
+        if not app_instance or not app_instance.db:
+            raise HTTPException(status_code=503, detail="DB no disponible")
+
+        indicator_codes = (
+            [c.strip() for c in codes.split(",") if c.strip()] if codes else DEFAULT_HISTORY_CODES
+        )
+        since = datetime.now(TZ_BOLIVIA).replace(tzinfo=None) - timedelta(days=days)
+
+        repository = EconomicIndicatorRepository(app_instance.db.session_maker)
+        history = await call_db(
+            repository.get_history(indicator_codes, since), action="get_history"
+        )
+        return {"since": since, "days": days, "series": history}
 
     @router.get("")
     async def get_latest_economic_indicators(
