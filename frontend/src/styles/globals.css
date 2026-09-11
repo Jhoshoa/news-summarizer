@@ -299,6 +299,10 @@ p {
   padding: 22px 26px 28px;
 }
 
+.page:has(> .landing-page) {
+  padding-top: 0;
+}
+
 .home-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
