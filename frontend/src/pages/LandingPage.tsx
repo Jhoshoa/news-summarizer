@@ -4,6 +4,7 @@ import { SummaryCard } from "../components/news/SummaryCard";
 import { SummaryCardSkeleton } from "../components/ui/Skeleton";
 import { useGetImpactMetricsQuery, useGetSummariesQuery } from "../services/api";
 import { formatNumber } from "../components/indicators/indicatorUtils";
+import { cleanGeneratedText } from "../utils/summaryText";
 
 const STEPS = [
   {
@@ -31,124 +32,147 @@ const STEPS = [
 export const LandingPage = () => {
   const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
     fallback_to_latest: true,
-    page_size: 4,
+    page_size: 7,
   });
   const { data: impact } = useGetImpactMetricsQuery({ fallback_to_latest: true });
 
   const summaries = summariesData?.items ?? [];
-  const [heroStory, ...restStories] = summaries;
+  const previewStories = summaries.slice(0, 3);
+  const gridStories = summaries.slice(3, 7);
 
   return (
     <section className="landing-page">
-      <section className="landing-hero">
-        <div className="landing-hero-copy">
-          <span className="landing-kicker">
-            <IconNews size={16} />
-            Bolivia, sin repetir la misma historia dos veces
-          </span>
-          <h1>Las noticias de Bolivia, verificadas y sin ruido.</h1>
-          <p className="landing-lede">
-            EcoBrief lee los principales medios bolivianos, junta las versiones de un mismo hecho en una sola
-            historia, y te entrega un resumen con la fuente de cada dato a un clic.
-          </p>
-          <div className="landing-ctas">
-            <Link className="button" href="/panel">
-              Ver las noticias de hoy
-            </Link>
-            <Link className="button secondary" href="/suscribirse">
-              Suscribirme gratis
-            </Link>
+      <section className="landing-hero-band">
+        <div className="landing-inner landing-hero">
+          <div className="landing-hero-copy">
+            <span className="landing-kicker">
+              <IconNews size={16} />
+              Bolivia, sin repetir la misma historia dos veces
+            </span>
+            <h1>
+              Las noticias de Bolivia, <em>verificadas</em> y sin ruido.
+            </h1>
+            <p className="landing-lede">
+              EcoBrief lee los principales medios bolivianos, junta las versiones de un mismo hecho en una sola
+              historia, y te entrega un resumen con la fuente de cada dato a un clic.
+            </p>
+            <div className="landing-ctas">
+              <Link className="button" href="/panel">
+                Ver las noticias de hoy
+              </Link>
+              <Link className="button secondary" href="/suscribirse">
+                Suscribirme gratis
+              </Link>
+            </div>
+
+            {impact?.has_data && (
+              <div className="landing-stat-row">
+                <div>
+                  <strong>{formatNumber(impact.reduction_rate, 0)}%</strong>
+                  <span>reduccion del flujo</span>
+                </div>
+                <div>
+                  <strong>{formatNumber(impact.estimated_pages_avoided, 0)}</strong>
+                  <span>paginas evitadas hoy</span>
+                </div>
+                <div>
+                  <strong>{formatNumber(impact.estimated_minutes_saved, 0)} min</strong>
+                  <span>lectura ahorrada</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {impact?.has_data && (
-            <div className="landing-stat-row">
-              <div>
-                <strong>{formatNumber(impact.reduction_rate, 0)}%</strong>
-                <span>reduccion del flujo</span>
-              </div>
-              <div>
-                <strong>{formatNumber(impact.estimated_pages_avoided, 0)}</strong>
-                <span>paginas evitadas hoy</span>
-              </div>
-              <div>
-                <strong>{formatNumber(impact.estimated_minutes_saved, 0)} min</strong>
-                <span>de lectura ahorrados</span>
-              </div>
+          <div className="landing-preview-card" aria-label="Vista previa de EcoBrief">
+            <div className="landing-preview-chrome">
+              <span />
+              <span />
+              <span />
+              <strong>ecobrief.bo</strong>
             </div>
+            <div className="landing-preview-body">
+              {isFetchingSummaries
+                ? Array.from({ length: 3 }, (_, index) => <div className="landing-preview-row skeleton" key={index} />)
+                : previewStories.map((summary) => (
+                    <Link
+                      className="landing-preview-row"
+                      href={summary.article_id ? `/article/${summary.article_id}` : "/panel"}
+                      key={summary.id ?? summary.title}
+                    >
+                      <span className="landing-preview-tag">{summary.category}</span>
+                      <span className="landing-preview-title">{cleanGeneratedText(summary.title)}</span>
+                      <span className="landing-preview-badge">IA</span>
+                    </Link>
+                  ))}
+            </div>
+            <div className="landing-preview-footer">
+              <span>Actualizado hace instantes</span>
+              <span>{impact?.summaries ?? "--"} briefs hoy</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="landing-inner">
+        <section className="landing-section">
+          <div className="section-label">Lo ultimo, resumido y verificado</div>
+          <div className="landing-news-grid">
+            {isFetchingSummaries
+              ? Array.from({ length: 4 }, (_, index) => <SummaryCardSkeleton key={index} />)
+              : gridStories.map((summary) => <SummaryCard key={summary.id ?? summary.title} summary={summary} />)}
+          </div>
+          {!isFetchingSummaries && gridStories.length === 0 && (
+            <section className="empty-state compact">
+              <span className="panel-title">Sin mas briefs disponibles todavia</span>
+              <p>Volve mas tarde, el sistema procesa noticias durante todo el dia.</p>
+            </section>
           )}
-        </div>
+        </section>
 
-        <div className="landing-hero-visual">
-          {isFetchingSummaries ? (
-            <SummaryCardSkeleton />
-          ) : heroStory ? (
-            <SummaryCard summary={heroStory} />
-          ) : (
-            <div className="empty-state compact">
-              <span className="panel-title">Sin briefs disponibles todavia</span>
-            </div>
-          )}
-        </div>
-      </section>
+        <section className="landing-section">
+          <div className="section-label">Como funciona</div>
+          <div className="landing-steps">
+            {STEPS.map((step, index) => (
+              <div className="landing-step" key={step.title}>
+                <span className="landing-step-number">{index + 1}</span>
+                <div className="landing-step-icon">{step.icon}</div>
+                <h3>{step.title}</h3>
+                <p>{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <section className="landing-section">
-        <div className="section-label">Lo ultimo, resumido y verificado</div>
-        <div className="landing-news-grid">
-          {isFetchingSummaries
-            ? Array.from({ length: 3 }, (_, index) => <SummaryCardSkeleton key={index} />)
-            : restStories.map((summary) => <SummaryCard key={summary.id ?? summary.title} summary={summary} />)}
-        </div>
-        {!isFetchingSummaries && restStories.length === 0 && (
-          <section className="empty-state compact">
-            <span className="panel-title">Sin mas briefs disponibles todavia</span>
-            <p>Volve mas tarde, el sistema procesa noticias durante todo el dia.</p>
-          </section>
-        )}
-      </section>
+        <section className="landing-section landing-trust">
+          <div className="section-label">Nos auditamos a nosotros mismos</div>
+          <p className="landing-trust-lede">
+            La misma disciplina que aplicamos a cada noticia -verificar contra la fuente original- se la aplicamos a
+            nuestros propios datos.
+          </p>
+          <ul className="landing-changelog">
+            <li>
+              <IconCheckCircle size={16} />
+              Corregimos el tipo de cambio oficial: se leia de un reporte bancario desactualizado en vez del valor
+              vigente del BCB.
+            </li>
+            <li>
+              <IconCheckCircle size={16} />
+              Corregimos el precio de venta en Binance P2P, que tomaba el valor mas bajo en vez del mas alto.
+            </li>
+            <li>
+              <IconClock size={16} />
+              Indicadores economicos actualizados cada 10 minutos, con historico verificable en la pagina de Datos.
+            </li>
+          </ul>
+        </section>
 
-      <section className="landing-section">
-        <div className="section-label">Como funciona</div>
-        <div className="landing-steps">
-          {STEPS.map((step, index) => (
-            <div className="landing-step" key={step.title}>
-              <span className="landing-step-number">{index + 1}</span>
-              <div className="landing-step-icon">{step.icon}</div>
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="landing-section landing-trust">
-        <div className="section-label">Nos auditamos a nosotros mismos</div>
-        <p className="landing-trust-lede">
-          La misma disciplina que aplicamos a cada noticia -verificar contra la fuente original- se la aplicamos a
-          nuestros propios datos.
-        </p>
-        <ul className="landing-changelog">
-          <li>
-            <IconCheckCircle size={16} />
-            Corregimos el tipo de cambio oficial: se leia de un reporte bancario desactualizado en vez del valor
-            vigente del BCB.
-          </li>
-          <li>
-            <IconCheckCircle size={16} />
-            Corregimos el precio de venta en Binance P2P, que tomaba el valor mas bajo en vez del mas alto.
-          </li>
-          <li>
-            <IconClock size={16} />
-            Indicadores economicos actualizados cada 10 minutos, con historico verificable en la pagina de Datos.
-          </li>
-        </ul>
-      </section>
-
-      <section className="landing-cta-final">
-        <h2>Recibi el resumen del dia, sin abrir diez pestanas.</h2>
-        <Link className="button" href="/suscribirse">
-          Suscribirme gratis
-        </Link>
-      </section>
+        <section className="landing-cta-final">
+          <h2>Recibi el resumen del dia, sin abrir diez pestanas.</h2>
+          <Link className="button" href="/suscribirse">
+            Suscribirme gratis
+          </Link>
+        </section>
+      </div>
     </section>
   );
 };

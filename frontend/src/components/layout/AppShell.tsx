@@ -13,6 +13,7 @@ type AppShellProps = {
   compactHeader?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
+  showTrail?: boolean;
 };
 
 export const AppShell = ({
@@ -23,6 +24,7 @@ export const AppShell = ({
   compactHeader = false,
   isRefreshing = false,
   onRefresh,
+  showTrail = true,
 }: AppShellProps) => (
   <div className="app-frame">
     <div className="sticky-shell-header">
@@ -32,7 +34,7 @@ export const AppShell = ({
         isRefreshing={isRefreshing}
         onRefresh={onRefresh}
       />
-      <NavigationTrail backFallback={backFallback} breadcrumbs={breadcrumbs} />
+      {showTrail && <NavigationTrail backFallback={backFallback} breadcrumbs={breadcrumbs} />}
     </div>
     <main className="page">{children}</main>
     <Footer />

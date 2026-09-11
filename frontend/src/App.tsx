@@ -56,6 +56,7 @@ const App = () => {
       compactHeader={compactHeader}
       isRefreshing={manualRefreshEnabled ? isRefreshing : false}
       onRefresh={manualRefreshEnabled ? onRefresh : undefined}
+      showTrail={!isLandingRoute}
     >
       {page}
     </AppShell>
