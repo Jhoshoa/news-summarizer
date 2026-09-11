@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
+import { EconomicHistoryChart } from "../components/indicators/EconomicHistoryChart";
 import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
 import { findByExactCode, findOfficialUsdIndicator, formatNumber } from "../components/indicators/indicatorUtils";
 import { SummaryCard } from "../components/news/SummaryCard";
@@ -119,6 +120,7 @@ export const DataPage = () => {
               ) : (
                 <CurrencySpread indicators={indicators} />
               )}
+              <EconomicHistoryChart />
             </section>
 
             <section className="data-section">

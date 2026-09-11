@@ -21,6 +21,18 @@ export type EconomicIndicatorsResponse = {
   items: EconomicIndicator[];
 };
 
+export type EconomicIndicatorHistoryPoint = {
+  value: number;
+  observed_at: string | null;
+  collected_at: string;
+};
+
+export type EconomicIndicatorHistoryResponse = {
+  since: string;
+  days: number;
+  series: Record<string, EconomicIndicatorHistoryPoint[]>;
+};
+
 export type WeatherLocation = {
   key: string;
   name: string;
