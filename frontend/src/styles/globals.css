@@ -469,7 +469,7 @@ p {
   padding: 22px clamp(20px, 6vw, 64px) 28px;
 }
 
-.page:has(> .landing-page) {
+.page:has(> .landing-hero-band) {
   padding-top: 0;
 }
 
@@ -3621,10 +3621,6 @@ p {
 /* ---------------------------------------------------------------------- */
 /* Landing page (/) - front door for first-time visitors                  */
 /* ---------------------------------------------------------------------- */
-
-.landing-page {
-  display: block;
-}
 
 .landing-inner {
   max-width: 1180px;

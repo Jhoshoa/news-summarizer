@@ -13,7 +13,7 @@ type HeaderProps = {
 };
 
 const NAV_ITEMS: { href: string; label: string; match: NavigationState["activePath"][] }[] = [
-  { href: "/panel", label: "Inicio", match: ["/panel"] },
+  { href: "/", label: "Inicio", match: ["/"] },
   { href: "/news", label: "Noticias", match: ["/news", "/article"] },
   { href: "/datos", label: "Datos", match: ["/datos"] },
   { href: "/impacto", label: "Impacto", match: ["/impacto"] },

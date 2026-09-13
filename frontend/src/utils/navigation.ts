@@ -4,7 +4,7 @@ export type BreadcrumbItem = {
 };
 
 export type NavigationState = {
-  activePath: "/" | "/panel" | "/news" | "/datos" | "/impacto" | "/fuentes" | "/suscribirse" | "/article";
+  activePath: "/" | "/news" | "/datos" | "/impacto" | "/fuentes" | "/suscribirse" | "/article";
   backFallback: string;
   breadcrumbs: BreadcrumbItem[];
 };
@@ -15,7 +15,7 @@ export const getNavigationState = (pathname: string): NavigationState => {
       activePath: "/article",
       backFallback: "/news",
       breadcrumbs: [
-        { href: "/panel", label: "Inicio" },
+        { href: "/", label: "Inicio" },
         { href: "/news", label: "Noticias" },
         { href: pathname, label: "Detalle" },
       ],
@@ -25,9 +25,9 @@ export const getNavigationState = (pathname: string): NavigationState => {
   if (pathname.startsWith("/news")) {
     return {
       activePath: "/news",
-      backFallback: "/panel",
+      backFallback: "/",
       breadcrumbs: [
-        { href: "/panel", label: "Inicio" },
+        { href: "/", label: "Inicio" },
         { href: "/news", label: "Noticias" },
       ],
     };
@@ -36,9 +36,9 @@ export const getNavigationState = (pathname: string): NavigationState => {
   if (pathname.startsWith("/datos")) {
     return {
       activePath: "/datos",
-      backFallback: "/panel",
+      backFallback: "/",
       breadcrumbs: [
-        { href: "/panel", label: "Inicio" },
+        { href: "/", label: "Inicio" },
         { href: "/datos", label: "Datos" },
       ],
     };
@@ -47,9 +47,9 @@ export const getNavigationState = (pathname: string): NavigationState => {
   if (pathname.startsWith("/impacto")) {
     return {
       activePath: "/impacto",
-      backFallback: "/panel",
+      backFallback: "/",
       breadcrumbs: [
-        { href: "/panel", label: "Inicio" },
+        { href: "/", label: "Inicio" },
         { href: "/impacto", label: "Impacto" },
       ],
     };
@@ -58,9 +58,9 @@ export const getNavigationState = (pathname: string): NavigationState => {
   if (pathname.startsWith("/fuentes")) {
     return {
       activePath: "/fuentes",
-      backFallback: "/panel",
+      backFallback: "/",
       breadcrumbs: [
-        { href: "/panel", label: "Inicio" },
+        { href: "/", label: "Inicio" },
         { href: "/fuentes", label: "Fuentes" },
       ],
     };
@@ -69,19 +69,11 @@ export const getNavigationState = (pathname: string): NavigationState => {
   if (pathname.startsWith("/suscribirse")) {
     return {
       activePath: "/suscribirse",
-      backFallback: "/panel",
+      backFallback: "/",
       breadcrumbs: [
-        { href: "/panel", label: "Inicio" },
+        { href: "/", label: "Inicio" },
         { href: "/suscribirse", label: "Suscribirse" },
       ],
-    };
-  }
-
-  if (pathname.startsWith("/panel")) {
-    return {
-      activePath: "/panel",
-      backFallback: "/panel",
-      breadcrumbs: [{ href: "/panel", label: "Inicio" }],
     };
   }
 
