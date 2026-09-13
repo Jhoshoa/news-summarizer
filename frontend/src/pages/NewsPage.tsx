@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
 import { Link, useRouter } from "../app/router";
+import { CategoryIcon } from "../components/icons/categoryIcons";
 import { NewsCard } from "../components/news/NewsCard";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { NewsCardSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
@@ -161,6 +162,7 @@ export const NewsPage = () => {
               key={item.label}
               href={buildNewsHref(1, selectedDate, item.value, view)}
             >
+              <CategoryIcon category={item.value} size={15} />
               {item.label}
             </Link>
           ))}

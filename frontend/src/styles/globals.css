@@ -1515,6 +1515,21 @@ p {
   font-weight: 600;
 }
 
+.category-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-subtle);
+}
+
+.category-tabs a svg {
+  color: var(--ink-3);
+}
+
+.category-tabs a.active svg {
+  color: var(--white);
+}
+
 .view-tabs {
   flex: 0 1 auto;
   width: fit-content;
@@ -2360,9 +2375,15 @@ p {
 }
 
 .segmented-options button.active,
+.check-card.active,
 .check-card:has(input:checked) {
-  border-color: color-mix(in srgb, var(--ink) 35%, transparent);
-  background: var(--color-primary-soft);
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.check-card.active span,
+.check-card:has(input:checked) span {
+  color: var(--brand-dark);
 }
 
 .segmented-options button:disabled {
@@ -2415,9 +2436,30 @@ p {
   cursor: pointer;
 }
 
-.check-card input,
+.check-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .consent-row input {
   accent-color: var(--color-primary);
+}
+
+.check-card svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+.check-card.active svg,
+.check-card:has(input:checked) svg {
+  color: var(--brand);
 }
 
 .check-card span,
@@ -2425,7 +2467,7 @@ p {
   min-width: 0;
   color: var(--color-subtle);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .consent-row {

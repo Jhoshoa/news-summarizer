@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
+import { CategoryIcon } from "../components/icons/categoryIcons";
 import {
   useGetPreferenceOptionsQuery,
   usePreviewPreferencesMutation,
@@ -405,12 +406,18 @@ export const SubscribePage = () => {
             <legend>Categorias</legend>
             <div className="category-choice-grid">
               {(options?.categories ?? []).map((category) => (
-                <label className="check-card" key={category.slug}>
+                <label
+                  className={
+                    form.categories.includes(category.slug) ? "check-card active" : "check-card"
+                  }
+                  key={category.slug}
+                >
                   <input
                     checked={form.categories.includes(category.slug)}
                     type="checkbox"
                     onChange={() => toggleCategory(category.slug)}
                   />
+                  <CategoryIcon category={category.slug} size={16} />
                   <span>{category.label}</span>
                 </label>
               ))}
