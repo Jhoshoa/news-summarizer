@@ -53,7 +53,6 @@ export const DataPage = () => {
   const summaries = summariesData?.items ?? [];
   const current = weather?.current ?? {};
   const elevation = getNumber(weather?.raw_payload.elevation);
-  const timezone = String(weather?.raw_payload.timezone ?? "America/La_Paz");
   const city = weather?.location.name ?? selectedLocation;
   const showWeatherSkeleton = isFetchingWeather;
 
@@ -144,7 +143,8 @@ export const DataPage = () => {
                     </div>
                   </div>
                   <small>
-                    {timezone} {elevation ? `- elevacion ${formatNumber(elevation, 0)} m` : ""}
+                    {city}
+                    {elevation ? ` - elevacion ${formatNumber(elevation, 0)} m` : ""}
                   </small>
                 </section>
               )}
