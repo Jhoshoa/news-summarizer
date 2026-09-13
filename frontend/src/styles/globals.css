@@ -1825,11 +1825,14 @@ p {
 
 .data-context-main,
 .data-context-sidebar {
-  border-left: 2px solid var(--color-border-strong);
   display: grid;
   gap: 18px;
   align-content: start;
   min-width: 0;
+}
+
+.data-context-sidebar {
+  border-left: 2px solid var(--color-border-strong);
   padding-left: 18px;
 }
 
