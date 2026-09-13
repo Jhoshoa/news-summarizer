@@ -29,7 +29,7 @@ const TickerStripComponent = () => {
   if (impact?.has_data) {
     items.push(`${formatNumber(impact.collected_articles, 0)} RECOLECTADAS`);
     items.push(`${formatNumber(impact.summaries, 0)} BRIEFS`);
-    items.push(`${formatNumber(impact.reduction_rate, 1)}% REDUCCION`);
+    items.push(`${formatNumber(impact.reduction_rate * 100, 1)}% REDUCCION`);
   }
 
   const officialRate = findOfficialUsdIndicator(indicators?.items ?? [])?.value;

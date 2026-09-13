@@ -236,7 +236,7 @@ export const HomePage = () => {
             {impactMetrics?.has_data && (
               <div className="landing-stat-row">
                 <div>
-                  <strong>{formatNumber(impactMetrics.reduction_rate, 0)}%</strong>
+                  <strong>{formatNumber(impactMetrics.reduction_rate * 100, 0)}%</strong>
                   <span>reduccion del flujo</span>
                 </div>
                 <div>
