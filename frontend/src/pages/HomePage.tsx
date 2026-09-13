@@ -3,20 +3,24 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Link } from "../app/router";
 import { usePageRefreshControl } from "../app/refreshControl";
 import { ImpactMetricsPanel } from "../components/impact/ImpactMetricsPanel";
-import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
-import { SecondaryIndicators } from "../components/indicators/SecondaryIndicators";
-import { IconBell, IconCheckCircle, IconClock, IconNews, IconRss, IconShield, IconUsers } from "../components/icons/Icons";
+import {
+  IconArrowRight,
+  IconBell,
+  IconCheckCircle,
+  IconClock,
+  IconCloudSun,
+  IconCoins,
+  IconNews,
+  IconRss,
+  IconShield,
+  IconTrendingUp,
+  IconUsers,
+} from "../components/icons/Icons";
 import { ArticleImage } from "../components/news/ArticleImage";
+import { CardMediaFallback, CategoryTag, FactChip, SourceTag } from "../components/news/CardParts";
 import { NewsCard } from "../components/news/NewsCard";
 import { SummaryCard } from "../components/news/SummaryCard";
-import {
-  MarketSkeletons,
-  MiniIndicatorSkeletons,
-  NewsCardSkeleton,
-  PanelSkeleton,
-  SummaryCardSkeleton,
-} from "../components/ui/Skeleton";
-import { WeatherPanel } from "../components/weather/WeatherPanel";
+import { MarketSkeletons, NewsCardSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
 import { trackEvent } from "../services/analytics";
 import {
   useGetArticlesQuery,
@@ -28,7 +32,11 @@ import {
   useTriggerSummaryMutation,
 } from "../services/api";
 import type { Article, Summary } from "../services/types";
-import { formatNumber } from "../components/indicators/indicatorUtils";
+import {
+  findByExactCode,
+  findOfficialUsdIndicator,
+  formatNumber,
+} from "../components/indicators/indicatorUtils";
 import { formatPublishedDate } from "../utils/date";
 import { buildContextualSummary, cleanGeneratedText } from "../utils/summaryText";
 
@@ -53,18 +61,6 @@ const STEPS = [
     title: "Te llega",
     body: "Por Telegram, WhatsApp, email o la web, en la categoria y la hora que elegiste vos.",
   },
-];
-
-const departments = [
-  "La Paz",
-  "Santa Cruz",
-  "Cochabamba",
-  "Oruro",
-  "Potosi",
-  "Tarija",
-  "Beni",
-  "Chuquisaca",
-  "Pando",
 ];
 
 const formatContentDate = (value?: string | null) => {
@@ -100,19 +96,21 @@ const FeaturedSummary = ({ summary }: { summary: Summary }) => {
   const content = (
     <>
       <ArticleImage image={summary.image} alt={title} />
+      <CardMediaFallback category={summary.category} image={summary.image} />
       <div className="featured-summary-copy">
         <div className="card-meta-row">
-          <span className="eyebrow">
-            {summary.source ?? "EcoBrief Bolivia"} - {summary.category}
-          </span>
-          <span className="status-badge summarized">Resumido IA</span>
+          <SourceTag category={summary.category} source={summary.source} />
+          <div className="card-badges">
+            <CategoryTag category={summary.category} />
+            <span className="status-badge summarized">Resumido IA</span>
+          </div>
         </div>
         <time className="published-date" dateTime={summary.published_at ?? summary.created_at ?? undefined}>
           {formatPublishedDate(summary.published_at ?? summary.created_at)}
         </time>
         <h2>{title}</h2>
         <p>{summaryText}</p>
-        {fact && <small>{fact}</small>}
+        <FactChip fact={fact} />
       </div>
     </>
   );
@@ -153,6 +151,10 @@ export const HomePage = () => {
   const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
 
   const indicators = indicatorsData?.items ?? [];
+  const officialRate = findOfficialUsdIndicator(indicators)?.value;
+  const p2pBuy = findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value;
+  const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
+  const weatherTemp = Number(weather?.current.temperature_2m);
   const articles = useMemo(() => articlesData?.items ?? [], [articlesData?.items]);
   const summaries = useMemo(() => summariesData?.items ?? [], [summariesData?.items]);
   const fallbackDate = summariesData?.is_fallback
@@ -336,24 +338,62 @@ export const HomePage = () => {
                   )}
                 </section>
               </div>
-            </div>
 
-            <aside className="side-stack">
-              {showWeatherSkeleton ? <PanelSkeleton /> : <WeatherPanel weather={weather} />}
-              <section className="economic-side-section" aria-label="Indicadores economicos">
-                <div className="section-label">Datos clave</div>
-                {showIndicatorSkeleton ? <MarketSkeletons /> : <ExchangeRateCards indicators={indicators} />}
-                {showIndicatorSkeleton ? <MiniIndicatorSkeletons /> : <SecondaryIndicators indicators={indicators} />}
-              </section>
-              <section className="departments-card" id="departamentos">
-                <div className="panel-title">Departamentos</div>
-                <div className="chips">
-                  {departments.map((department) => (
-                    <span key={department}>{department}</span>
-                  ))}
+              <section className="essential-data-section" aria-label="Datos esenciales">
+                <div className="section-label">Datos esenciales</div>
+                <div className="essential-data-grid">
+                  {showIndicatorSkeleton || showWeatherSkeleton ? (
+                    <MarketSkeletons />
+                  ) : (
+                    <>
+                      <Link className="essential-data-card" href="/datos">
+                        <div className="row-top">
+                          <span className="icon-badge" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>
+                            <IconTrendingUp size={16} />
+                          </span>
+                          <span className="label">BCB</span>
+                        </div>
+                        <b>Bs {formatNumber(officialRate)}</b>
+                        <span className="label">Tipo de cambio oficial</span>
+                        <span className="essential-data-link">
+                          Ver historico <IconArrowRight size={12} />
+                        </span>
+                      </Link>
+                      <Link className="essential-data-card" href="/datos">
+                        <div className="row-top">
+                          <span className="icon-badge" style={{ background: "var(--amber-soft)", color: "var(--amber-ink)" }}>
+                            <IconCoins size={16} />
+                          </span>
+                          <span className="label">Binance P2P</span>
+                        </div>
+                        <b>
+                          Bs {formatNumber(p2pBuy)} / {formatNumber(p2pSell)}
+                        </b>
+                        <span className="label">Mejor compra / mejor venta</span>
+                        <span className="essential-data-link">
+                          Ver historico <IconArrowRight size={12} />
+                        </span>
+                      </Link>
+                      <Link className="essential-data-card" href="/datos">
+                        <div className="row-top">
+                          <span className="icon-badge" style={{ background: "var(--sky-soft)", color: "var(--sky)" }}>
+                            <IconCloudSun size={16} />
+                          </span>
+                          <span className="label">Clima</span>
+                        </div>
+                        <b>{Number.isNaN(weatherTemp) ? "--" : `${Math.round(weatherTemp)}C`}</b>
+                        <span className="label">
+                          {weather?.location.name ?? "La Paz"} - UV {formatNumber(weather?.today.uv_index_max, 0)}
+                        </span>
+                        <span className="essential-data-link">
+                          Ver clima <IconArrowRight size={12} />
+                        </span>
+                      </Link>
+                    </>
+                  )}
                 </div>
               </section>
-            </aside>
+            </div>
           </section>
         </section>
       </section>

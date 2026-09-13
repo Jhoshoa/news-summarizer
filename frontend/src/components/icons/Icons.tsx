@@ -181,6 +181,27 @@ export const IconGrid = ({ size = 18, ...props }: IconProps) => (
   </svg>
 );
 
+export const IconTrendingUp = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M3.5 16.5l5.5-6 4 4 6.5-8" />
+    <path d="M15.5 6.2h4v4" />
+  </svg>
+);
+
+export const IconCloudSun = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M5 4.5v1.8M2.4 8h1.8M9.6 4.3L8.4 5.7M12 8l-1.4 1.4" />
+    <path d="M8.5 19a3.6 3.6 0 0 1-.4-7.2 4.8 4.8 0 0 1 9.2-1.4A4 4 0 0 1 17.7 19H8.5z" />
+  </svg>
+);
+
+export const IconSparkles = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M12 3l1.4 4.2 4.1 1.3-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.3L12 3z" />
+    <path d="M18.5 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z" />
+  </svg>
+);
+
 export const IconMenu = ({ size = 18, ...props }: IconProps) => (
   <svg {...base(size)} {...props}>
     <path d="M4 6h16M4 12h16M4 18h16" />
