@@ -173,7 +173,7 @@ export const HomePage = () => {
     [summaries],
   );
   const collectedArticles = useMemo(
-    () => prioritizedArticles.filter((article) => !summarizedArticleIds.has(article.id)).slice(0, 4),
+    () => prioritizedArticles.filter((article) => !summarizedArticleIds.has(article.id)).slice(0, 2),
     [prioritizedArticles, summarizedArticleIds],
   );
   const primarySummary = prioritizedSummaries[0];
@@ -323,7 +323,7 @@ export const HomePage = () => {
                   <div className="section-label">Noticias recolectadas</div>
                   <div className="collected-list">
                     {showArticleSkeleton
-                      ? Array.from({ length: 4 }, (_, index) => <NewsCardSkeleton key={index} />)
+                      ? Array.from({ length: 2 }, (_, index) => <NewsCardSkeleton key={index} />)
                       : collectedArticles.map((article) => (
                           <NewsCard key={article.id} article={article} />
                         ))}
