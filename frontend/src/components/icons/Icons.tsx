@@ -202,6 +202,27 @@ export const IconSparkles = ({ size = 18, ...props }: IconProps) => (
   </svg>
 );
 
+export const IconSun = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2.5v2.5M12 19v2.5M4.5 12H2M22 12h-2.5M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7" />
+  </svg>
+);
+
+export const IconDroplet = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M12 3.3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z" />
+  </svg>
+);
+
+export const IconWind = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M3 8h11.5a2.7 2.7 0 1 0-2.6-3.4" />
+    <path d="M3 12.2h15.5a3 3 0 1 1-2.9 3.7" />
+    <path d="M3 16.4h8.5" />
+  </svg>
+);
+
 export const IconMenu = ({ size = 18, ...props }: IconProps) => (
   <svg {...base(size)} {...props}>
     <path d="M4 6h16M4 12h16M4 18h16" />

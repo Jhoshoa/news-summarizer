@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { usePageRefreshControl } from "../app/refreshControl";
 import { EconomicHistoryChart } from "../components/indicators/EconomicHistoryChart";
 import { formatNumber } from "../components/indicators/indicatorUtils";
+import { IconDroplet, IconSun, IconWind } from "../components/icons/Icons";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { PanelSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
 import {
@@ -115,15 +116,30 @@ export const DataPage = () => {
                   </div>
                   <div className="metric-list">
                     <div>
-                      <span>Radiacion UV</span>
+                      <span>
+                        <span className="icon-badge icon-badge-sm" style={{ background: "var(--amber-soft)", color: "var(--amber-ink)" }}>
+                          <IconSun size={14} />
+                        </span>
+                        Radiacion UV
+                      </span>
                       <strong>{formatMetric(weather?.today.uv_index_max, "", 1)}</strong>
                     </div>
                     <div>
-                      <span>Humedad</span>
+                      <span>
+                        <span className="icon-badge icon-badge-sm" style={{ background: "var(--sky-soft)", color: "var(--sky)" }}>
+                          <IconDroplet size={14} />
+                        </span>
+                        Humedad
+                      </span>
                       <strong>{formatMetric(current.relative_humidity_2m, "%", 0)}</strong>
                     </div>
                     <div>
-                      <span>Viento</span>
+                      <span>
+                        <span className="icon-badge icon-badge-sm" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>
+                          <IconWind size={14} />
+                        </span>
+                        Viento
+                      </span>
                       <strong>{formatMetric(current.wind_speed_10m, " km/h", 1)}</strong>
                     </div>
                   </div>
