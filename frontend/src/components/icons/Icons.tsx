@@ -223,6 +223,34 @@ export const IconWind = ({ size = 18, ...props }: IconProps) => (
   </svg>
 );
 
+export const IconMapPin = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M12 21s7-7.2 7-12a7 7 0 1 0-14 0c0 4.8 7 12 7 12z" />
+    <circle cx="12" cy="9" r="2.2" />
+  </svg>
+);
+
+export const IconStar = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M12 3.5l2.5 5.3 5.8.8-4.2 4.1 1 5.8-5.1-2.7-5.1 2.7 1-5.8-4.2-4.1 5.8-.8z" />
+  </svg>
+);
+
+export const IconLayers = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M12 4l8 4-8 4-8-4 8-4z" />
+    <path d="M4 12l8 4 8-4" />
+    <path d="M4 16l8 4 8-4" />
+  </svg>
+);
+
+export const IconShieldCheck = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M12 3.3l6.5 2.6v5.2c0 4.6-3 7.7-6.5 8.6-3.5-.9-6.5-4-6.5-8.6V5.9L12 3.3z" />
+    <path d="M9 12.2l2 2 4-4.2" />
+  </svg>
+);
+
 export const IconMenu = ({ size = 18, ...props }: IconProps) => (
   <svg {...base(size)} {...props}>
     <path d="M4 6h16M4 12h16M4 18h16" />
