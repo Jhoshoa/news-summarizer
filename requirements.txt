@@ -9,6 +9,9 @@ python-multipart>=0.0.9
 # IA / LLM
 openai>=1.12.0
 
+# Monitoring
+sentry-sdk[fastapi]>=1.39.0
+
 # Recolección
 httpx>=0.26.0
 aiohttp>=3.9.0

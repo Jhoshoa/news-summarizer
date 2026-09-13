@@ -15,7 +15,15 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from src.db.repository import Base, Database, NewsArticle, NewsCategory, NewsSource, Story, StoryArticle
+from src.db.repository import (
+    Base,
+    Database,
+    NewsArticle,
+    NewsCategory,
+    NewsSource,
+    Story,
+    StoryArticle,
+)
 
 
 @pytest.fixture
@@ -233,7 +241,7 @@ async def test_link_ai_detected_duplicates_skips_non_singleton_cluster(db: Datab
             title="Duplicado", url="https://example.com/2",
             story_cluster_id="cluster-b", published_at=now,
         )
-        sibling = await _make_article(
+        await _make_article(
             session, category_id=category.id, source_id=source.id,
             title="Hermano del duplicado", url="https://example.com/3",
             story_cluster_id="cluster-b", published_at=now,

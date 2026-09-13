@@ -2,6 +2,7 @@ import { Link } from "../../app/router";
 import type { Article } from "../../services/types";
 import { formatPublishedDate } from "../../utils/date";
 import { ArticleImage } from "./ArticleImage";
+import { CardMediaFallback, CategoryTag, SourceTag } from "./CardParts";
 
 type NewsCardProps = {
   article: Article;
@@ -11,15 +12,15 @@ type NewsCardProps = {
 export const NewsCard = ({ article, isSummarized = false }: NewsCardProps) => (
   <Link className="news-card card-link" href={`/article/${article.id}`}>
     <ArticleImage image={article.image} alt={article.title} compact />
+    <CardMediaFallback category={article.category} image={article.image} compact />
     <div>
       <div className="card-meta-row">
-        <span className="eyebrow">
-          {article.source} - {article.category}
-        </span>
+        <SourceTag category={article.category} source={article.source} />
         <div className="card-badges">
           {(article.source_count ?? 1) >= 2 && (
             <span className="status-badge confidence-multi">Varias fuentes</span>
           )}
+          <CategoryTag category={article.category} />
           <span className={`status-badge ${isSummarized ? "summarized" : ""}`}>
             {isSummarized ? "Resumido IA" : "Recolectado"}
           </span>

@@ -3,8 +3,5 @@
 # Production server
 gunicorn>=21.0.0
 
-# Monitoring
-sentry-sdk[fastapi]>=1.39.0
-
 # Production DB
 psycopg2-binary>=2.9.9

@@ -3,6 +3,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type {
   Article,
   CategoryCountsResponse,
+  EconomicIndicatorHistoryResponse,
   EconomicIndicatorsResponse,
   ImpactMetricsResponse,
   PaginatedResponse,
@@ -24,6 +25,11 @@ import type {
 
 type GetIndicatorsArgs = {
   date?: string | null;
+};
+
+type GetIndicatorsHistoryArgs = {
+  codes?: string[];
+  days?: number;
 };
 
 type GetArticlesArgs = {
@@ -75,6 +81,19 @@ export const newsApi = createApi({
       query: (args) => ({
         url: "/api/economic-indicators",
         params: args?.date ? { date: args.date } : undefined,
+      }),
+      providesTags: ["EconomicIndicators"],
+    }),
+    getEconomicIndicatorsHistory: builder.query<
+      EconomicIndicatorHistoryResponse,
+      GetIndicatorsHistoryArgs | void
+    >({
+      query: (args) => ({
+        url: "/api/economic-indicators/history",
+        params: {
+          codes: args?.codes?.join(","),
+          days: args?.days ?? 120,
+        },
       }),
       providesTags: ["EconomicIndicators"],
     }),
@@ -208,6 +227,7 @@ export const newsApi = createApi({
 
 export const {
   useGetEconomicIndicatorsQuery,
+  useGetEconomicIndicatorsHistoryQuery,
   useRefreshEconomicIndicatorsMutation,
   useGetWeatherQuery,
   useGetWeatherLocationsQuery,

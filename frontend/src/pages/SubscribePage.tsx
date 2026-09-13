@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
+import { CategoryIcon } from "../components/icons/categoryIcons";
 import {
   useGetPreferenceOptionsQuery,
   usePreviewPreferencesMutation,
   useSubscribeToBriefMutation,
   useUnsubscribeFromBriefMutation,
 } from "../services/api";
-import type { PreferenceOption } from "../services/types";
+import type { PreferenceOption, PreferencePreviewResponse } from "../services/types";
 import {
   buildSubscribePayload,
   getSubscribeApiErrorMessage,
@@ -96,7 +97,9 @@ export const SubscribePage = () => {
   const { data: options, isError: optionsError, isFetching: isLoadingOptions } = useGetPreferenceOptionsQuery();
   const [subscribe, subscribeState] = useSubscribeToBriefMutation();
   const [unsubscribe, unsubscribeState] = useUnsubscribeFromBriefMutation();
-  const [previewPreferences, previewState] = usePreviewPreferencesMutation();
+  const [previewPreferences] = usePreviewPreferencesMutation();
+  const [previewStatus, setPreviewStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [previewData, setPreviewData] = useState<PreferencePreviewResponse | null>(null);
   const [form, setForm] = useState<SubscribeFormState>(defaultForm);
   const [unsubscribeIdentifier, setUnsubscribeIdentifier] = useState("");
   const [formErrors, setFormErrors] = useState<string[]>([]);
@@ -172,18 +175,44 @@ export const SubscribePage = () => {
 
   useEffect(() => {
     if (!form.categories.length) {
+      setPreviewStatus("idle");
+      setPreviewData(null);
       return undefined;
     }
 
     // La frecuencia no afecta que briefs trae el preview (el backend la
     // ignora), asi que a proposito no esta en las dependencias: cambiarla
     // no debe disparar una recarga del preview.
+    //
+    // `cancelled` evita pisar el estado con la respuesta de un pedido viejo:
+    // el hook de mutacion de RTK Query puede quedar con `isLoading` pegado
+    // en true si el efecto se desmonta y remonta antes de que resuelva (pasa
+    // en desarrollo con Strict Mode, que remonta cada efecto una vez para
+    // detectar justamente este tipo de bug) -- manejar el resultado en
+    // estado local propio, ignorando cualquier resolucion de un efecto ya
+    // limpiado, evita depender de ese estado interno del hook.
+    let cancelled = false;
     const categories = form.categories;
     const timeout = window.setTimeout(() => {
-      previewTriggerRef.current({ categories });
+      setPreviewStatus("loading");
+      previewTriggerRef
+        .current({ categories })
+        .unwrap()
+        .then((data) => {
+          if (cancelled) return;
+          setPreviewData(data);
+          setPreviewStatus("success");
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setPreviewStatus("error");
+        });
     }, 450);
 
-    return () => window.clearTimeout(timeout);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
   }, [form.categories]);
 
   const handleSubmit = async () => {
@@ -209,7 +238,8 @@ export const SubscribePage = () => {
       setTouchedFields({});
       setFormErrors([]);
       setIsConfirmingSubscribe(false);
-      previewState.reset();
+      setPreviewStatus("idle");
+      setPreviewData(null);
     } catch (error) {
       const message = getSubscribeApiErrorMessage(error);
       setIsConfirmingSubscribe(false);
@@ -376,12 +406,18 @@ export const SubscribePage = () => {
             <legend>Categorias</legend>
             <div className="category-choice-grid">
               {(options?.categories ?? []).map((category) => (
-                <label className="check-card" key={category.slug}>
+                <label
+                  className={
+                    form.categories.includes(category.slug) ? "check-card active" : "check-card"
+                  }
+                  key={category.slug}
+                >
                   <input
                     checked={form.categories.includes(category.slug)}
                     type="checkbox"
                     onChange={() => toggleCategory(category.slug)}
                   />
+                  <CategoryIcon category={category.slug} size={16} />
                   <span>{category.label}</span>
                 </label>
               ))}
@@ -534,15 +570,15 @@ export const SubscribePage = () => {
               </div>
 
               <div className="channel-mock-body">
-                {previewState.isLoading ? (
+                {previewStatus === "loading" ? (
                   <p className="impact-section-copy">Cargando briefs recientes...</p>
-                ) : previewState.isError ? (
+                ) : previewStatus === "error" ? (
                   <p className="form-notice">
                     No se pudo cargar el preview. Revisa el backend e intenta de nuevo.
                   </p>
-                ) : previewState.data?.items.length ? (
+                ) : previewData?.items.length ? (
                   form.channel === "email" ? (
-                    previewState.data.items.map((item) => (
+                    previewData.items.map((item) => (
                       <article className="mock-email-card" key={`${item.category}-${item.title}`}>
                         <span>{categoryLabelBySlug.get(item.category) ?? item.category}</span>
                         <h3>{item.title}</h3>
@@ -554,7 +590,7 @@ export const SubscribePage = () => {
                     <div className="mock-chat-bubble">
                       <strong>Tu brief de hoy</strong>
                       <ul>
-                        {previewState.data.items.map((item) => (
+                        {previewData.items.map((item) => (
                           <li key={`${item.category}-${item.title}`}>
                             <span>{categoryLabelBySlug.get(item.category) ?? item.category}</span>
                             {item.title}
@@ -567,7 +603,7 @@ export const SubscribePage = () => {
                       </span>
                     </div>
                   )
-                ) : previewState.data ? (
+                ) : previewData ? (
                   <p className="impact-section-copy">
                     No hay briefs recientes para las categorias seleccionadas.
                   </p>
@@ -576,7 +612,7 @@ export const SubscribePage = () => {
                 )}
               </div>
             </div>
-            {previewState.data && !previewState.isLoading && <small>{previewState.data.message}</small>}
+            {previewData && previewStatus !== "loading" && <small>{previewData.message}</small>}
           </section>
         </aside>
       </div>

@@ -1,11 +1,84 @@
 import { useMemo, useState } from "react";
 
+import {
+  IconClock,
+  IconLayers,
+  IconMapPin,
+  IconRss,
+  IconShieldCheck,
+  IconStar,
+  IconTrendingUp,
+} from "../components/icons/Icons";
 import { SummaryCard } from "../components/news/SummaryCard";
 import { SummaryCardSkeleton } from "../components/ui/Skeleton";
 import { useGetImpactMetricsQuery, useGetSummariesQuery } from "../services/api";
 import type { ImpactMetricsResponse, ImpactMetricsRun } from "../services/types";
 import { formatPublishedDate } from "../utils/date";
 import { getImpactPipelineRows } from "../utils/impact";
+
+const SCORING_FACTORS = [
+  {
+    icon: <IconTrendingUp size={16} />,
+    label: "Impacto informativo",
+    pct: 20,
+    body: "Palabras clave sobre economia, politica, salud, educacion y seguridad.",
+  },
+  {
+    icon: <IconMapPin size={16} />,
+    label: "Relevancia local",
+    pct: 20,
+    body: "Mencion de regiones, ciudades o autoridades de Bolivia.",
+  },
+  {
+    icon: <IconStar size={16} />,
+    label: "Calidad del contenido",
+    pct: 17,
+    body: "Noticias con mayor extension, imagenes y descripcion clara.",
+  },
+  {
+    icon: <IconClock size={16} />,
+    label: "Actualidad",
+    pct: 15,
+    body: "Noticias mas recientes reciben mayor puntaje. Dentro de las ultimas horas pesa mas.",
+  },
+  {
+    icon: <IconRss size={16} />,
+    label: "Fuente",
+    pct: 10,
+    body: "Fuentes reconocidas de noticias bolivianas tienen mayor peso inicial.",
+  },
+  {
+    icon: <IconLayers size={16} />,
+    label: "Corroboracion",
+    pct: 10,
+    body: "Noticias cubiertas por multiples fuentes suman puntos adicionales.",
+  },
+  {
+    icon: <IconShieldCheck size={16} />,
+    label: "Confianza de categoria",
+    pct: 8,
+    body: "Que tan coherente es el contenido con la categoria asignada.",
+  },
+];
+
+const DEDUP_LAYERS = [
+  {
+    title: "Lote",
+    body: "Hash de URL + similitud de titulo dentro de la misma corrida (umbral 0.85).",
+  },
+  {
+    title: "Huella",
+    body: "Normalizacion de URL y huella de contenido entre corridas distintas.",
+  },
+  {
+    title: "Clustering",
+    body: "Similitud de titulo y tokens, ajustada por proximidad temporal (ventana de 3 dias).",
+  },
+  {
+    title: "Semantica",
+    body: 'Un modelo de IA distingue "misma noticia" de "mismo tema, noticia distinta".',
+  },
+];
 
 const numberFormatter = new Intl.NumberFormat("es-BO", {
   maximumFractionDigits: 1,
@@ -525,65 +598,49 @@ export const ImpactPage = () => {
             </div>
           </section>
 
-          <section className="data-panel">
-            <div className="panel-heading">
-              <span className="panel-title">Como se priorizan las noticias</span>
-              <p>Cada noticia recibe un puntaje segun estos criterios. Las mejor puntuadas pasan al resumen.</p>
-            </div>
-            <div className="scoring-layout" style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-              <div className="scoring-bars" style={{ flex: "0 0 auto", minWidth: "14rem" }}>
-                {[
-                  { label: "Actualidad", pct: 15 },
-                  { label: "Relevancia local", pct: 20 },
-                  { label: "Impacto informativo", pct: 20 },
-                  { label: "Calidad contenido", pct: 17 },
-                  { label: "Fuente", pct: 10 },
-                  { label: "Corroboracion", pct: 10 },
-                  { label: "Confianza categoria", pct: 8 },
-                ].map((c) => (
-                  <div key={c.label} style={{ marginBottom: "0.4rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.15rem" }}>
-                      <span style={{ color: "#374151" }}>{c.label}</span>
-                      <span style={{ color: "#6b7280" }}>{c.pct}%</span>
-                    </div>
-                    <div style={{ height: 8, backgroundColor: "#e5e7eb", borderRadius: 4, overflow: "hidden" }}>
-                      <div style={{ width: `${c.pct}%`, height: "100%", backgroundColor: "#006d77", borderRadius: 4, transition: "width 0.5s ease" }} />
+          <div className="two-col">
+            <section className="data-panel" style={{ marginTop: 0 }}>
+              <div className="panel-heading">
+                <span className="panel-title">Como se priorizan las noticias</span>
+                <p>Cada noticia recibe un puntaje segun estos criterios. Las mejor puntuadas pasan al resumen.</p>
+              </div>
+              <div>
+                {SCORING_FACTORS.map((factor) => (
+                  <div className="factor-row" key={factor.label}>
+                    <span className="factor-icon">{factor.icon}</span>
+                    <div className="factor-info">
+                      <div className="factor-top">
+                        <span>{factor.label}</span>
+                        <span className="pct">{factor.pct}%</span>
+                      </div>
+                      <div className="bar-track">
+                        <div className="bar-fill" style={{ width: `${factor.pct * 4}%` }} />
+                      </div>
+                      <p className="factor-body">{factor.body}</p>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="impact-narrative-list" style={{ flex: 1, minWidth: "16rem" }}>
-                <div>
-                  <strong>Actualidad (15%)</strong>
-                  <p>Noticias mas recientes reciben mayor puntaje. Dentro de las ultimas horas pesa mas.</p>
-                </div>
-                <div>
-                  <strong>Relevancia local (20%)</strong>
-                  <p>Mencion de regiones, ciudades o autoridades de Bolivia.</p>
-                </div>
-                <div>
-                  <strong>Impacto informativo (20%)</strong>
-                  <p>Palabras clave sobre economia, politica, salud, educacion y seguridad.</p>
-                </div>
-                <div>
-                  <strong>Calidad del contenido (17%)</strong>
-                  <p>Noticias con mayor extension, imagenes y descripcion clara.</p>
-                </div>
-                <div>
-                  <strong>Fuente (10%)</strong>
-                  <p>Fuentes reconocidas de noticias bolivianas tienen mayor peso inicial.</p>
-                </div>
-                <div>
-                  <strong>Corroboracion (10%)</strong>
-                  <p>Noticias cubiertas por multiples fuentes suman puntos adicionales.</p>
-                </div>
-                <div>
-                  <strong>Confianza de categoria (8%)</strong>
-                  <p>Que tan coherente es el contenido con la categoria asignada.</p>
-                </div>
+            </section>
+
+            <section className="data-panel" style={{ marginTop: 0 }}>
+              <div className="panel-heading">
+                <span className="panel-title">Cuatro capas de deduplicacion</span>
+                <p>Antes de resumir, cada noticia pasa por estos filtros para no repetir la misma historia.</p>
               </div>
-            </div>
-          </section>
+              <div>
+                {DEDUP_LAYERS.map((layer, index) => (
+                  <div className="layer-item" key={layer.title}>
+                    <span className="layer-num">{index + 1}</span>
+                    <div>
+                      <h6>{layer.title}</h6>
+                      <p>{layer.body}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
 
         </div>
 

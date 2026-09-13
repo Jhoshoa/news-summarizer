@@ -3,19 +3,24 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Link } from "../app/router";
 import { usePageRefreshControl } from "../app/refreshControl";
 import { ImpactMetricsPanel } from "../components/impact/ImpactMetricsPanel";
-import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
-import { SecondaryIndicators } from "../components/indicators/SecondaryIndicators";
+import {
+  IconArrowRight,
+  IconBell,
+  IconCheckCircle,
+  IconClock,
+  IconCloudSun,
+  IconCoins,
+  IconNews,
+  IconRss,
+  IconShield,
+  IconTrendingUp,
+  IconUsers,
+} from "../components/icons/Icons";
 import { ArticleImage } from "../components/news/ArticleImage";
+import { CardMediaFallback, CategoryTag, FactChip, SourceTag } from "../components/news/CardParts";
 import { NewsCard } from "../components/news/NewsCard";
 import { SummaryCard } from "../components/news/SummaryCard";
-import {
-  MarketSkeletons,
-  MiniIndicatorSkeletons,
-  NewsCardSkeleton,
-  PanelSkeleton,
-  SummaryCardSkeleton,
-} from "../components/ui/Skeleton";
-import { WeatherPanel } from "../components/weather/WeatherPanel";
+import { MarketSkeletons, NewsCardSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
 import { trackEvent } from "../services/analytics";
 import {
   useGetArticlesQuery,
@@ -27,19 +32,35 @@ import {
   useTriggerSummaryMutation,
 } from "../services/api";
 import type { Article, Summary } from "../services/types";
+import {
+  findByExactCode,
+  findOfficialUsdIndicator,
+  formatNumber,
+} from "../components/indicators/indicatorUtils";
 import { formatPublishedDate } from "../utils/date";
 import { buildContextualSummary, cleanGeneratedText } from "../utils/summaryText";
 
-const departments = [
-  "La Paz",
-  "Santa Cruz",
-  "Cochabamba",
-  "Oruro",
-  "Potosi",
-  "Tarija",
-  "Beni",
-  "Chuquisaca",
-  "Pando",
+const STEPS = [
+  {
+    icon: <IconRss size={20} />,
+    title: "Recolecta",
+    body: "Lee Radio Fides, Unitel, Red Uno, Red Bolivision, Los Tiempos y El Deber, todo el dia.",
+  },
+  {
+    icon: <IconUsers size={20} />,
+    title: "Agrupa",
+    body: "Detecta cuando dos articulos de fuentes distintas cuentan el mismo hecho y los une en una historia.",
+  },
+  {
+    icon: <IconShield size={20} />,
+    title: "Verifica",
+    body: "La IA resume y marca cada afirmacion: confirmada por varias fuentes, oficial, o de una sola fuente.",
+  },
+  {
+    icon: <IconBell size={20} />,
+    title: "Te llega",
+    body: "Por Telegram, WhatsApp, email o la web, en la categoria y la hora que elegiste vos.",
+  },
 ];
 
 const formatContentDate = (value?: string | null) => {
@@ -75,19 +96,21 @@ const FeaturedSummary = ({ summary }: { summary: Summary }) => {
   const content = (
     <>
       <ArticleImage image={summary.image} alt={title} />
+      <CardMediaFallback category={summary.category} image={summary.image} />
       <div className="featured-summary-copy">
         <div className="card-meta-row">
-          <span className="eyebrow">
-            {summary.source ?? "EcoBrief Bolivia"} - {summary.category}
-          </span>
-          <span className="status-badge summarized">Resumido IA</span>
+          <SourceTag category={summary.category} source={summary.source} />
+          <div className="card-badges">
+            <CategoryTag category={summary.category} />
+            <span className="status-badge summarized">Resumido IA</span>
+          </div>
         </div>
         <time className="published-date" dateTime={summary.published_at ?? summary.created_at ?? undefined}>
           {formatPublishedDate(summary.published_at ?? summary.created_at)}
         </time>
         <h2>{title}</h2>
         <p>{summaryText}</p>
-        {fact && <small>{fact}</small>}
+        <FactChip fact={fact} />
       </div>
     </>
   );
@@ -128,6 +151,10 @@ export const HomePage = () => {
   const [triggerSummary, { isLoading: isTriggeringSummary }] = useTriggerSummaryMutation();
 
   const indicators = indicatorsData?.items ?? [];
+  const officialRate = findOfficialUsdIndicator(indicators)?.value;
+  const p2pBuy = findByExactCode(indicators, "binance_p2p_usdt_bob_buy")?.value;
+  const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
+  const weatherTemp = Number(weather?.current.temperature_2m);
   const articles = useMemo(() => articlesData?.items ?? [], [articlesData?.items]);
   const summaries = useMemo(() => summariesData?.items ?? [], [summariesData?.items]);
   const fallbackDate = summariesData?.is_fallback
@@ -148,11 +175,12 @@ export const HomePage = () => {
     [summaries],
   );
   const collectedArticles = useMemo(
-    () => prioritizedArticles.filter((article) => !summarizedArticleIds.has(article.id)).slice(0, 4),
+    () => prioritizedArticles.filter((article) => !summarizedArticleIds.has(article.id)).slice(0, 2),
     [prioritizedArticles, summarizedArticleIds],
   );
   const primarySummary = prioritizedSummaries[0];
   const secondarySummaries = prioritizedSummaries.slice(1, 5);
+  const heroPreviewSummaries = prioritizedSummaries.slice(0, 3);
 
   const handleRefresh = useCallback(() => {
     void Promise.all([
@@ -182,6 +210,78 @@ export const HomePage = () => {
 
   return (
     <>
+      <section className="landing-hero-band">
+        <div className="landing-inner landing-hero">
+          <div className="landing-hero-copy">
+            <span className="landing-kicker">
+              <IconNews size={16} />
+              Bolivia, sin repetir la misma historia dos veces
+            </span>
+            <h1>
+              Las noticias de Bolivia, <em>verificadas</em> y sin ruido.
+            </h1>
+            <p className="landing-lede">
+              EcoBrief lee los principales medios bolivianos, junta las versiones de un mismo hecho en una sola
+              historia, y te entrega un resumen con la fuente de cada dato a un clic.
+            </p>
+            <div className="landing-ctas">
+              <Link className="button" href="/news">
+                Ver todas las noticias
+              </Link>
+              <Link className="button secondary" href="/suscribirse">
+                Suscribirme gratis
+              </Link>
+            </div>
+
+            {impactMetrics?.has_data && (
+              <div className="landing-stat-row">
+                <div>
+                  <strong>{formatNumber(impactMetrics.reduction_rate * 100, 0)}%</strong>
+                  <span>reduccion del flujo</span>
+                </div>
+                <div>
+                  <strong>{formatNumber(impactMetrics.estimated_pages_avoided, 0)}</strong>
+                  <span>paginas evitadas hoy</span>
+                </div>
+                <div>
+                  <strong>{formatNumber(impactMetrics.estimated_minutes_saved, 0)} min</strong>
+                  <span>lectura ahorrada</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="landing-preview-card" aria-label="Vista previa de EcoBrief">
+            <div className="landing-preview-chrome">
+              <span />
+              <span />
+              <span />
+              <strong>ecobrief.bo</strong>
+            </div>
+            <div className="landing-preview-body">
+              {showSummarySkeleton
+                ? Array.from({ length: 3 }, (_, index) => <div className="landing-preview-row skeleton" key={index} />)
+                : heroPreviewSummaries.map((summary) => (
+                    <Link
+                      className="landing-preview-row"
+                      href={summary.article_id ? `/article/${summary.article_id}` : "/news"}
+                      key={summary.id ?? summary.title}
+                    >
+                      <span className="landing-preview-tag">{summary.category}</span>
+                      <span className="landing-preview-title">{cleanGeneratedText(summary.title)}</span>
+                      <span className="landing-preview-badge">IA</span>
+                    </Link>
+                  ))}
+            </div>
+            <div className="landing-preview-footer">
+              <span>Actualizado hace instantes</span>
+              <span>{impactMetrics?.summaries ?? "--"} briefs hoy</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="landing-inner">
       <section className="home-layout">
         <section className="content-column">
           <ImpactMetricsPanel
@@ -225,7 +325,7 @@ export const HomePage = () => {
                   <div className="section-label">Noticias recolectadas</div>
                   <div className="collected-list">
                     {showArticleSkeleton
-                      ? Array.from({ length: 4 }, (_, index) => <NewsCardSkeleton key={index} />)
+                      ? Array.from({ length: 2 }, (_, index) => <NewsCardSkeleton key={index} />)
                       : collectedArticles.map((article) => (
                           <NewsCard key={article.id} article={article} />
                         ))}
@@ -238,27 +338,111 @@ export const HomePage = () => {
                   )}
                 </section>
               </div>
-            </div>
 
-            <aside className="side-stack">
-              {showWeatherSkeleton ? <PanelSkeleton /> : <WeatherPanel weather={weather} />}
-              <section className="economic-side-section" aria-label="Indicadores economicos">
-                <div className="section-label">Datos clave</div>
-                {showIndicatorSkeleton ? <MarketSkeletons /> : <ExchangeRateCards indicators={indicators} />}
-                {showIndicatorSkeleton ? <MiniIndicatorSkeletons /> : <SecondaryIndicators indicators={indicators} />}
-              </section>
-              <section className="departments-card" id="departamentos">
-                <div className="panel-title">Departamentos</div>
-                <div className="chips">
-                  {departments.map((department) => (
-                    <span key={department}>{department}</span>
-                  ))}
+              <section className="essential-data-section" aria-label="Datos esenciales">
+                <div className="section-label">Datos esenciales</div>
+                <div className="essential-data-grid">
+                  {showIndicatorSkeleton || showWeatherSkeleton ? (
+                    <MarketSkeletons />
+                  ) : (
+                    <>
+                      <Link className="essential-data-card" href="/datos">
+                        <div className="row-top">
+                          <span className="icon-badge" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>
+                            <IconTrendingUp size={16} />
+                          </span>
+                          <span className="label">BCB</span>
+                        </div>
+                        <b>Bs {formatNumber(officialRate)}</b>
+                        <span className="label">Tipo de cambio oficial</span>
+                        <span className="essential-data-link">
+                          Ver historico <IconArrowRight size={12} />
+                        </span>
+                      </Link>
+                      <Link className="essential-data-card" href="/datos">
+                        <div className="row-top">
+                          <span className="icon-badge" style={{ background: "var(--amber-soft)", color: "var(--amber-ink)" }}>
+                            <IconCoins size={16} />
+                          </span>
+                          <span className="label">Binance P2P</span>
+                        </div>
+                        <b>
+                          Bs {formatNumber(p2pBuy)} / {formatNumber(p2pSell)}
+                        </b>
+                        <span className="label">Mejor compra / mejor venta</span>
+                        <span className="essential-data-link">
+                          Ver historico <IconArrowRight size={12} />
+                        </span>
+                      </Link>
+                      <Link className="essential-data-card" href="/datos">
+                        <div className="row-top">
+                          <span className="icon-badge" style={{ background: "var(--sky-soft)", color: "var(--sky)" }}>
+                            <IconCloudSun size={16} />
+                          </span>
+                          <span className="label">Clima</span>
+                        </div>
+                        <b>{Number.isNaN(weatherTemp) ? "--" : `${Math.round(weatherTemp)}C`}</b>
+                        <span className="label">
+                          {weather?.location.name ?? "La Paz"} - UV {formatNumber(weather?.today.uv_index_max, 0)}
+                        </span>
+                        <span className="essential-data-link">
+                          Ver clima <IconArrowRight size={12} />
+                        </span>
+                      </Link>
+                    </>
+                  )}
                 </div>
               </section>
-            </aside>
+            </div>
           </section>
         </section>
       </section>
+
+      <section className="landing-section">
+        <div className="section-label">Como funciona</div>
+        <div className="landing-steps">
+          {STEPS.map((step, index) => (
+            <div className="landing-step" key={step.title}>
+              <span className="landing-step-number">{index + 1}</span>
+              <div className="landing-step-icon">{step.icon}</div>
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="landing-section landing-trust">
+        <div className="section-label">Nos auditamos a nosotros mismos</div>
+        <p className="landing-trust-lede">
+          La misma disciplina que aplicamos a cada noticia -verificar contra la fuente original- se la aplicamos a
+          nuestros propios datos.
+        </p>
+        <ul className="landing-changelog">
+          <li>
+            <IconCheckCircle size={16} />
+            Cada afirmacion de un resumen se descarta si no hay un articulo real que la respalde: no confiamos en lo
+            que la IA "recuerda" o infiere.
+          </li>
+          <li>
+            <IconCheckCircle size={16} />
+            Si un proveedor de IA falla o se degrada, el sistema conmuta automaticamente a otro en vez de reintentar
+            contra el mismo indefinidamente.
+          </li>
+          <li>
+            <IconClock size={16} />
+            Indicadores economicos actualizados cada 10 minutos, con historico verificable en la pagina de Datos.
+          </li>
+        </ul>
+      </section>
+
+      <section className="landing-cta-final">
+        <h2>Recibi el resumen del dia, sin abrir diez pestanas.</h2>
+        <Link className="button" href="/suscribirse">
+          Suscribirme gratis
+        </Link>
+      </section>
+      </div>
     </>
   );
 };

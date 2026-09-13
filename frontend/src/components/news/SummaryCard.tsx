@@ -3,6 +3,7 @@ import type { Summary } from "../../services/types";
 import { formatPublishedDate } from "../../utils/date";
 import { buildContextualSummary, cleanGeneratedText } from "../../utils/summaryText";
 import { ArticleImage } from "./ArticleImage";
+import { CardMediaFallback, CategoryTag, FactChip, SourceTag } from "./CardParts";
 
 type SummaryCardProps = {
   summary: Summary;
@@ -17,15 +18,15 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
   const content = (
     <>
       <ArticleImage image={summary.image} alt={title} compact />
+      <CardMediaFallback category={summary.category} image={summary.image} compact />
       <div>
         <div className="card-meta-row">
-          <span className="eyebrow">
-            {summary.source ?? "EcoBrief Bolivia"} - {summary.category}
-          </span>
+          <SourceTag category={summary.category} source={summary.source} />
           <div className="card-badges">
             {hasMultipleSources && (
               <span className="status-badge confidence-multi">Varias fuentes</span>
             )}
+            <CategoryTag category={summary.category} />
             <span className="status-badge summarized">Resumido IA</span>
           </div>
         </div>
@@ -34,7 +35,7 @@ export const SummaryCard = ({ summary }: SummaryCardProps) => {
         </time>
         <h3>{title}</h3>
         <p>{summaryText}</p>
-        {fact && <small>{fact}</small>}
+        <FactChip fact={fact} />
       </div>
     </>
   );

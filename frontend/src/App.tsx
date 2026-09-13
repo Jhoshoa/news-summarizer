@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { useRefreshControlContext } from "./app/refreshControl";
 import { useRouter } from "./app/router";
 import { AppShell } from "./components/layout/AppShell";
@@ -13,7 +15,7 @@ import { getNavigationState } from "./utils/navigation";
 const manualRefreshEnabled = import.meta.env.VITE_ENABLE_MANUAL_REFRESH === "true";
 
 const App = () => {
-  const { location } = useRouter();
+  const { location, replace } = useRouter();
   const { isRefreshing, onRefresh } = useRefreshControlContext();
   const isArticleRoute = location.pathname.startsWith("/article");
   const isNewsRoute = location.pathname.startsWith("/news");
@@ -21,8 +23,26 @@ const App = () => {
   const isImpactRoute = location.pathname.startsWith("/impacto");
   const isFuentesRoute = location.pathname.startsWith("/fuentes");
   const isSubscribeRoute = location.pathname.startsWith("/suscribirse");
-  const compactHeader = isArticleRoute || isNewsRoute || isDataRoute || isImpactRoute || isFuentesRoute || isSubscribeRoute;
+  // /panel se fusiono con la landing en "/" (una sola pagina de inicio, no dos
+  // que se repetian). Se mantiene el redirect para no romper enlaces viejos.
+  const isLegacyPanelRoute = location.pathname.startsWith("/panel");
+  const isHomeRoute =
+    !isArticleRoute &&
+    !isNewsRoute &&
+    !isDataRoute &&
+    !isImpactRoute &&
+    !isFuentesRoute &&
+    !isSubscribeRoute &&
+    !isLegacyPanelRoute;
+  const compactHeader =
+    isArticleRoute || isNewsRoute || isDataRoute || isImpactRoute || isFuentesRoute || isSubscribeRoute;
   const navigationState = getNavigationState(location.pathname);
+
+  useEffect(() => {
+    if (isLegacyPanelRoute) {
+      replace("/");
+    }
+  }, [isLegacyPanelRoute, replace]);
 
   let page = <HomePage />;
 
@@ -38,6 +58,8 @@ const App = () => {
     page = <FuentesPage />;
   } else if (isSubscribeRoute) {
     page = <SubscribePage />;
+  } else if (isHomeRoute || isLegacyPanelRoute) {
+    page = <HomePage />;
   }
 
   return (
@@ -48,6 +70,7 @@ const App = () => {
       compactHeader={compactHeader}
       isRefreshing={manualRefreshEnabled ? isRefreshing : false}
       onRefresh={manualRefreshEnabled ? onRefresh : undefined}
+      showTrail={!isHomeRoute}
     >
       {page}
     </AppShell>

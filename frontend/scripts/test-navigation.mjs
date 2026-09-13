@@ -13,7 +13,16 @@ const assertNavigationState = (actual, expected) => {
 assertNavigationState(getNavigationState("/"), {
   activePath: "/",
   backFallback: "/",
-  breadcrumbs: [{ href: "/", label: "Inicio" }],
+  breadcrumbs: [{ href: "/", label: "EcoBrief Bolivia" }],
+});
+
+// "/panel" was merged into "/" (landing + dashboard unification); the old
+// panel-specific branch is gone, so it now falls through to the home state.
+// The client-side redirect to "/" lives in App.tsx, not in this helper.
+assertNavigationState(getNavigationState("/panel"), {
+  activePath: "/",
+  backFallback: "/",
+  breadcrumbs: [{ href: "/", label: "EcoBrief Bolivia" }],
 });
 
 assertNavigationState(getNavigationState("/news"), {

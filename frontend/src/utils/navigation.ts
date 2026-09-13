@@ -80,6 +80,6 @@ export const getNavigationState = (pathname: string): NavigationState => {
   return {
     activePath: "/",
     backFallback: "/",
-    breadcrumbs: [{ href: "/", label: "Inicio" }],
+    breadcrumbs: [{ href: "/", label: "EcoBrief Bolivia" }],
   };
 };

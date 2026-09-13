@@ -4,6 +4,7 @@ import type { BreadcrumbItem, NavigationState } from "../../utils/navigation";
 import { Footer } from "./Footer";
 import { Header } from "./Header";
 import { NavigationTrail } from "./NavigationTrail";
+import { TickerStrip } from "./TickerStrip";
 
 type AppShellProps = {
   activePath?: NavigationState["activePath"];
@@ -13,6 +14,7 @@ type AppShellProps = {
   compactHeader?: boolean;
   isRefreshing?: boolean;
   onRefresh?: () => void;
+  showTrail?: boolean;
 };
 
 export const AppShell = ({
@@ -23,6 +25,7 @@ export const AppShell = ({
   compactHeader = false,
   isRefreshing = false,
   onRefresh,
+  showTrail = true,
 }: AppShellProps) => (
   <div className="app-frame">
     <div className="sticky-shell-header">
@@ -32,7 +35,8 @@ export const AppShell = ({
         isRefreshing={isRefreshing}
         onRefresh={onRefresh}
       />
-      <NavigationTrail backFallback={backFallback} breadcrumbs={breadcrumbs} />
+      <TickerStrip />
+      {showTrail && <NavigationTrail backFallback={backFallback} breadcrumbs={breadcrumbs} />}
     </div>
     <main className="page">{children}</main>
     <Footer />

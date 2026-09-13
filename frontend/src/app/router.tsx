@@ -142,10 +142,17 @@ export const useRouter = () => {
   return context;
 };
 
-export const Link = ({ children, className, href, target, ...props }: LinkProps) => {
+export const Link = ({ children, className, href, target, onClick, ...props }: LinkProps) => {
   const { navigate } = useRouter();
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    // Un onClick propio (ej. cerrar el menu movil al navegar) debe poder
+    // correr ademas de -- no en vez de -- la navegacion interna. Antes
+    // {...props} pisaba silenciosamente este onClick cuando el que llama
+    // pasaba el suyo, asi que el <a> quedaba sin preventDefault y el click
+    // terminaba en una navegacion real del navegador (recarga completa).
+    onClick?.(event);
+
     if (
       event.defaultPrevented ||
       event.button !== 0 ||

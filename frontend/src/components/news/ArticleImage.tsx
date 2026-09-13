@@ -9,7 +9,7 @@ type ArticleImageProps = {
 const blockedImageHosts = ["tracker.metricool.com"];
 const blockedImagePatterns = ["/c3po.jpg", "pixel", "tracker", "analytics"];
 
-const isUsableImageUrl = (value?: string | null) => {
+export const isUsableImageUrl = (value?: string | null) => {
   const imageUrl = value?.trim();
   if (!imageUrl) {
     return false;

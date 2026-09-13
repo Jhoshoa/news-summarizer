@@ -1,17 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { usePageRefreshControl } from "../app/refreshControl";
-import { ExchangeRateCards } from "../components/indicators/ExchangeRateCards";
-import { findByExactCode, findOfficialUsdIndicator, formatNumber } from "../components/indicators/indicatorUtils";
+import { EconomicHistoryChart } from "../components/indicators/EconomicHistoryChart";
+import { formatNumber } from "../components/indicators/indicatorUtils";
+import { IconDroplet, IconSun, IconWind } from "../components/icons/Icons";
 import { SummaryCard } from "../components/news/SummaryCard";
-import { MarketSkeletons, PanelSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
+import { PanelSkeleton, SummaryCardSkeleton } from "../components/ui/Skeleton";
 import {
   useGetEconomicIndicatorsQuery,
   useGetSummariesQuery,
   useGetWeatherQuery,
   useRefreshEconomicIndicatorsMutation,
 } from "../services/api";
-import type { EconomicIndicator } from "../services/types";
 
 const getNumber = (value: unknown) => {
   const numberValue = Number(value);
@@ -25,32 +25,6 @@ const formatMetric = (value: unknown, suffix = "", digits = 1) => {
   }
 
   return `${formatNumber(numberValue, digits)}${suffix}`;
-};
-
-const CurrencySpread = ({ indicators }: { indicators: EconomicIndicator[] }) => {
-  const officialRate = findOfficialUsdIndicator(indicators)?.value;
-  const p2pSell = findByExactCode(indicators, "binance_p2p_usdt_bob_sell")?.value;
-  const spread = p2pSell && officialRate ? p2pSell - officialRate : null;
-
-  return (
-    <section className="data-panel">
-      <span className="panel-title">Brecha cambiaria</span>
-      <div className="hero-metric">
-        <strong>Bs {formatNumber(spread, 2)}</strong>
-        <span>P2P venta menos dolar oficial</span>
-      </div>
-      <div className="metric-list">
-        <div>
-          <span>Dolar oficial</span>
-          <strong>Bs {formatNumber(officialRate, 2)}</strong>
-        </div>
-        <div>
-          <span>P2P venta</span>
-          <strong>Bs {formatNumber(p2pSell, 2)}</strong>
-        </div>
-      </div>
-    </section>
-  );
 };
 
 const departments: Array<{ label: string; location: string }> = [
@@ -68,7 +42,7 @@ const departments: Array<{ label: string; location: string }> = [
 export const DataPage = () => {
   const [selectedDept, setSelectedDept] = useState("La Paz");
   const selectedLocation = departments.find((d) => d.label === selectedDept)?.location ?? "La Paz";
-  const { data: indicatorsData, isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
+  const { isFetching: isFetchingIndicators } = useGetEconomicIndicatorsQuery();
   const { data: weather, isFetching: isFetchingWeather } = useGetWeatherQuery(selectedLocation);
   const { data: summariesData, isFetching: isFetchingSummaries } = useGetSummariesQuery({
     fallback_to_latest: true,
@@ -76,13 +50,10 @@ export const DataPage = () => {
   });
   const [refreshIndicators, { isLoading: isRefreshing }] = useRefreshEconomicIndicatorsMutation();
 
-  const indicators = indicatorsData?.items ?? [];
   const summaries = summariesData?.items ?? [];
   const current = weather?.current ?? {};
   const elevation = getNumber(weather?.raw_payload.elevation);
-  const timezone = String(weather?.raw_payload.timezone ?? "America/La_Paz");
   const city = weather?.location.name ?? selectedLocation;
-  const showEconomySkeleton = isFetchingIndicators;
   const showWeatherSkeleton = isFetchingWeather;
 
   const handleRefresh = useCallback(() => {
@@ -110,15 +81,7 @@ export const DataPage = () => {
         <section className="data-context-layout">
           <div className="data-context-main">
             <section className="data-section">
-              <div className="panel-heading">
-                <span className="panel-title">Economia esencial</span>
-              </div>
-              {showEconomySkeleton ? <MarketSkeletons /> : <ExchangeRateCards indicators={indicators} />}
-              {showEconomySkeleton ? (
-                <PanelSkeleton />
-              ) : (
-                <CurrencySpread indicators={indicators} />
-              )}
+              <EconomicHistoryChart />
             </section>
 
             <section className="data-section">
@@ -152,20 +115,36 @@ export const DataPage = () => {
                   </div>
                   <div className="metric-list">
                     <div>
-                      <span>Radiacion UV</span>
+                      <span>
+                        <span className="icon-badge icon-badge-sm" style={{ background: "var(--amber-soft)", color: "var(--amber-ink)" }}>
+                          <IconSun size={14} />
+                        </span>
+                        Radiacion UV
+                      </span>
                       <strong>{formatMetric(weather?.today.uv_index_max, "", 1)}</strong>
                     </div>
                     <div>
-                      <span>Humedad</span>
+                      <span>
+                        <span className="icon-badge icon-badge-sm" style={{ background: "var(--sky-soft)", color: "var(--sky)" }}>
+                          <IconDroplet size={14} />
+                        </span>
+                        Humedad
+                      </span>
                       <strong>{formatMetric(current.relative_humidity_2m, "%", 0)}</strong>
                     </div>
                     <div>
-                      <span>Viento</span>
+                      <span>
+                        <span className="icon-badge icon-badge-sm" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>
+                          <IconWind size={14} />
+                        </span>
+                        Viento
+                      </span>
                       <strong>{formatMetric(current.wind_speed_10m, " km/h", 1)}</strong>
                     </div>
                   </div>
                   <small>
-                    {timezone} {elevation ? `- elevacion ${formatNumber(elevation, 0)} m` : ""}
+                    {city}
+                    {elevation ? ` - elevacion ${formatNumber(elevation, 0)} m` : ""}
                   </small>
                 </section>
               )}

@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from src.db.repository import Base, Database, SummaryRefreshJob
+from src.db.repository import Base, Database, SummaryRefreshJob, _now_bolivia
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ async def test_no_active_job_when_none_exists(db: Database):
 
 @pytest.mark.asyncio
 async def test_finds_running_job(db: Database):
-    await _insert_job(db, job_id="job-1", status="running", requested_at=datetime.now())
+    await _insert_job(db, job_id="job-1", status="running", requested_at=_now_bolivia())
 
     active = await db.get_active_summary_refresh_job()
 
@@ -61,7 +61,7 @@ async def test_finds_running_job(db: Database):
 
 @pytest.mark.asyncio
 async def test_finds_queued_job(db: Database):
-    await _insert_job(db, job_id="job-2", status="queued", requested_at=datetime.now())
+    await _insert_job(db, job_id="job-2", status="queued", requested_at=_now_bolivia())
 
     active = await db.get_active_summary_refresh_job()
 
@@ -71,8 +71,8 @@ async def test_finds_queued_job(db: Database):
 
 @pytest.mark.asyncio
 async def test_ignores_finished_jobs(db: Database):
-    await _insert_job(db, job_id="job-3", status="success", requested_at=datetime.now())
-    await _insert_job(db, job_id="job-4", status="failed", requested_at=datetime.now())
+    await _insert_job(db, job_id="job-3", status="success", requested_at=_now_bolivia())
+    await _insert_job(db, job_id="job-4", status="failed", requested_at=_now_bolivia())
 
     assert await db.get_active_summary_refresh_job() is None
 
@@ -94,7 +94,7 @@ async def test_ignores_stale_orphaned_job():
     database.engine = engine
     database.session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    old = datetime.now() - timedelta(hours=2)
+    old = _now_bolivia() - timedelta(hours=2)
     await _insert_job(database, job_id="orphaned", status="running", requested_at=old)
 
     active = await database.get_active_summary_refresh_job(stale_after_seconds=3600)
@@ -105,7 +105,7 @@ async def test_ignores_stale_orphaned_job():
 
 @pytest.mark.asyncio
 async def test_returns_most_recent_active_job_when_several_exist(db: Database):
-    now = datetime.now()
+    now = _now_bolivia()
     await _insert_job(db, job_id="older", status="running", requested_at=now - timedelta(minutes=5))
     await _insert_job(db, job_id="newer", status="queued", requested_at=now)
 
