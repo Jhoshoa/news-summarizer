@@ -23,7 +23,7 @@ const options = {
     { slug: "whatsapp", label: "WhatsApp", enabled: true },
   ],
   frequencies: [{ slug: "diario", label: "Diario", enabled: true }],
-  preferred_times: [{ slug: "manana", label: "Manana", enabled: true }],
+  preferred_hours: [{ slug: "9", label: "9:00", enabled: true }],
 };
 
 const form = {
@@ -33,7 +33,7 @@ const form = {
   telegramId: "",
   categories: ["economia"],
   frequency: "diario",
-  preferredTime: "manana",
+  preferredHour: 9,
   consentAccepted: true,
 };
 
@@ -56,7 +56,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(buildSubscribePayload(form, options))
   email: null,
   categories: ["economia"],
   frequency: "diario",
-  preferred_time: "manana",
+  preferred_hour: 9,
   timezone: "America/La_Paz",
   consent_accepted: true,
 });
@@ -89,7 +89,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(buildSubscribePayload(emailForm, opti
   email: "persona@example.com",
   categories: ["economia"],
   frequency: "diario",
-  preferred_time: "manana",
+  preferred_hour: 9,
   timezone: "America/La_Paz",
   consent_accepted: true,
 });

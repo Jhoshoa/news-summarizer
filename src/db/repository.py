@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta
 from collections.abc import Iterable
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -2553,7 +2553,7 @@ class Database:
             )
 
         rows = (await session.execute(stmt)).all()
-        counts = {name: count for name, count in rows}
+        counts = dict(rows)
         return counts, sum(counts.values())
 
     async def get_summary_by_id(self, summary_id: int) -> dict | None:

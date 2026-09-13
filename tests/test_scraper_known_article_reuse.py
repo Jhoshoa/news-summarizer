@@ -10,7 +10,7 @@ fetch when the article is old enough (SCRAPER_DETAIL_REFRESH_HOURS, default
 keeps getting re-checked every run like before.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import httpx
 import pytest

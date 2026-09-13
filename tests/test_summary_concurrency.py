@@ -17,15 +17,15 @@ from src.main import NewsSummarizerApp
 
 
 def _settings(**overrides):
-    base = dict(
-        summary_candidates_per_category=8,
-        summary_candidates_extended_limit=8,
-        summary_candidates_extended_categories="politica, economia",
-        categories_list=["politica", "economia", "deportes"],
-        news_cache_ttl_minutes=60,
-        news_min_articles=20,
-        summary_concurrency=2,
-    )
+    base = {
+        "summary_candidates_per_category": 8,
+        "summary_candidates_extended_limit": 8,
+        "summary_candidates_extended_categories": "politica, economia",
+        "categories_list": ["politica", "economia", "deportes"],
+        "news_cache_ttl_minutes": 60,
+        "news_min_articles": 20,
+        "summary_concurrency": 2,
+    }
     base.update(overrides)
     return SimpleNamespace(**base)
 

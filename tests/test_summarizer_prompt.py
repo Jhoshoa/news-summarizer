@@ -12,7 +12,7 @@ def test_valid_categories_matches_default_categories():
     silently filed every summary in those categories under 'general' instead,
     because the category the pipeline passed in wasn't recognized as valid."""
 
-    assert NewsSummarizer.VALID_CATEGORIES == set(DEFAULT_CATEGORIES)
+    assert set(DEFAULT_CATEGORIES) == NewsSummarizer.VALID_CATEGORIES
 
 
 def test_build_prompt_includes_article_body_excerpt_and_url():

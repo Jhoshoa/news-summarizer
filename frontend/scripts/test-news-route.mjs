@@ -18,7 +18,7 @@ assert.equal(getCurrentPage("?page=-1"), 1);
 assert.equal(getCurrentPage("?page=abc"), 1);
 assert.equal(getCategory("?category=politica"), "politica");
 assert.equal(getCategory("?category="), undefined);
-assert.equal(getCategory("?category=general"), undefined);
+assert.equal(getCategory("?category=general"), "general");
 assert.equal(isValidDateValue("2026-05-28"), true);
 assert.equal(isValidDateValue("2026-02-31"), false);
 assert.equal(getSelectedDate("?date=2026-05-28", "2026-05-29"), "2026-05-28");

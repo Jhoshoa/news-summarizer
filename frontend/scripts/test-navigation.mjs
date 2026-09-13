@@ -16,44 +16,47 @@ assertNavigationState(getNavigationState("/"), {
   breadcrumbs: [{ href: "/", label: "EcoBrief Bolivia" }],
 });
 
+// "/panel" was merged into "/" (landing + dashboard unification); the old
+// panel-specific branch is gone, so it now falls through to the home state.
+// The client-side redirect to "/" lives in App.tsx, not in this helper.
 assertNavigationState(getNavigationState("/panel"), {
-  activePath: "/panel",
-  backFallback: "/panel",
-  breadcrumbs: [{ href: "/panel", label: "Inicio" }],
+  activePath: "/",
+  backFallback: "/",
+  breadcrumbs: [{ href: "/", label: "EcoBrief Bolivia" }],
 });
 
 assertNavigationState(getNavigationState("/news"), {
   activePath: "/news",
-  backFallback: "/panel",
+  backFallback: "/",
   breadcrumbs: [
-    { href: "/panel", label: "Inicio" },
+    { href: "/", label: "Inicio" },
     { href: "/news", label: "Noticias" },
   ],
 });
 
 assertNavigationState(getNavigationState("/datos"), {
   activePath: "/datos",
-  backFallback: "/panel",
+  backFallback: "/",
   breadcrumbs: [
-    { href: "/panel", label: "Inicio" },
+    { href: "/", label: "Inicio" },
     { href: "/datos", label: "Datos" },
   ],
 });
 
 assertNavigationState(getNavigationState("/impacto"), {
   activePath: "/impacto",
-  backFallback: "/panel",
+  backFallback: "/",
   breadcrumbs: [
-    { href: "/panel", label: "Inicio" },
+    { href: "/", label: "Inicio" },
     { href: "/impacto", label: "Impacto" },
   ],
 });
 
 assertNavigationState(getNavigationState("/suscribirse"), {
   activePath: "/suscribirse",
-  backFallback: "/panel",
+  backFallback: "/",
   breadcrumbs: [
-    { href: "/panel", label: "Inicio" },
+    { href: "/", label: "Inicio" },
     { href: "/suscribirse", label: "Suscribirse" },
   ],
 });
@@ -62,7 +65,7 @@ assertNavigationState(getNavigationState("/article/42"), {
   activePath: "/article",
   backFallback: "/news",
   breadcrumbs: [
-    { href: "/panel", label: "Inicio" },
+    { href: "/", label: "Inicio" },
     { href: "/news", label: "Noticias" },
     { href: "/article/42", label: "Detalle" },
   ],
