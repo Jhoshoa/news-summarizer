@@ -105,6 +105,18 @@ export const IconClock = ({ size = 18, ...props }: IconProps) => (
   </svg>
 );
 
+export const IconMenu = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </svg>
+);
+
+export const IconX = ({ size = 18, ...props }: IconProps) => (
+  <svg {...base(size)} {...props}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+);
+
 export const IconExternal = ({ size = 18, ...props }: IconProps) => (
   <svg {...base(size)} {...props}>
     <path d="M9 6H5.5A1.5 1.5 0 0 0 4 7.5v11A1.5 1.5 0 0 0 5.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15" />
