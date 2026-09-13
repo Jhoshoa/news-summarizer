@@ -421,12 +421,13 @@ export const HomePage = () => {
         <ul className="landing-changelog">
           <li>
             <IconCheckCircle size={16} />
-            Corregimos el tipo de cambio oficial: se leia de un reporte bancario desactualizado en vez del valor
-            vigente del BCB.
+            Cada afirmacion de un resumen se descarta si no hay un articulo real que la respalde: no confiamos en lo
+            que la IA "recuerda" o infiere.
           </li>
           <li>
             <IconCheckCircle size={16} />
-            Corregimos el precio de venta en Binance P2P, que tomaba el valor mas bajo en vez del mas alto.
+            Si un proveedor de IA falla o se degrada, el sistema conmuta automaticamente a otro en vez de reintentar
+            contra el mismo indefinidamente.
           </li>
           <li>
             <IconClock size={16} />
