@@ -2,8 +2,11 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 import src.main as main_module
+from src.db.repository import Base, Database
 from src.main import app
 
 
@@ -54,6 +57,53 @@ def fake_app_instance():
         yield db
     finally:
         main_module.app_instance = original
+
+
+class FakeTelegram:
+    def __init__(self, username: str | None = "EcoBriefBoliviaBot", bot: bool = True):
+        self.bot = bot
+        self._username = username
+
+    async def get_username(self):
+        return self._username
+
+
+@pytest.fixture
+async def fake_app_instance_with_telegram():
+    """Como fake_app_instance, pero con Telegram "configurado" y un `db.session_maker`
+    real (sqlite en memoria) para que /telegram/link pueda usar TelegramLinkRepository."""
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    db = object.__new__(Database)
+    db.engine = engine
+    db.session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        db=db,
+        telegram=FakeTelegram(),
+        settings=SimpleNamespace(
+            summary_candidates_per_category=8,
+            summary_candidates_extended_limit=8,
+            summary_candidates_extended_categories="politica, economia",
+            telegram_bot_token="fake-token",
+            whatsapp_meta_access_token=None,
+            whatsapp_meta_phone_number_id=None,
+            email_enabled=False,
+        ),
+    )
+    try:
+        yield db
+    finally:
+        main_module.app_instance = original
+        await engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -355,6 +405,65 @@ async def test_unsubscribe_returns_503_instead_of_a_raw_500_when_db_connection_d
         response = await client.post(
             "/api/preferences/unsubscribe",
             json={"channel": "whatsapp", "identifier": "+59170000000"},
+        )
+
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_create_telegram_link_returns_deep_link_with_token(fake_app_instance_with_telegram):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/telegram/link",
+            json={
+                "categories": ["economia", "deportes"],
+                "frequency": "semanal",
+                "preferred_hour": 20,
+                "timezone": "America/La_Paz",
+                "consent_accepted": True,
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["bot_username"] == "EcoBriefBoliviaBot"
+    assert payload["deep_link"] == f"https://t.me/EcoBriefBoliviaBot?start={payload['token']}"
+    assert payload["expires_in_seconds"] == 600
+    assert payload["token"]
+
+
+@pytest.mark.asyncio
+async def test_create_telegram_link_rejects_missing_consent(fake_app_instance_with_telegram):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/telegram/link",
+            json={"categories": ["economia"], "consent_accepted": False},
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_telegram_link_rejects_invalid_category(fake_app_instance_with_telegram):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/telegram/link",
+            json={"categories": ["no-existe"], "consent_accepted": True},
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_telegram_link_returns_503_when_telegram_not_configured(fake_app_instance):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/telegram/link",
+            json={"categories": ["economia"], "consent_accepted": True},
         )
 
     assert response.status_code == 503

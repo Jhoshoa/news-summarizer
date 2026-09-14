@@ -3,7 +3,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 import sentry_sdk
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
+from src.db.repository import Base
+from src.db.telegram_links import TelegramLinkRepository
 from src.distributors.telegram_handler import TelegramHandler
 
 
@@ -16,18 +20,31 @@ class FakeDb:
         self.saved: list[dict] = []
         self.unsubscribed: list[str] = []
 
-    async def save_subscription(self, *, telegram_id, channel, categories, consent_accepted):
-        self.saved.append(
-            {
-                "telegram_id": telegram_id,
-                "channel": channel,
-                "categories": categories,
-                "consent_accepted": consent_accepted,
-            }
-        )
+    async def save_subscription(self, **kwargs):
+        self.saved.append(kwargs)
 
     async def unsubscribe(self, telegram_id):
         self.unsubscribed.append(telegram_id)
+
+
+@pytest.fixture
+async def db_with_telegram_links():
+    """FakeDb con un `session_maker` real (sqlite en memoria) para poder
+    ejercitar `_handle_start_with_token`, que arma su propio
+    TelegramLinkRepository a partir de `self.db.session_maker`."""
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    db = FakeDb()
+    db.session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    yield db
+    await engine.dispose()
 
 
 def test_handler_without_token_has_no_bot():
@@ -172,3 +189,153 @@ async def test_handle_cancel_unsubscribes_via_db():
 
     assert result == "Dado de baja"
     assert db.unsubscribed == ["888"]
+
+
+@pytest.mark.asyncio
+async def test_callback_query_tap_saves_subscription_and_answers_the_query():
+    """Regression test: the inline category buttons (`_show_categories`) send
+    a callback_query update, not a message -- handle_message used to check
+    only `update.message` and silently no-op on button taps."""
+
+    db = FakeDb()
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=SimpleNamespace(
+            data="cat_3",
+            answer=AsyncMock(),
+            message=SimpleNamespace(chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+        ),
+        message=None,
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Suscripcion guardada"
+    update.callback_query.answer.assert_awaited_once()
+    update.callback_query.message.reply_text.assert_awaited_once()
+    assert db.saved == [
+        {
+            "telegram_id": "555",
+            "channel": "telegram",
+            "categories": {"deportes"},
+            "consent_accepted": True,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_callback_query_todas_selects_every_category():
+    db = FakeDb()
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=SimpleNamespace(
+            data="cat_todas",
+            answer=AsyncMock(),
+            message=SimpleNamespace(chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+        ),
+        message=None,
+    )
+
+    await handler.handle_message(update, None)
+
+    assert db.saved[0]["categories"] == {
+        "economia",
+        "politica",
+        "deportes",
+        "tecnologia",
+        "entretenimiento",
+    }
+
+
+@pytest.mark.asyncio
+async def test_start_with_valid_token_applies_web_preferences_without_asking_again(
+    db_with_telegram_links,
+):
+    """The subscribe form's telegram QR/link carries the categories,
+    frequency, and hour picked on the web as a one-use token; /start <token>
+    should apply all of it immediately instead of showing the category
+    picker (which only ever sets categories, not frequency/hour)."""
+
+    repo = TelegramLinkRepository(db_with_telegram_links.session_maker)
+    token, _ = await repo.create_link(
+        categories={"economia", "tecnologia"},
+        frequency="semanal",
+        preferred_hour=20,
+        timezone="America/La_Paz",
+        consent_accepted=True,
+    )
+    handler = TelegramHandler(db_repository=db_with_telegram_links, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(
+            text=f"/start {token}",
+            chat=SimpleNamespace(id=999),
+            reply_text=AsyncMock(),
+        ),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Suscripcion guardada desde la web"
+    update.message.reply_text.assert_awaited_once()
+    assert db_with_telegram_links.saved == [
+        {
+            "telegram_id": "999",
+            "channel": "telegram",
+            "categories": {"economia", "tecnologia"},
+            "frequency": "semanal",
+            "preferred_hour": 20,
+            "timezone": "America/La_Paz",
+            "consent_accepted": True,
+        }
+    ]
+
+    # el token es de un solo uso
+    assert await repo.consume_link(token) is None
+
+
+@pytest.mark.asyncio
+async def test_start_with_unknown_token_falls_back_to_category_picker(db_with_telegram_links):
+    handler = TelegramHandler(db_repository=db_with_telegram_links, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(
+            text="/start no-existe-o-vencio",
+            chat=SimpleNamespace(id=999),
+            reply_text=AsyncMock(),
+        ),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result is not None
+    assert "EcoBrief Bolivia" in result
+    assert db_with_telegram_links.saved == []
+    # aviso de codigo invalido + bienvenida + botones de categorias
+    assert update.message.reply_text.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_bare_start_without_token_shows_category_picker_as_before(db_with_telegram_links):
+    handler = TelegramHandler(db_repository=db_with_telegram_links, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(
+            text="/start",
+            chat=SimpleNamespace(id=999),
+            reply_text=AsyncMock(),
+        ),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result is not None
+    assert "EcoBrief Bolivia" in result
+    assert db_with_telegram_links.saved == []
+    # bienvenida + botones de categorias, sin el aviso de codigo invalido
+    assert update.message.reply_text.await_count == 2

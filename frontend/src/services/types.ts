@@ -172,6 +172,21 @@ export type PreferencePreviewRequest = {
   categories: string[];
 };
 
+export type TelegramLinkRequest = {
+  categories: string[];
+  frequency: string;
+  preferred_hour: number;
+  timezone: string;
+  consent_accepted: boolean;
+};
+
+export type TelegramLinkResponse = {
+  token: string;
+  deep_link: string;
+  bot_username: string;
+  expires_in_seconds: number;
+};
+
 export type PreferencePreviewItem = {
   category: string;
   title: string;

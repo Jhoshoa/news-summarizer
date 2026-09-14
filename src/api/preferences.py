@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.api.db_errors import call_db as _call_db
 from src.db.repository import DEFAULT_CATEGORIES
+from src.db.telegram_links import TelegramLinkRepository
 
 ChannelSlug = Literal["whatsapp", "telegram", "email"]
 FrequencySlug = Literal["diario", "dias_habiles", "tres_veces_semana", "semanal"]
@@ -182,6 +183,46 @@ class PreviewResponse(BaseModel):
     message: str
 
 
+class TelegramLinkRequest(BaseModel):
+    categories: list[str] = Field(min_length=1)
+    frequency: FrequencySlug = "diario"
+    preferred_hour: int = Field(default=9, ge=MIN_PREFERRED_HOUR, le=MAX_PREFERRED_HOUR)
+    timezone: str = "America/La_Paz"
+    consent_accepted: bool = False
+
+    @field_validator("categories")
+    @classmethod
+    def normalize_categories(cls, values: list[str]) -> list[str]:
+        normalized = sorted({str(value).strip().lower() for value in values if str(value).strip()})
+        invalid = [value for value in normalized if value not in DEFAULT_CATEGORIES]
+        if invalid:
+            raise ValueError(f"Categorias no soportadas: {', '.join(invalid)}")
+        if not normalized:
+            raise ValueError("Selecciona al menos una categoria")
+        return normalized
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        normalized = value.strip() or "America/La_Paz"
+        if not re.fullmatch(r"[A-Za-z_]+/[A-Za-z_\-]+", normalized):
+            raise ValueError("Timezone invalido")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_consent(self):
+        if not self.consent_accepted:
+            raise ValueError("Debes aceptar recibir briefs segun tus preferencias")
+        return self
+
+
+class TelegramLinkResponse(BaseModel):
+    token: str
+    deep_link: str
+    bot_username: str
+    expires_in_seconds: int
+
+
 def _channel_options(app_instance: Any) -> list[PreferenceOption]:
     settings = getattr(app_instance, "settings", None)
     whatsapp_enabled = bool(
@@ -308,6 +349,41 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
                 if items
                 else "No hay briefs recientes para las categorias seleccionadas."
             ),
+        )
+
+    @router.post("/telegram/link", response_model=TelegramLinkResponse)
+    async def create_telegram_link(request: TelegramLinkRequest):
+        app_instance = get_app_instance()
+        if not app_instance or not app_instance.db:
+            raise HTTPException(status_code=503, detail="DB no disponible")
+
+        telegram = getattr(app_instance, "telegram", None)
+        if not telegram or not getattr(telegram, "bot", None):
+            raise HTTPException(status_code=503, detail="Telegram no esta configurado")
+
+        username = await telegram.get_username()
+        if not username:
+            raise HTTPException(
+                status_code=503, detail="No se pudo obtener el bot de Telegram"
+            )
+
+        repo = TelegramLinkRepository(app_instance.db.session_maker)
+        token, expires_in = await _call_db(
+            repo.create_link(
+                categories=set(request.categories),
+                frequency=request.frequency,
+                preferred_hour=request.preferred_hour,
+                timezone=request.timezone,
+                consent_accepted=request.consent_accepted,
+            ),
+            action="telegram_link",
+        )
+
+        return TelegramLinkResponse(
+            token=token,
+            deep_link=f"https://t.me/{username}?start={token}",
+            bot_username=username,
+            expires_in_seconds=expires_in,
         )
 
     return router

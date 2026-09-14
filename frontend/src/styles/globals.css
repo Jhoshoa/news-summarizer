@@ -2772,6 +2772,46 @@ p {
   font-weight: 700;
 }
 
+.telegram-connect-hint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.telegram-connect {
+  display: grid;
+  gap: 10px;
+}
+
+.telegram-connect > .button {
+  justify-self: start;
+}
+
+.telegram-connect-result {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-m);
+  background: var(--color-surface-muted);
+}
+
+.telegram-connect-result img {
+  width: 180px;
+  height: 180px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-s);
+  background: #fff;
+  padding: 8px;
+}
+
+.telegram-connect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .toast {
   position: fixed;
   top: 18px;

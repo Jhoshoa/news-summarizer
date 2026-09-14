@@ -9,6 +9,7 @@ from .repository import (
     Subscriber,
     SummaryRefreshJob,
 )
+from .telegram_links import TelegramLinkRepository, TelegramLinkToken
 
 __all__ = [
     "CollectionRun",
@@ -21,4 +22,6 @@ __all__ = [
     "NewsSummary",
     "Subscriber",
     "SummaryRefreshJob",
+    "TelegramLinkRepository",
+    "TelegramLinkToken",
 ]

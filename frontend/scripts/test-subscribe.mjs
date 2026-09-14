@@ -30,7 +30,6 @@ const form = {
   channel: "whatsapp",
   email: "",
   phone: "591 700-00000",
-  telegramId: "",
   categories: ["economia"],
   frequency: "diario",
   preferredHour: 9,

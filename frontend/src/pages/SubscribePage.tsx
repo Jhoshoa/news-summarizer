@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import { CategoryIcon } from "../components/icons/categoryIcons";
+import { TelegramConnect } from "../components/subscribe/TelegramConnect";
 import {
   useGetPreferenceOptionsQuery,
   usePreviewPreferencesMutation,
@@ -23,7 +24,6 @@ const defaultForm: SubscribeFormState = {
   channel: "email",
   email: "",
   phone: "",
-  telegramId: "",
   categories: ["general"],
   frequency: "diario",
   preferredHour: 9,
@@ -88,7 +88,7 @@ const CHANNEL_MOCK_COPY: Record<
   },
   telegram: {
     app: "Telegram",
-    senderLine: (form) => (form.telegramId.trim() ? `@${form.telegramId.trim().replace(/^@/, "")}` : "Bot de EcoBrief"),
+    senderLine: () => "Bot de EcoBrief",
     subLine: "bot",
   },
 };
@@ -165,11 +165,6 @@ export const SubscribePage = () => {
     form.channel === "whatsapp" && touchedFields.phone && !isValidInternationalPhone(form.phone)
       ? "Ingresa un numero de WhatsApp en formato internacional."
       : "";
-  const telegramInputError =
-    form.channel === "telegram" && touchedFields.telegramId && !form.telegramId.trim()
-      ? "Telegram requiere un identificador o usar el bot configurado."
-      : "";
-
   const previewTriggerRef = useRef(previewPreferences);
   previewTriggerRef.current = previewPreferences;
 
@@ -378,27 +373,13 @@ export const SubscribePage = () => {
                 {emailInputError && <small className="field-error" id="email-error">{emailInputError}</small>}
               </label>
             ) : (
-              <label className="form-field form-field--full">
-                <span>Telegram ID</span>
-                <input
-                  aria-describedby={telegramInputError ? "telegram-error" : undefined}
-                  aria-invalid={Boolean(telegramInputError)}
-                  className={telegramInputError ? "invalid" : ""}
-                  placeholder="chat_id o identificador de demo"
-                  type="text"
-                  value={form.telegramId}
-                  onBlur={() => markFieldTouched("telegramId")}
-                  onChange={(event) => {
-                    markFieldTouched("telegramId");
-                    setForm((current) => ({
-                      ...current,
-                      telegramId: event.target.value,
-                    }));
-                  }}
-                />
-                {telegramInputError && <small className="field-error" id="telegram-error">{telegramInputError}</small>}
-                <small>Para usuarios reales, lo ideal es conectar desde el bot con /preferencias.</small>
-              </label>
+              <div className="form-field form-field--full">
+                <span>Telegram</span>
+                <p className="telegram-connect-hint">
+                  No hace falta ningun ID: elegi tus categorias, frecuencia y hora abajo, y al
+                  final vas a poder generar un codigo para conectarte con nuestro bot.
+                </p>
+              </div>
             )}
           </div>
 
@@ -504,11 +485,21 @@ export const SubscribePage = () => {
 
           {subscribeMessage && <p className="success-notice">{subscribeMessage}</p>}
 
-          <div className="form-actions">
-            <button className="button" disabled={subscribeState.isLoading || isLoadingOptions} type="button" onClick={handleSubmit}>
-              {subscribeState.isLoading ? "Guardando" : "Guardar preferencias"}
-            </button>
-          </div>
+          {form.channel === "telegram" ? (
+            <TelegramConnect
+              categories={form.categories}
+              consentAccepted={form.consentAccepted}
+              frequency={form.frequency}
+              preferredHour={form.preferredHour}
+              timezone="America/La_Paz"
+            />
+          ) : (
+            <div className="form-actions">
+              <button className="button" disabled={subscribeState.isLoading || isLoadingOptions} type="button" onClick={handleSubmit}>
+                {subscribeState.isLoading ? "Guardando" : "Guardar preferencias"}
+              </button>
+            </div>
+          )}
         </section>
 
         <section className="data-panel unsubscribe-panel">
@@ -544,6 +535,9 @@ export const SubscribePage = () => {
               {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
             </button>
           </div>
+          {form.channel === "telegram" && (
+            <small>Mas facil: escribile /cancelar directamente al bot en Telegram.</small>
+          )}
           {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
         </section>
         </div>

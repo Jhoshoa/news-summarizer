@@ -16,6 +16,8 @@ import type {
   Summary,
   SubscribeRequest,
   SubscribeResponse,
+  TelegramLinkRequest,
+  TelegramLinkResponse,
   TriggerSummaryResponse,
   UnsubscribeRequest,
   UnsubscribeResponse,
@@ -210,6 +212,13 @@ export const newsApi = createApi({
         body,
       }),
     }),
+    createTelegramLink: builder.mutation<TelegramLinkResponse, TelegramLinkRequest>({
+      query: (body) => ({
+        url: "/api/preferences/telegram/link",
+        method: "POST",
+        body,
+      }),
+    }),
     triggerSummary: builder.mutation<TriggerSummaryResponse, TriggerSummaryArgs | void>({
       query: (args) => ({
         url: "/trigger/summary",
@@ -244,4 +253,5 @@ export const {
   useTriggerSummaryMutation,
   useSubscribeToBriefMutation,
   useUnsubscribeFromBriefMutation,
+  useCreateTelegramLinkMutation,
 } = newsApi;

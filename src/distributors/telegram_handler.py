@@ -1,3 +1,4 @@
+import re
 from contextlib import suppress
 from typing import Any
 
@@ -28,6 +29,7 @@ class TelegramHandler:
         self.db = db_repository
         self.settings = settings
         self.bot = None
+        self._username: str | None = None
 
         if settings and settings.telegram_bot_token:
             try:
@@ -39,6 +41,24 @@ class TelegramHandler:
                 logger.warning("python-telegram-bot no esta instalado")
         else:
             logger.info("Telegram handler inicializado sin token (modo desarrollo)")
+
+    async def get_username(self) -> str | None:
+        """@username del bot, para armar el deep link `t.me/<username>?start=...`.
+
+        Se cachea tras la primera consulta -- no cambia en caliente y evita
+        pegarle a la API de Telegram en cada request que arma un link.
+        """
+
+        if not self.bot:
+            return None
+        if self._username is None:
+            try:
+                me = await self.bot.get_me()
+                self._username = me.username
+            except Exception as e:
+                logger.warning(f"No se pudo obtener el username del bot de Telegram: {e}")
+                return None
+        return self._username
 
     async def process_update(self, payload: dict[str, Any]) -> None:
         """Procesa un update entrante recibido por webhook (Fase distribucion).
@@ -64,14 +84,32 @@ class TelegramHandler:
     async def handle_message(self, update, context) -> str | None:
         """Procesa mensaje entrante."""
 
+        if update.callback_query:
+            return await self._handle_callback_selection(update, context)
+
         if not update.message:
             return None
 
-        text = update.message.text.strip().upper()
+        raw_text = (update.message.text or "").strip()
+        text = raw_text.upper()
         chat_id = str(update.message.chat.id)
 
+        if text == "/START" or text.startswith("/START "):
+            # El deep link `t.me/<bot>?start=<token>` llega como "/start <token>";
+            # el token es case-sensitive (base64 urlsafe), asi que se extrae de
+            # raw_text, nunca de la version en mayusculas usada para comandos.
+            token = raw_text[len("/start") :].strip()
+            if token:
+                confirmed = await self._handle_start_with_token(update, chat_id, token)
+                if confirmed:
+                    return confirmed
+                with suppress(Exception):
+                    await update.message.reply_text(
+                        "El codigo de suscripcion vencio o ya se uso. Elegi tus categorias abajo:"
+                    )
+            return await self._handle_start(update, context)
+
         handlers = {
-            "/START": self._handle_start,
             "/AYUDA": self._handle_help,
             "/HELP": self._handle_help,
             "HOLA": self._handle_start,
@@ -87,6 +125,44 @@ class TelegramHandler:
             return await handler(update, context)
 
         return await self._handle_selection(update, context, chat_id, text)
+
+    async def _handle_start_with_token(self, update, chat_id: str, token: str) -> str | None:
+        """Consume el token del deep link generado desde el formulario web
+        (categorias/frecuencia/hora ya elegidas ahi) y guarda la suscripcion
+        completa de una. None si el token no existe/ya vencio/ya se uso --
+        el caller cae al flujo normal de botones en ese caso.
+        """
+
+        if not self.db or not getattr(self.db, "session_maker", None):
+            return None
+
+        from src.db.telegram_links import TelegramLinkRepository
+
+        repo = TelegramLinkRepository(self.db.session_maker)
+        preferences = await repo.consume_link(token)
+        if not preferences:
+            return None
+
+        categories = set(preferences["categories"]) or {"general"}
+        await self.db.save_subscription(
+            telegram_id=chat_id,
+            channel="telegram",
+            categories=categories,
+            frequency=preferences["frequency"],
+            preferred_hour=preferences["preferred_hour"],
+            timezone=preferences["timezone"],
+            consent_accepted=True,
+        )
+
+        category_names = ", ".join(sorted(categories))
+        text = "*Preferencias guardadas en EcoBrief Bolivia*\n\n"
+        text += f"Categorias: {category_names}\n"
+        text += f"Frecuencia: {preferences['frequency']}\n"
+        text += f"Hora: {preferences['preferred_hour']:02d}:00 (hora Bolivia)\n\n"
+        text += "Podes cambiar tus categorias cuando quieras con /preferencias."
+
+        await update.message.reply_text(text, parse_mode="Markdown")
+        return "Suscripcion guardada desde la web"
 
     async def _handle_start(self, update, context) -> str:
         text = "*EcoBrief Bolivia*\n\n"
@@ -147,10 +223,35 @@ class TelegramHandler:
         await update.message.reply_text(text, parse_mode="Markdown")
         return text
 
-    async def _handle_selection(self, update, context, chat_id: str, text: str) -> str:
-        """Procesa seleccion de categorias."""
+    async def _handle_callback_selection(self, update, context) -> str | None:
+        """Procesa el tap en los botones inline de categorias (callback_query).
 
-        import re
+        `_show_categories` los genera con callback_data "cat_1".."cat_5" y
+        "cat_todas"; a diferencia de un mensaje de texto, Telegram requiere
+        `answer()` para quitar el spinner de carga del boton.
+        """
+
+        query = update.callback_query
+        if not query or not query.message:
+            return None
+
+        with suppress(Exception):
+            await query.answer()
+
+        data = (query.data or "").strip()
+        if data == "cat_todas":
+            selected_keys = set(self.CATEGORIES.keys())
+        else:
+            match = re.fullmatch(r"cat_(\d)", data)
+            if not match or match.group(1) not in self.CATEGORIES:
+                return None
+            selected_keys = {match.group(1)}
+
+        chat_id = str(query.message.chat.id)
+        return await self._save_selection(chat_id, selected_keys, query.message)
+
+    async def _handle_selection(self, update, context, chat_id: str, text: str) -> str:
+        """Procesa seleccion de categorias enviada como texto (ej. '1 3')."""
 
         selected_keys = {
             number
@@ -164,6 +265,11 @@ class TelegramHandler:
 
         if "6" in selected_keys:
             selected_keys = set(self.CATEGORIES.keys())
+
+        return await self._save_selection(chat_id, selected_keys, update.message)
+
+    async def _save_selection(self, chat_id: str, selected_keys: set[str], reply_target) -> str:
+        """Guarda la suscripcion y confirma, usado por texto y por botones."""
 
         categories = {self.CATEGORIES[key]["category"] for key in selected_keys}
 
@@ -185,7 +291,7 @@ class TelegramHandler:
         for name in names:
             text += f"- {name}\n"
 
-        await update.message.reply_text(text, parse_mode="Markdown")
+        await reply_target.reply_text(text, parse_mode="Markdown")
         return "Suscripcion guardada"
 
     async def send_message(self, chat_id: str, message: str) -> bool:

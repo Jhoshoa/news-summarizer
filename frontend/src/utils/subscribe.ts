@@ -4,7 +4,6 @@ export type SubscribeFormState = {
   channel: "whatsapp" | "telegram" | "email";
   email: string;
   phone: string;
-  telegramId: string;
   categories: string[];
   frequency: string;
   preferredHour: number;
@@ -87,10 +86,6 @@ export const validateSubscribeForm = (
     errors.push("Ingresa un numero de WhatsApp en formato internacional.");
   }
 
-  if (form.channel === "telegram" && !form.telegramId.trim()) {
-    errors.push("Telegram requiere un identificador o usar el bot configurado.");
-  }
-
   if (form.channel === "email" && !isValidEmail(form.email)) {
     errors.push("Ingresa un correo electronico valido.");
   }
@@ -124,7 +119,7 @@ export const buildSubscribePayload = (
   return {
     channel: form.channel,
     phone: form.channel === "whatsapp" ? normalizePhone(form.phone) : null,
-    telegram_id: form.channel === "telegram" ? form.telegramId.trim() : null,
+    telegram_id: null,
     email: form.channel === "email" ? normalizeEmail(form.email) : null,
     categories,
     frequency: form.frequency,

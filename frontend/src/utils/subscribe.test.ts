@@ -34,7 +34,6 @@ const baseForm: SubscribeFormState = {
   channel: "email",
   email: "persona@example.com",
   phone: "",
-  telegramId: "",
   categories: ["economia"],
   frequency: "diario",
   preferredHour: 9,
