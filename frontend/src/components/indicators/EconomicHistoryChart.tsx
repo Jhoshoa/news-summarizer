@@ -40,7 +40,7 @@ export const EconomicHistoryChart = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
-  const [range, setRange] = useState<RangeKey>("all");
+  const [range, setRange] = useState<RangeKey>("30");
   const [hover, setHover] = useState<{ oficial: number | null; compra: number | null; venta: number | null } | null>(
     null,
   );
