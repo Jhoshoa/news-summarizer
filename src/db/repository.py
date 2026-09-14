@@ -648,9 +648,10 @@ class Database:
         async with self.session_maker() as session:
             query_limit = max(int(limit), 1) * 3
             stmt = (
-                select(NewsSummary, NewsCategory.name)
+                select(NewsSummary, NewsCategory.name, NewsArticle.image_url)
                 .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
                 .outerjoin(Story, NewsSummary.story_cluster_id == Story.id)
+                .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
                 .where(
                     NewsCategory.name.in_(normalized_categories),
                     or_(Story.id.is_(None), Story.current_status != "unpublished"),
@@ -661,7 +662,7 @@ class Database:
             result = await session.execute(stmt)
             items = []
             seen_titles: set[str] = set()
-            for summary, category_name in result.all():
+            for summary, category_name, image_url in result.all():
                 title_key = self._summary_title_key(summary.title)
                 if title_key in seen_titles:
                     continue
@@ -674,6 +675,7 @@ class Database:
                         "summary": summary.summary,
                         "fact": summary.fact,
                         "summary_date": summary.summary_date,
+                        "image_url": image_url,
                     }
                 )
                 if len(items) >= limit:

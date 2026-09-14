@@ -5,7 +5,10 @@ from typing import Any
 import sentry_sdk
 from loguru import logger
 
+from src.db.repository import DEFAULT_CATEGORIES
+
 _MARKDOWN_V1_SPECIAL_CHARS = re.compile(r"([_*`\[])")
+_MAX_CAPTION_LENGTH = 1000  # Telegram limita el caption de una foto a 1024
 
 
 def _escape_markdown(value: str) -> str:
@@ -264,25 +267,60 @@ class TelegramHandler:
             )
             return "Sin noticias nuevas"
 
-        text = "*Tu brief de EcoBrief Bolivia*\n\n"
+        await update.message.reply_text(
+            f"*Tu brief de EcoBrief Bolivia* ({len(items)} noticias)", parse_mode="Markdown"
+        )
+
+        photos_sent = 0
         for index, item in enumerate(items, start=1):
-            title = _escape_markdown(str(item.get("title") or ""))
-            summary = str(item.get("summary") or "")
-            if len(summary) > 220:
-                summary = summary[:217].rstrip() + "..."
+            card = self._format_news_card(item, index)
+            image_url = item.get("image_url")
+            sent_as_photo = False
 
-            text += f"{index}. *{title}*\n"
-            if summary:
-                text += f"{_escape_markdown(summary)}\n"
-            fact = item.get("fact")
-            if fact:
-                text += f"Dato: {_escape_markdown(str(fact))}\n"
-            text += "\n"
+            if image_url:
+                with suppress(Exception):
+                    await update.message.reply_photo(
+                        photo=image_url, caption=card, parse_mode="Markdown"
+                    )
+                    sent_as_photo = True
 
-        text += "/preferencias para cambiar categorias | /cancelar para darte de baja"
+            if sent_as_photo:
+                photos_sent += 1
+            else:
+                # Sin imagen, o Telegram no pudo bajarla (link roto, timeout,
+                # formato no soportado): la misma card, como texto.
+                await update.message.reply_text(card, parse_mode="Markdown")
 
-        await update.message.reply_text(text, parse_mode="Markdown")
+        await update.message.reply_text("/preferencias para cambiar categorias | /cancelar para darte de baja")
+        logger.info(f"Brief a demanda enviado a {chat_id}: {photos_sent}/{len(items)} con foto")
         return "Brief enviado a demanda"
+
+    def _format_news_card(self, item: dict, index: int) -> str:
+        """Arma el texto de una noticia -- se usa igual como caption de una
+        foto o como mensaje de texto solo, para que el fallback sin imagen
+        se vea igual de prolijo, no como un texto plano de relleno."""
+
+        category_label = DEFAULT_CATEGORIES.get(
+            str(item.get("category") or ""), str(item.get("category") or "").capitalize()
+        )
+        title = _escape_markdown(str(item.get("title") or ""))
+        summary = str(item.get("summary") or "")
+        if len(summary) > 280:
+            summary = summary[:277].rstrip() + "..."
+        fact = item.get("fact")
+
+        lines = [f"{index}. *{title}*", f"_{category_label}_"]
+        if summary:
+            lines.append("")
+            lines.append(_escape_markdown(summary))
+        if fact:
+            lines.append("")
+            lines.append(f"Dato: {_escape_markdown(str(fact))}")
+
+        card = "\n".join(lines)
+        if len(card) > _MAX_CAPTION_LENGTH:
+            card = card[: _MAX_CAPTION_LENGTH - 3].rstrip() + "..."
+        return card
 
     async def _handle_callback_selection(self, update, context) -> str | None:
         """Procesa el tap en los botones inline de categorias (callback_query).

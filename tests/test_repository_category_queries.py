@@ -118,9 +118,9 @@ async def test_get_preference_preview_deduplicates_by_normalized_title():
         summary_date=date_cls(2026, 8, 25),
     )
     rows = [
-        (duplicate_a, "economia"),
-        (duplicate_b, "economia"),
-        (distinct, "economia"),
+        (duplicate_a, "economia", "https://example.com/a.jpg"),
+        (duplicate_b, "economia", "https://example.com/b.jpg"),
+        (distinct, "economia", None),
     ]
     db, _ = _database_with_session(rows=rows)
 

@@ -353,7 +353,15 @@ async def test_bare_start_without_token_shows_category_picker_as_before(db_with_
 
 
 @pytest.mark.asyncio
+def _all_reply_text_bodies(mock: AsyncMock) -> list[str]:
+    return [call.args[0] for call in mock.await_args_list]
+
+
+@pytest.mark.asyncio
 async def test_noticias_sends_brief_for_a_subscribed_chat():
+    """Sin image_url, cada noticia cae directo a texto (header + 1 card +
+    footer = 3 mensajes)."""
+
     db = FakeDb()
     db.subscriptions["555"] = {"categories": ["deportes"], "frequency": "diario", "preferred_hour": 9}
     db.preview_items = [
@@ -375,10 +383,80 @@ async def test_noticias_sends_brief_for_a_subscribed_chat():
     result = await handler.handle_message(update, None)
 
     assert result == "Brief enviado a demanda"
-    update.message.reply_text.assert_awaited_once()
-    sent_text = update.message.reply_text.await_args.args[0]
-    assert "Bolivia gana 2-0" in sent_text
-    assert "Segundo triunfo consecutivo." in sent_text
+    assert update.message.reply_text.await_count == 3
+    bodies = _all_reply_text_bodies(update.message.reply_text)
+    assert any("Bolivia gana 2-0" in body and "Segundo triunfo consecutivo." in body for body in bodies)
+    assert any("/preferencias" in body for body in bodies)
+
+
+@pytest.mark.asyncio
+async def test_noticias_sends_item_as_photo_when_image_url_present():
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"]}
+    db.preview_items = [
+        {
+            "category": "deportes",
+            "title": "Bolivia gana 2-0",
+            "summary": "Resumen del partido.",
+            "fact": None,
+            "image_url": "https://example.com/foto.jpg",
+        }
+    ]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(
+            text="/noticias",
+            chat=SimpleNamespace(id=555),
+            reply_text=AsyncMock(),
+            reply_photo=AsyncMock(),
+        ),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Brief enviado a demanda"
+    update.message.reply_photo.assert_awaited_once()
+    assert update.message.reply_photo.await_args.kwargs["photo"] == "https://example.com/foto.jpg"
+    assert "Bolivia gana 2-0" in update.message.reply_photo.await_args.kwargs["caption"]
+    # header + footer via texto, la noticia en si via foto (no duplicada como texto)
+    assert update.message.reply_text.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_noticias_falls_back_to_text_when_sending_the_photo_fails():
+    """Un link de imagen roto/caido no debe perder la noticia -- cae a texto."""
+
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"]}
+    db.preview_items = [
+        {
+            "category": "deportes",
+            "title": "Bolivia gana 2-0",
+            "summary": "Resumen del partido.",
+            "fact": None,
+            "image_url": "https://example.com/foto-rota.jpg",
+        }
+    ]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(
+            text="/noticias",
+            chat=SimpleNamespace(id=555),
+            reply_text=AsyncMock(),
+            reply_photo=AsyncMock(side_effect=RuntimeError("no se pudo bajar la imagen")),
+        ),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Brief enviado a demanda"
+    update.message.reply_photo.assert_awaited_once()
+    bodies = _all_reply_text_bodies(update.message.reply_text)
+    assert any("Bolivia gana 2-0" in body for body in bodies)
 
 
 @pytest.mark.asyncio
@@ -457,5 +535,5 @@ async def test_noticias_escapes_markdown_special_characters_in_titles():
 
     await handler.handle_message(update, None)
 
-    sent_text = update.message.reply_text.await_args.args[0]
-    assert r"Precio\_del\* dolar \`sube\` \[hoy]" in sent_text
+    bodies = _all_reply_text_bodies(update.message.reply_text)
+    assert any(r"Precio\_del\* dolar \`sube\` \[hoy]" in body for body in bodies)
