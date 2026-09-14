@@ -104,18 +104,21 @@ async def test_get_preference_preview_deduplicates_by_normalized_title():
         summary="resumen A",
         fact=None,
         summary_date=date_cls(2026, 8, 25),
+        article_id=1,
     )
     duplicate_b = SimpleNamespace(
         title="SUBEN PRECIOS DEL COMBUSTIBLE",
         summary="resumen B (mismo titulo, distinta mayuscula)",
         fact=None,
         summary_date=date_cls(2026, 8, 25),
+        article_id=2,
     )
     distinct = SimpleNamespace(
         title="Otra noticia distinta",
         summary="resumen C",
         fact=None,
         summary_date=date_cls(2026, 8, 25),
+        article_id=3,
     )
     rows = [
         (duplicate_a, "economia", "https://example.com/a.jpg"),

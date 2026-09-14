@@ -271,18 +271,50 @@ class TelegramHandler:
             f"*Tu brief de EcoBrief Bolivia* ({len(items)} noticias)", parse_mode="Markdown"
         )
 
-        photos_sent = 0
-        for index, item in enumerate(items, start=1):
+        indexed_items = list(enumerate(items, start=1))
+        with_image = [(i, item) for i, item in indexed_items if item.get("image_url")]
+        without_image = [(i, item) for i, item in indexed_items if not item.get("image_url")]
+
+        group_sent = False
+        if with_image:
+            from telegram import InputMediaPhoto
+
+            # sendMediaGroup es todo-o-nada: si Telegram no puede bajar una
+            # sola de las imagenes, falla el grupo entero (no solo esa foto).
+            # Por eso el fallback de abajo no distingue "parcial" -- si esto
+            # tira, se manda todo item por item como antes de esta funcion.
+            media = [
+                InputMediaPhoto(
+                    media=item["image_url"],
+                    caption=self._format_news_card(item, i),
+                    parse_mode="Markdown",
+                )
+                for i, item in with_image
+            ]
+            try:
+                await update.message.reply_media_group(media=media)
+                group_sent = True
+            except Exception as e:
+                logger.warning(f"No se pudo mandar el album de Telegram a {chat_id}: {e}")
+
+        photos_sent = len(with_image) if group_sent else 0
+        fallback_items = without_image if group_sent else indexed_items
+
+        for index, item in fallback_items:
             card = self._format_news_card(item, index)
             image_url = item.get("image_url")
             sent_as_photo = False
 
             if image_url:
-                with suppress(Exception):
+                try:
                     await update.message.reply_photo(
                         photo=image_url, caption=card, parse_mode="Markdown"
                     )
                     sent_as_photo = True
+                except Exception as e:
+                    logger.warning(
+                        f"No se pudo mandar la foto de '{item.get('title')}' a {chat_id}: {e}"
+                    )
 
             if sent_as_photo:
                 photos_sent += 1
@@ -292,7 +324,10 @@ class TelegramHandler:
                 await update.message.reply_text(card, parse_mode="Markdown")
 
         await update.message.reply_text("/preferencias para cambiar categorias | /cancelar para darte de baja")
-        logger.info(f"Brief a demanda enviado a {chat_id}: {photos_sent}/{len(items)} con foto")
+        logger.info(
+            f"Brief a demanda enviado a {chat_id}: {photos_sent}/{len(items)} con foto "
+            f"(grupo={'si' if group_sent else 'no'})"
+        )
         return "Brief enviado a demanda"
 
     def _format_news_card(self, item: dict, index: int) -> str:
@@ -317,10 +352,21 @@ class TelegramHandler:
             lines.append("")
             lines.append(f"Dato: {_escape_markdown(str(fact))}")
 
-        card = "\n".join(lines)
-        if len(card) > _MAX_CAPTION_LENGTH:
-            card = card[: _MAX_CAPTION_LENGTH - 3].rstrip() + "..."
-        return card
+        body = "\n".join(lines)
+        # Deja margen para el link "leer completo" que se agrega abajo sin
+        # escapar (es una URL real, no texto de usuario) -- truncar el bloque
+        # ANTES de agregarlo evita cortar el link a la mitad, lo que lo
+        # dejaria roto/no clickeable.
+        if len(body) > _MAX_CAPTION_LENGTH - 100:
+            body = body[: _MAX_CAPTION_LENGTH - 103].rstrip() + "..."
+
+        article_id = item.get("article_id")
+        site_base_url = getattr(self.settings, "site_base_url", None) if self.settings else None
+        if article_id and site_base_url:
+            link = f"{site_base_url.rstrip('/')}/article/{article_id}"
+            body += f"\n\n[Leer completo]({link})"
+
+        return body
 
     async def _handle_callback_selection(self, update, context) -> str | None:
         """Procesa el tap en los botones inline de categorias (callback_query).

@@ -676,6 +676,7 @@ class Database:
                         "fact": summary.fact,
                         "summary_date": summary.summary_date,
                         "image_url": image_url,
+                        "article_id": summary.article_id,
                     }
                 )
                 if len(items) >= limit:

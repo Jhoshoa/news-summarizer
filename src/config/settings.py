@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
     log_level: str = Field(default="DEBUG", alias="LOG_LEVEL")
     sentry_dsn: str | None = Field(default=None, alias="SENTRY_DSN")
+    # Dominio publico del sitio (sin barra final), para armar links "leer
+    # completo" en canales que no pueden mostrar el articulo entero (Telegram,
+    # email). Ej: https://ecobriefbolivia.online
+    site_base_url: str | None = Field(default=None, alias="SITE_BASE_URL")
 
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
