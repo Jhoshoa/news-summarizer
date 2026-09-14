@@ -259,7 +259,7 @@ class TelegramHandler:
             return "No suscripto"
 
         categories = subscription.get("categories") or ["general"]
-        items = await self.db.get_preference_preview(categories, limit=8)
+        items = await self.db.get_preference_preview(categories, limit=5)
 
         if not items:
             await update.message.reply_text(
@@ -271,36 +271,8 @@ class TelegramHandler:
             f"*Tu brief de EcoBrief Bolivia* ({len(items)} noticias)", parse_mode="Markdown"
         )
 
-        indexed_items = list(enumerate(items, start=1))
-        with_image = [(i, item) for i, item in indexed_items if item.get("image_url")]
-        without_image = [(i, item) for i, item in indexed_items if not item.get("image_url")]
-
-        group_sent = False
-        if with_image:
-            from telegram import InputMediaPhoto
-
-            # sendMediaGroup es todo-o-nada: si Telegram no puede bajar una
-            # sola de las imagenes, falla el grupo entero (no solo esa foto).
-            # Por eso el fallback de abajo no distingue "parcial" -- si esto
-            # tira, se manda todo item por item como antes de esta funcion.
-            media = [
-                InputMediaPhoto(
-                    media=item["image_url"],
-                    caption=self._format_news_card(item, i),
-                    parse_mode="Markdown",
-                )
-                for i, item in with_image
-            ]
-            try:
-                await update.message.reply_media_group(media=media)
-                group_sent = True
-            except Exception as e:
-                logger.warning(f"No se pudo mandar el album de Telegram a {chat_id}: {e}")
-
-        photos_sent = len(with_image) if group_sent else 0
-        fallback_items = without_image if group_sent else indexed_items
-
-        for index, item in fallback_items:
+        photos_sent = 0
+        for index, item in enumerate(items, start=1):
             card = self._format_news_card(item, index)
             image_url = item.get("image_url")
             sent_as_photo = False
@@ -324,10 +296,7 @@ class TelegramHandler:
                 await update.message.reply_text(card, parse_mode="Markdown")
 
         await update.message.reply_text("/preferencias para cambiar categorias | /cancelar para darte de baja")
-        logger.info(
-            f"Brief a demanda enviado a {chat_id}: {photos_sent}/{len(items)} con foto "
-            f"(grupo={'si' if group_sent else 'no'})"
-        )
+        logger.info(f"Brief a demanda enviado a {chat_id}: {photos_sent}/{len(items)} con foto")
         return "Brief enviado a demanda"
 
     def _format_news_card(self, item: dict, index: int) -> str:

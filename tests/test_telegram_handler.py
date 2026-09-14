@@ -21,6 +21,7 @@ class FakeDb:
         self.unsubscribed: list[str] = []
         self.subscriptions: dict[str, dict] = {}
         self.preview_items: list[dict] = []
+        self.preview_calls: list[dict] = []
 
     async def save_subscription(self, **kwargs):
         self.saved.append(kwargs)
@@ -32,6 +33,7 @@ class FakeDb:
         return self.subscriptions.get(telegram_id)
 
     async def get_preference_preview(self, categories, *, limit=5):
+        self.preview_calls.append({"categories": categories, "limit": limit})
         return self.preview_items[:limit]
 
 
@@ -358,6 +360,29 @@ def _all_reply_text_bodies(mock: AsyncMock) -> list[str]:
 
 
 @pytest.mark.asyncio
+async def test_noticias_asks_for_at_most_five_items():
+    """5, no 8 -- y siempre las mas recientes, porque get_preference_preview
+    ya ordena por fecha descendente (ver test_repository_category_queries.py);
+    aca solo se confirma que /noticias le pide el limite correcto."""
+
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"]}
+    db.preview_items = [
+        {"category": "deportes", "title": f"Noticia {i}", "summary": "", "fact": None} for i in range(5)
+    ]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    await handler.handle_message(update, None)
+
+    assert db.preview_calls == [{"categories": ["deportes"], "limit": 5}]
+
+
+@pytest.mark.asyncio
 async def test_noticias_sends_brief_for_a_subscribed_chat():
     """Sin image_url, cada noticia cae directo a texto (header + 1 card +
     footer = 3 mensajes)."""
@@ -498,101 +523,6 @@ async def test_noticias_omits_the_link_when_site_base_url_is_not_configured():
 
     bodies = _all_reply_text_bodies(update.message.reply_text)
     assert not any("Leer completo" in body for body in bodies)
-
-
-@pytest.mark.asyncio
-async def test_noticias_groups_multiple_photos_into_one_album_message():
-    """Varias noticias con imagen se mandan juntas en un solo album (menos
-    mensajes que una foto por noticia); la que no tiene imagen no entra al
-    grupo pero igual llega, como texto."""
-
-    db = FakeDb()
-    db.subscriptions["555"] = {"categories": ["deportes"]}
-    db.preview_items = [
-        {
-            "category": "deportes",
-            "title": "Noticia A",
-            "summary": "",
-            "fact": None,
-            "image_url": "https://example.com/a.jpg",
-        },
-        {
-            "category": "deportes",
-            "title": "Noticia B",
-            "summary": "",
-            "fact": None,
-            "image_url": "https://example.com/b.jpg",
-        },
-        {"category": "deportes", "title": "Noticia C sin imagen", "summary": "", "fact": None},
-    ]
-    handler = TelegramHandler(db_repository=db, settings=_settings())
-
-    update = SimpleNamespace(
-        callback_query=None,
-        message=SimpleNamespace(
-            text="/noticias",
-            chat=SimpleNamespace(id=555),
-            reply_text=AsyncMock(),
-            reply_photo=AsyncMock(),
-            reply_media_group=AsyncMock(),
-        ),
-    )
-
-    result = await handler.handle_message(update, None)
-
-    assert result == "Brief enviado a demanda"
-    update.message.reply_media_group.assert_awaited_once()
-    media = update.message.reply_media_group.await_args.kwargs["media"]
-    assert len(media) == 2
-    assert "Noticia A" in media[0].caption
-    assert "Noticia B" in media[1].caption
-    update.message.reply_photo.assert_not_awaited()
-    bodies = _all_reply_text_bodies(update.message.reply_text)
-    assert any("Noticia C sin imagen" in body for body in bodies)
-
-
-@pytest.mark.asyncio
-async def test_noticias_falls_back_to_individual_photos_when_the_album_fails():
-    """sendMediaGroup es todo-o-nada: si una sola imagen del album falla,
-    Telegram rechaza el grupo entero -- hay que reintentar item por item
-    para no perder las que si funcionan."""
-
-    db = FakeDb()
-    db.subscriptions["555"] = {"categories": ["deportes"]}
-    db.preview_items = [
-        {
-            "category": "deportes",
-            "title": "Noticia A",
-            "summary": "",
-            "fact": None,
-            "image_url": "https://example.com/a.jpg",
-        },
-        {
-            "category": "deportes",
-            "title": "Noticia B",
-            "summary": "",
-            "fact": None,
-            "image_url": "https://example.com/b.jpg",
-        },
-    ]
-    handler = TelegramHandler(db_repository=db, settings=_settings())
-
-    update = SimpleNamespace(
-        callback_query=None,
-        message=SimpleNamespace(
-            text="/noticias",
-            chat=SimpleNamespace(id=555),
-            reply_text=AsyncMock(),
-            reply_photo=AsyncMock(),
-            reply_media_group=AsyncMock(side_effect=RuntimeError("una imagen del grupo no se pudo bajar")),
-        ),
-    )
-
-    result = await handler.handle_message(update, None)
-
-    assert result == "Brief enviado a demanda"
-    update.message.reply_media_group.assert_awaited_once()
-    assert update.message.reply_photo.await_count == 2
 
 
 @pytest.mark.asyncio
