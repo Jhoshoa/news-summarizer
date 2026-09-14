@@ -351,6 +351,34 @@ The workflow assumes `~/news-summarizer` on the instance is the same git checkou
 in step 4 and that `.env` (step 5) is already in place — it only pulls code and images,
 it never touches secrets on the server.
 
+## Seeding Production With Locally Collected Content
+
+`deploy/export-content-seed.sh` (run locally) and `deploy/import-content-seed.sh` (run on
+the server) move real collected content -- articles, summaries, story clustering, economic
+indicator history -- from a local DB into a production one, **without touching real
+subscribers**. They deliberately exclude `subscribers`, `telegram_link_tokens`,
+`analytics_events`, `summary_refresh_jobs`, and `schema_migrations`: those either hold real
+user data that must never be overwritten, or are operational/schema bookkeeping specific to
+each environment. Safe to run even after production already has real subscribers.
+
+```bash
+# Locally, from the repo root:
+./deploy/export-content-seed.sh content_seed.dump
+scp -i path/to/key.pem content_seed.dump user@<server>:~/
+
+# On the server:
+./deploy/import-content-seed.sh content_seed.dump
+```
+
+The import script prompts for confirmation before it `TRUNCATE`s the content tables (it
+lists exactly which ones), restores the dump, and resets each table's id sequence -- without
+that reset, the app's own next insert would collide with a restored id, since
+`pg_restore --data-only` inserts explicit ids without advancing the sequence that generates
+new ones.
+
+Both scripts keep their own `TABLES`/`TABLES_SQL` list in sync by design -- if a new content
+table is ever added to the schema, update both scripts together.
+
 ## Distribution Channels (Email / WhatsApp / Telegram)
 
 Each channel degrades independently: if it's not configured, `/api/preferences/options`
