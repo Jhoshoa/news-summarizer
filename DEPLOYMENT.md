@@ -88,11 +88,26 @@ listening port.
 
 ### Firewall
 
-`docker-compose.yml` publishes `postgres` on the host (`POSTGRES_HOST_PORT`, default 5433) for local
-`psql`/pgAdmin access. On the VPS, make sure the firewall (Hostinger's panel or `ufw` on the box)
-blocks external access to 5433 (and to 8000/5173 -- Dokploy's Traefik should be the only public entry
-point, over 80/443) so the database isn't reachable from the open internet just because the port is
-published.
+`docker-compose.yml` publishes `postgres`, `backend`, and `frontend` directly on the host (5433,
+8000, 5173) -- needed for local dev (`localhost:8000`, etc.), but Dokploy's Traefik talks to
+containers over the internal Docker network by service name, not through those published ports, so
+none of the three need to be reachable from the internet in production. Unlike AWS (where the EC2
+Security Group is a default-deny firewall you configure per-port at instance launch), a Hostinger VPS
+has no such default -- every published port is open to the world until you close it yourself. Unless
+Hostinger's own panel has an equivalent, lock it down with `ufw` on the box once Dokploy/Traefik is
+confirmed working over 80/443:
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+sudo ufw status
+```
+
+Do this only *after* verifying the site loads over HTTPS through Dokploy -- enabling `ufw` before
+confirming that closes your only way in if something's misconfigured (SSH stays open here, but
+double check that rule matches the actual SSH port before enabling).
 
 ### Telegram
 
