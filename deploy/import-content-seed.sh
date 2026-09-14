@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Git Bash on Windows rewrites any argument that looks like a Unix path
+# (e.g. "/tmp/content_seed.dump") into a Windows path before handing it to
+# docker.exe -- fatal here, since that path must stay literal, it's inside
+# the Linux container, not on the Windows host. Harmless no-op on Linux/macOS
+# (i.e. the actual server this script is meant to run on).
+export MSYS_NO_PATHCONV=1
+
 # Restores a content-only dump (produced by export-content-seed.sh) into
 # THIS server's running postgres container.
 #

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Git Bash on Windows rewrites any argument that looks like a Unix path
+# (e.g. "/tmp/content_seed.dump") into a Windows path before handing it to
+# docker.exe -- fatal here, since that path must stay literal, it's inside
+# the Linux container, not on the Windows host. Harmless no-op on Linux/macOS.
+export MSYS_NO_PATHCONV=1
+
 # Dumps ONLY the content tables (categories, sources, articles, summaries,
 # story clustering, economic indicators) from a running local DB container.
 #
