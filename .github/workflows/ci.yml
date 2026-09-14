@@ -76,3 +76,6 @@ jobs:
 
       - name: Validate local compose
         run: docker compose --env-file .env.local.example -f docker-compose.yml -f docker-compose.local.yml config --quiet
+
+      - name: Validate AWS compose
+        run: docker compose --env-file .env.aws.example -f docker-compose.yml -f docker-compose.aws.yml config --quiet

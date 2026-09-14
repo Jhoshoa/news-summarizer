@@ -1,0 +1,28 @@
+{$DOMAIN}, {$WWW_DOMAIN}, {$BRIEFS_DOMAIN} {
+	# Backend: everything the API actually owns. Order matters -- most
+	# specific paths first, frontend catches whatever is left (the SPA).
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /admin/* {
+		reverse_proxy backend:8000
+	}
+	handle /webhook/* {
+		reverse_proxy backend:8000
+	}
+	handle /trigger/* {
+		reverse_proxy backend:8000
+	}
+	handle /health {
+		reverse_proxy backend:8000
+	}
+	handle /stats {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:5173
+	}
+
+	encode gzip
+}

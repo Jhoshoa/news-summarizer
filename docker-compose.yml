@@ -27,6 +27,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DEBUG: ${DEBUG:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}

@@ -1,0 +1,46 @@
+
+# Override for a single free-tier EC2 instance (1 GiB RAM): trims the
+# backend down to 2 gunicorn workers and adds a lightweight Caddy reverse
+# proxy for automatic HTTPS, replacing Dokploy/Traefik (which alone costs
+# a few hundred MB of RAM this box doesn't have to spare).
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.aws.yml up -d --build
+
+services:
+  # `image:` is what CI pushes to and what `docker compose pull` fetches on
+  # the instance for ongoing deploys; `build:` (from the base compose file)
+  # still works for the manual first bring-up via `--build`. Same compose
+  # file either way -- `pull` vs `build` decides which one actually runs.
+  backend:
+    image: ghcr.io/jhoshoa/news-summarizer-backend:latest
+    environment:
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+
+  frontend:
+    image: ghcr.io/jhoshoa/news-summarizer-frontend:latest
+
+  cron-job:
+    image: ghcr.io/jhoshoa/news-summarizer-cron:latest
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: news-summarizer-new-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN to the apex public hostname for this deployment}
+      WWW_DOMAIN: ${WWW_DOMAIN:?set WWW_DOMAIN to the www subdomain for this deployment}
+      BRIEFS_DOMAIN: ${BRIEFS_DOMAIN:?set BRIEFS_DOMAIN to the briefs subdomain for this deployment}
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
