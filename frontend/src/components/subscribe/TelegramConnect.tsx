@@ -5,9 +5,6 @@ import { useCreateTelegramLinkMutation } from "../../services/api";
 
 type TelegramConnectProps = {
   categories: string[];
-  frequency: string;
-  preferredHour: number;
-  timezone: string;
   consentAccepted: boolean;
 };
 
@@ -22,13 +19,7 @@ const formatCountdown = (secondsLeft: number) => {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 };
 
-export const TelegramConnect = ({
-  categories,
-  frequency,
-  preferredHour,
-  timezone,
-  consentAccepted,
-}: TelegramConnectProps) => {
+export const TelegramConnect = ({ categories, consentAccepted }: TelegramConnectProps) => {
   const [createTelegramLink, telegramLinkState] = useCreateTelegramLinkMutation();
   const [link, setLink] = useState<ActiveLink | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -72,9 +63,6 @@ export const TelegramConnect = ({
     try {
       const response = await createTelegramLink({
         categories,
-        frequency,
-        preferred_hour: preferredHour,
-        timezone,
         consent_accepted: consentAccepted,
       }).unwrap();
       setLink({
@@ -102,8 +90,8 @@ export const TelegramConnect = ({
         <>
           <p className="telegram-connect-lede">
             Generá un código para conectarte con nuestro bot de Telegram. Va a guardar las
-            categorías, frecuencia y hora que elegiste arriba, sin que tengas que repetirlas
-            adentro de Telegram.
+            categorías que elegiste arriba y te va a llegar un brief diario a las 9:00 -- y
+            despues podes pedir noticias frescas cuando quieras con /noticias.
           </p>
           <button
             className="button"
@@ -137,7 +125,8 @@ export const TelegramConnect = ({
           </div>
           <small>
             Escaneá el código con la cámara o abrí el link desde tu celular, y presioná Start.
-            Vence en {formatCountdown(secondsLeft)}.
+            Vence en {formatCountdown(secondsLeft)}. Una vez conectado, escribí /noticias cuando
+            quieras tu brief al toque.
           </small>
         </div>
       )}

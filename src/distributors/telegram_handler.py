@@ -5,6 +5,16 @@ from typing import Any
 import sentry_sdk
 from loguru import logger
 
+_MARKDOWN_V1_SPECIAL_CHARS = re.compile(r"([_*`\[])")
+
+
+def _escape_markdown(value: str) -> str:
+    """Escapa los caracteres especiales del modo Markdown (v1) de Telegram
+    para poder interpolar texto dinamico (titulos de noticias reales) sin
+    que un `_`/`*`/`` ` ``/`[` suelto rompa el parseo del mensaje."""
+
+    return _MARKDOWN_V1_SPECIAL_CHARS.sub(r"\\\1", value)
+
 
 class TelegramHandler:
     """Maneja el bot de Telegram.
@@ -118,6 +128,8 @@ class TelegramHandler:
             "/PREFERENCIA": self._handle_preferences,
             "/CANCELAR": self._handle_cancel,
             "/BAJA": self._handle_cancel,
+            "/NOTICIAS": self._handle_on_demand_news,
+            "/HOY": self._handle_on_demand_news,
         }
 
         handler = handlers.get(text)
@@ -216,12 +228,60 @@ class TelegramHandler:
     async def _handle_help(self, update, context) -> str:
         text = "*Ayuda EcoBrief Bolivia*\n\n"
         text += "/start - Iniciar suscripcion\n"
+        text += "/noticias - Pedir tu brief ahora mismo\n"
         text += "/preferencias - Cambiar categorias\n"
         text += "/cancelar - Darse de baja\n"
         text += "/ayuda - Ver ayuda"
 
         await update.message.reply_text(text, parse_mode="Markdown")
         return text
+
+    async def _handle_on_demand_news(self, update, context) -> str:
+        """Comando /noticias (alias /hoy): entrega el brief actual a demanda,
+        sin esperar el envio programado. Reusa las categorias que ya eligio
+        al suscribirse -- no vuelve a preguntar nada."""
+
+        chat_id = str(update.message.chat.id)
+
+        if not self.db:
+            await update.message.reply_text("El servicio no esta disponible en este momento.")
+            return "DB no disponible"
+
+        subscription = await self.db.get_subscriber_by_telegram_id(chat_id)
+        if not subscription:
+            await update.message.reply_text(
+                "Todavia no estas suscripto. Usa /start para elegir tus categorias."
+            )
+            return "No suscripto"
+
+        categories = subscription.get("categories") or ["general"]
+        items = await self.db.get_preference_preview(categories, limit=8)
+
+        if not items:
+            await update.message.reply_text(
+                "No hay noticias nuevas en tus categorias por ahora. Proba mas tarde con /noticias."
+            )
+            return "Sin noticias nuevas"
+
+        text = "*Tu brief de EcoBrief Bolivia*\n\n"
+        for index, item in enumerate(items, start=1):
+            title = _escape_markdown(str(item.get("title") or ""))
+            summary = str(item.get("summary") or "")
+            if len(summary) > 220:
+                summary = summary[:217].rstrip() + "..."
+
+            text += f"{index}. *{title}*\n"
+            if summary:
+                text += f"{_escape_markdown(summary)}\n"
+            fact = item.get("fact")
+            if fact:
+                text += f"Dato: {_escape_markdown(str(fact))}\n"
+            text += "\n"
+
+        text += "/preferencias para cambiar categorias | /cancelar para darte de baja"
+
+        await update.message.reply_text(text, parse_mode="Markdown")
+        return "Brief enviado a demanda"
 
     async def _handle_callback_selection(self, update, context) -> str | None:
         """Procesa el tap en los botones inline de categorias (callback_query).

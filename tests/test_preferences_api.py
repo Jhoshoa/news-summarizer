@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 import src.main as main_module
 from src.db.repository import Base, Database
+from src.db.telegram_links import TelegramLinkRepository
 from src.main import app
 
 
@@ -416,13 +417,7 @@ async def test_create_telegram_link_returns_deep_link_with_token(fake_app_instan
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/api/preferences/telegram/link",
-            json={
-                "categories": ["economia", "deportes"],
-                "frequency": "semanal",
-                "preferred_hour": 20,
-                "timezone": "America/La_Paz",
-                "consent_accepted": True,
-            },
+            json={"categories": ["economia", "deportes"], "consent_accepted": True},
         )
 
     assert response.status_code == 200
@@ -431,6 +426,35 @@ async def test_create_telegram_link_returns_deep_link_with_token(fake_app_instan
     assert payload["deep_link"] == f"https://t.me/EcoBriefBoliviaBot?start={payload['token']}"
     assert payload["expires_in_seconds"] == 600
     assert payload["token"]
+
+
+@pytest.mark.asyncio
+async def test_create_telegram_link_always_uses_fixed_frequency_and_hour(
+    fake_app_instance_with_telegram,
+):
+    """Telegram no deja elegir frecuencia/hora en el formulario -- el push
+    queda fijo en diario/9am, y el bot cubre lo demas con /noticias."""
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/preferences/telegram/link",
+            # un cliente que ignore el tipo (o alguien pegandole directo a la
+            # API) no deberia poder colarse una frecuencia/hora distinta
+            json={
+                "categories": ["economia"],
+                "frequency": "semanal",
+                "preferred_hour": 20,
+                "consent_accepted": True,
+            },
+        )
+
+    token = response.json()["token"]
+    repo = TelegramLinkRepository(fake_app_instance_with_telegram.session_maker)
+    preferences = await repo.consume_link(token)
+
+    assert preferences["frequency"] == "diario"
+    assert preferences["preferred_hour"] == 9
 
 
 @pytest.mark.asyncio

@@ -174,9 +174,6 @@ export type PreferencePreviewRequest = {
 
 export type TelegramLinkRequest = {
   categories: string[];
-  frequency: string;
-  preferred_hour: number;
-  timezone: string;
   consent_accepted: boolean;
 };
 

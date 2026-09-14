@@ -183,11 +183,16 @@ class PreviewResponse(BaseModel):
     message: str
 
 
+# Telegram no deja elegir frecuencia/hora en el formulario: el bot ya suma
+# un canal a demanda (/noticias), asi que el push programado se mantiene
+# simple y fijo en vez de sumarle otra decision al usuario.
+TELEGRAM_FIXED_FREQUENCY: FrequencySlug = "diario"
+TELEGRAM_FIXED_PREFERRED_HOUR = 9
+TELEGRAM_FIXED_TIMEZONE = "America/La_Paz"
+
+
 class TelegramLinkRequest(BaseModel):
     categories: list[str] = Field(min_length=1)
-    frequency: FrequencySlug = "diario"
-    preferred_hour: int = Field(default=9, ge=MIN_PREFERRED_HOUR, le=MAX_PREFERRED_HOUR)
-    timezone: str = "America/La_Paz"
     consent_accepted: bool = False
 
     @field_validator("categories")
@@ -199,14 +204,6 @@ class TelegramLinkRequest(BaseModel):
             raise ValueError(f"Categorias no soportadas: {', '.join(invalid)}")
         if not normalized:
             raise ValueError("Selecciona al menos una categoria")
-        return normalized
-
-    @field_validator("timezone")
-    @classmethod
-    def validate_timezone(cls, value: str) -> str:
-        normalized = value.strip() or "America/La_Paz"
-        if not re.fullmatch(r"[A-Za-z_]+/[A-Za-z_\-]+", normalized):
-            raise ValueError("Timezone invalido")
         return normalized
 
     @model_validator(mode="after")
@@ -371,9 +368,9 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         token, expires_in = await _call_db(
             repo.create_link(
                 categories=set(request.categories),
-                frequency=request.frequency,
-                preferred_hour=request.preferred_hour,
-                timezone=request.timezone,
+                frequency=TELEGRAM_FIXED_FREQUENCY,
+                preferred_hour=TELEGRAM_FIXED_PREFERRED_HOUR,
+                timezone=TELEGRAM_FIXED_TIMEZONE,
                 consent_accepted=request.consent_accepted,
             ),
             action="telegram_link",

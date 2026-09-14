@@ -376,8 +376,8 @@ export const SubscribePage = () => {
               <div className="form-field form-field--full">
                 <span>Telegram</span>
                 <p className="telegram-connect-hint">
-                  No hace falta ningun ID: elegi tus categorias, frecuencia y hora abajo, y al
-                  final vas a poder generar un codigo para conectarte con nuestro bot.
+                  No hace falta ningun ID: elegi tus categorias abajo, y al final vas a poder
+                  generar un codigo para conectarte con nuestro bot.
                 </p>
               </div>
             )}
@@ -405,47 +405,55 @@ export const SubscribePage = () => {
             </div>
           </fieldset>
 
-          <div className="form-grid">
-            <label className="form-field">
-              <span>Frecuencia</span>
-              <select
-                value={form.frequency}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    frequency: event.target.value,
-                  }))
-                }
-              >
-                {(options?.frequencies ?? []).map((frequency) => (
-                  <option key={frequency.slug} value={frequency.slug}>
-                    {frequency.label}
-                  </option>
-                ))}
-              </select>
-              {selectedFrequency?.note && <small>{selectedFrequency.note}</small>}
-            </label>
+          {form.channel === "telegram" ? (
+            <p className="telegram-connect-hint">
+              Por Telegram el brief llega todos los dias a las 9:00, y ademas podes pedirlo
+              cuando quieras escribiendole /noticias al bot -- no hace falta elegir frecuencia
+              ni hora.
+            </p>
+          ) : (
+            <div className="form-grid">
+              <label className="form-field">
+                <span>Frecuencia</span>
+                <select
+                  value={form.frequency}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      frequency: event.target.value,
+                    }))
+                  }
+                >
+                  {(options?.frequencies ?? []).map((frequency) => (
+                    <option key={frequency.slug} value={frequency.slug}>
+                      {frequency.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedFrequency?.note && <small>{selectedFrequency.note}</small>}
+              </label>
 
-            <label className="form-field">
-              <span>Hora preferida</span>
-              <select
-                value={form.preferredHour}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    preferredHour: Number(event.target.value),
-                  }))
-                }
-              >
-                {(options?.preferred_hours ?? []).map((hour) => (
-                  <option key={hour.slug} value={hour.slug}>
-                    {hour.label}
-                  </option>
-                ))}
-              </select>
-              <small>Entre 9:00 y 23:00 -- fuera de ese rango casi no hay noticias nuevas.</small>
-            </label>
-          </div>
+              <label className="form-field">
+                <span>Hora preferida</span>
+                <select
+                  value={form.preferredHour}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      preferredHour: Number(event.target.value),
+                    }))
+                  }
+                >
+                  {(options?.preferred_hours ?? []).map((hour) => (
+                    <option key={hour.slug} value={hour.slug}>
+                      {hour.label}
+                    </option>
+                  ))}
+                </select>
+                <small>Entre 9:00 y 23:00 -- fuera de ese rango casi no hay noticias nuevas.</small>
+              </label>
+            </div>
+          )}
 
           <label className="consent-row">
             <input
@@ -486,13 +494,7 @@ export const SubscribePage = () => {
           {subscribeMessage && <p className="success-notice">{subscribeMessage}</p>}
 
           {form.channel === "telegram" ? (
-            <TelegramConnect
-              categories={form.categories}
-              consentAccepted={form.consentAccepted}
-              frequency={form.frequency}
-              preferredHour={form.preferredHour}
-              timezone="America/La_Paz"
-            />
+            <TelegramConnect categories={form.categories} consentAccepted={form.consentAccepted} />
           ) : (
             <div className="form-actions">
               <button className="button" disabled={subscribeState.isLoading || isLoadingOptions} type="button" onClick={handleSubmit}>

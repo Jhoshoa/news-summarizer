@@ -19,12 +19,20 @@ class FakeDb:
     def __init__(self):
         self.saved: list[dict] = []
         self.unsubscribed: list[str] = []
+        self.subscriptions: dict[str, dict] = {}
+        self.preview_items: list[dict] = []
 
     async def save_subscription(self, **kwargs):
         self.saved.append(kwargs)
 
     async def unsubscribe(self, telegram_id):
         self.unsubscribed.append(telegram_id)
+
+    async def get_subscriber_by_telegram_id(self, telegram_id):
+        return self.subscriptions.get(telegram_id)
+
+    async def get_preference_preview(self, categories, *, limit=5):
+        return self.preview_items[:limit]
 
 
 @pytest.fixture
@@ -339,3 +347,112 @@ async def test_bare_start_without_token_shows_category_picker_as_before(db_with_
     assert db_with_telegram_links.saved == []
     # bienvenida + botones de categorias, sin el aviso de codigo invalido
     assert update.message.reply_text.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_noticias_sends_brief_for_a_subscribed_chat():
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"], "frequency": "diario", "preferred_hour": 9}
+    db.preview_items = [
+        {
+            "category": "deportes",
+            "title": "Bolivia gana 2-0",
+            "summary": "Resumen del partido de anoche.",
+            "fact": "Segundo triunfo consecutivo.",
+            "summary_date": "2026-09-14",
+        }
+    ]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Brief enviado a demanda"
+    update.message.reply_text.assert_awaited_once()
+    sent_text = update.message.reply_text.await_args.args[0]
+    assert "Bolivia gana 2-0" in sent_text
+    assert "Segundo triunfo consecutivo." in sent_text
+
+
+@pytest.mark.asyncio
+async def test_hoy_is_an_alias_for_noticias():
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"]}
+    db.preview_items = [{"category": "deportes", "title": "Bolivia gana", "summary": "", "fact": None}]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/hoy", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Brief enviado a demanda"
+
+
+@pytest.mark.asyncio
+async def test_noticias_without_subscription_asks_to_start():
+    db = FakeDb()
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=999), reply_text=AsyncMock()),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "No suscripto"
+    sent_text = update.message.reply_text.await_args.args[0]
+    assert "/start" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_noticias_with_no_fresh_items_says_so():
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"]}
+    db.preview_items = []
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Sin noticias nuevas"
+
+
+@pytest.mark.asyncio
+async def test_noticias_escapes_markdown_special_characters_in_titles():
+    """Un titulo real puede traer _, *, ` o [ sueltos (texto scrapeado, no
+    controlado por nosotros); sin escapar rompe el parseo de Markdown y
+    Telegram devuelve un error en vez de mandar el mensaje."""
+
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["tecnologia"]}
+    db.preview_items = [
+        {
+            "category": "tecnologia",
+            "title": "Precio_del* dolar `sube` [hoy]",
+            "summary": "Texto con _guiones_bajos_ y *asteriscos*.",
+            "fact": None,
+        }
+    ]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    await handler.handle_message(update, None)
+
+    sent_text = update.message.reply_text.await_args.args[0]
+    assert r"Precio\_del\* dolar \`sube\` \[hoy]" in sent_text

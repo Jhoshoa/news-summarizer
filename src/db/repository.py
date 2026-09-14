@@ -460,6 +460,26 @@ class Database:
             logger.info(f"Desactivada suscripcion: {identifier}")
             return True
 
+    async def get_subscriber_by_telegram_id(self, telegram_id: str) -> dict | None:
+        """Suscripcion activa de un chat de Telegram, para comandos a demanda
+        como /noticias que necesitan saber que categorias tiene guardadas
+        sin volver a pedirselas."""
+
+        async with self.session_maker() as session:
+            stmt = select(Subscriber).where(
+                Subscriber.telegram_id == telegram_id,
+                Subscriber.is_active.is_(True),
+            )
+            result = await session.execute(stmt)
+            subscriber = result.scalar_one_or_none()
+            if not subscriber:
+                return None
+            return {
+                "categories": list(subscriber.categories or []),
+                "frequency": subscriber.frequency,
+                "preferred_hour": subscriber.preferred_hour,
+            }
+
     async def get_subscription_count(self) -> int:
         """Cuenta subscribers activos."""
 
