@@ -67,6 +67,10 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+# Content dumps produced by deploy/export-content-seed.sh -- transferred
+# via scp to seed production, never meant to live in git.
+*.dump
+content_seed*
 
 # ===========================================
 # Playwright
