@@ -55,13 +55,66 @@ ENVIRONMENT=production
 DEBUG=false
 CORS_ORIGINS=https://ecobriefbolivia.online,https://briefs.ecobriefbolivia.online
 VITE_API_BASE_URL=https://ecobriefbolivia.online
+SITE_BASE_URL=https://ecobriefbolivia.online
 GROQ_API_KEY=...
-NEWS_API_KEY=...
 API_AUTH_KEY=...
 POSTGRES_PASSWORD=...
 ```
 
 `VITE_API_BASE_URL` is a frontend build argument. If you change it in Dokploy, rebuild the frontend image.
+
+### Domain / path routing
+
+`docker-compose.yml` has no Traefik labels -- unlike the AWS deployment (which uses a committed
+Caddyfile, `deploy/aws/Caddyfile`), Dokploy's own domain routing is configured entirely in its UI,
+one entry per path prefix, all pointing at the same domain(s) so the frontend and backend can share
+one origin (this is what lets `VITE_API_BASE_URL` just be the bare domain instead of a separate API
+subdomain). Mirror the same rules the AWS Caddyfile encodes -- most specific path first, frontend
+catches whatever is left:
+
+| Domain | Path | Service | Port |
+|---|---|---|---|
+| ecobriefbolivia.online (+ www, briefs) | `/api/*` | backend | 8000 |
+| ecobriefbolivia.online (+ www, briefs) | `/admin/*` | backend | 8000 |
+| ecobriefbolivia.online (+ www, briefs) | `/webhook/*` | backend | 8000 |
+| ecobriefbolivia.online (+ www, briefs) | `/trigger/*` | backend | 8000 |
+| ecobriefbolivia.online (+ www, briefs) | `/health` | backend | 8000 |
+| ecobriefbolivia.online (+ www, briefs) | `/stats` | backend | 8000 |
+| ecobriefbolivia.online (+ www, briefs) | `/` (catch-all) | frontend | 5173 |
+
+Enable HTTPS on each domain entry (Dokploy provisions Let's Encrypt certs the same way Caddy does)
+-- Telegram's webhook and any browser hitting the site both require valid HTTPS, not just a
+listening port.
+
+### Firewall
+
+`docker-compose.yml` publishes `postgres` on the host (`POSTGRES_HOST_PORT`, default 5433) for local
+`psql`/pgAdmin access. On the VPS, make sure the firewall (Hostinger's panel or `ufw` on the box)
+blocks external access to 5433 (and to 8000/5173 -- Dokploy's Traefik should be the only public entry
+point, over 80/443) so the database isn't reachable from the open internet just because the port is
+published.
+
+### Telegram
+
+Same bot as local testing (from @BotFather), pointed at the real domain instead of an ngrok tunnel:
+
+```env
+TELEGRAM_BOT_TOKEN=<same token from @BotFather>
+TELEGRAM_WEBHOOK_URL=https://ecobriefbolivia.online
+TELEGRAM_WEBHOOK_SECRET=<a random string you generate, e.g. `openssl rand -hex 32`>
+```
+
+Nothing else to configure manually: `_register_telegram_webhook` (`src/main.py`) calls Telegram's
+`setWebhook` on every backend startup, pointed at `TELEGRAM_WEBHOOK_URL` + `/webhook/telegram`. As
+long as the `/webhook/*` routing rule above is live and the domain has a valid cert, it registers
+itself. Verify with `getWebhookInfo`:
+
+```bash
+curl -s "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
+```
+
+`SITE_BASE_URL` (same domain) is what the bot's `/noticias` "leer completo" links point at --
+without it, that link is silently omitted from the card, not broken.
 
 Database migrations run automatically during backend startup. Before deploying schema changes,
 take a database backup from the VPS provider or Postgres volume. Migration rules are documented
