@@ -171,6 +171,7 @@ class TelegramHandler:
         text += f"Categorias: {category_names}\n"
         text += f"Frecuencia: {preferences['frequency']}\n"
         text += f"Hora: {preferences['preferred_hour']:02d}:00 (hora Bolivia)\n\n"
+        text += "Escribi /noticias cuando quieras tu brief al toque, sin esperar el envio diario.\n"
         text += "Podes cambiar tus categorias cuando quieras con /preferencias."
 
         await update.message.reply_text(text, parse_mode="Markdown")
@@ -350,6 +351,7 @@ class TelegramHandler:
         text += "Te enviare briefs de:\n"
         for name in names:
             text += f"- {name}\n"
+        text += "\nEscribi /noticias cuando quieras tu brief al toque, sin esperar el envio diario."
 
         await reply_target.reply_text(text, parse_mode="Markdown")
         return "Suscripcion guardada"

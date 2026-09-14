@@ -182,6 +182,8 @@ async def test_handle_selection_saves_subscription_with_categories():
             "consent_accepted": True,
         }
     ]
+    # sin esto, nadie se entera de que /noticias existe
+    assert "/noticias" in update.message.reply_text.await_args.args[0]
 
 
 @pytest.mark.asyncio
@@ -300,6 +302,7 @@ async def test_start_with_valid_token_applies_web_preferences_without_asking_aga
             "consent_accepted": True,
         }
     ]
+    assert "/noticias" in update.message.reply_text.await_args.args[0]
 
     # el token es de un solo uso
     assert await repo.consume_link(token) is None
