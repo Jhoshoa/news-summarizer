@@ -509,36 +509,33 @@ export const SubscribePage = () => {
             <span className="panel-title">Cancelar suscripcion</span>
             <p>Usa el mismo canal con el que te registraste.</p>
           </div>
-          <div className="unsubscribe-row">
-            <input
-              placeholder={
-                form.channel === "whatsapp"
-                  ? "+59170000000"
-                  : form.channel === "email"
-                    ? "tu-correo@gmail.com"
-                    : "Telegram ID"
-              }
-              type="text"
-              value={unsubscribeIdentifier}
-              onChange={(event) =>
-                setUnsubscribeIdentifier(
-                  form.channel === "whatsapp"
-                    ? sanitizePhoneInput(event.target.value)
-                    : event.target.value,
-                )
-              }
-            />
-            <button
-              className="secondary-button"
-              disabled={unsubscribeState.isLoading}
-              type="button"
-              onClick={handleUnsubscribe}
-            >
-              {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
-            </button>
-          </div>
-          {form.channel === "telegram" && (
-            <small>Mas facil: escribile /cancelar directamente al bot en Telegram.</small>
+          {form.channel === "telegram" ? (
+            <p className="telegram-connect-hint">
+              Escribile /cancelar directamente al bot en Telegram -- no necesitas ningun ID aca.
+            </p>
+          ) : (
+            <div className="unsubscribe-row">
+              <input
+                placeholder={form.channel === "whatsapp" ? "+59170000000" : "tu-correo@gmail.com"}
+                type="text"
+                value={unsubscribeIdentifier}
+                onChange={(event) =>
+                  setUnsubscribeIdentifier(
+                    form.channel === "whatsapp"
+                      ? sanitizePhoneInput(event.target.value)
+                      : event.target.value,
+                  )
+                }
+              />
+              <button
+                className="secondary-button"
+                disabled={unsubscribeState.isLoading}
+                type="button"
+                onClick={handleUnsubscribe}
+              >
+                {unsubscribeState.isLoading ? "Procesando" : "Cancelar"}
+              </button>
+            </div>
           )}
           {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
         </section>
