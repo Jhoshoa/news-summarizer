@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -196,21 +197,25 @@ async def test_subscribe_rejects_missing_consent(fake_app_instance):
 @pytest.mark.asyncio
 async def test_subscribe_saves_normalized_email_preferences(fake_app_instance):
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post(
-            "/api/preferences/subscribe",
-            json={
-                "channel": "email",
-                "email": " Persona@Example.COM ",
-                "categories": ["general"],
-                "frequency": "semanal",
-                "preferred_hour": 20,
-                "timezone": "America/La_Paz",
-                "consent_accepted": True,
-            },
-        )
+    # domain_can_receive_mail hace una consulta DNS real -- se mockea para que
+    # el test no dependa de la red ni de que example.com siga resolviendo.
+    with patch("src.api.preferences.domain_can_receive_mail", return_value=True) as mock_check:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/preferences/subscribe",
+                json={
+                    "channel": "email",
+                    "email": " Persona@Example.COM ",
+                    "categories": ["general"],
+                    "frequency": "semanal",
+                    "preferred_hour": 20,
+                    "timezone": "America/La_Paz",
+                    "consent_accepted": True,
+                },
+            )
 
     assert response.status_code == 200
+    mock_check.assert_called_once_with("example.com")
     assert fake_app_instance.saved == [
         {
             "phone": None,
@@ -224,6 +229,28 @@ async def test_subscribe_saves_normalized_email_preferences(fake_app_instance):
             "consent_accepted": True,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_subscribe_rejects_email_whose_domain_cannot_receive_mail(fake_app_instance):
+    """Ej. test@test.cadfa -- formato valido pero el dominio no existe."""
+
+    transport = httpx.ASGITransport(app=app)
+    with patch("src.api.preferences.domain_can_receive_mail", return_value=False) as mock_check:
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/preferences/subscribe",
+                json={
+                    "channel": "email",
+                    "email": "test@test.cadfa",
+                    "categories": ["general"],
+                    "consent_accepted": True,
+                },
+            )
+
+    assert response.status_code == 422
+    mock_check.assert_called_once_with("test.cadfa")
+    assert fake_app_instance.saved == []
 
 
 @pytest.mark.asyncio

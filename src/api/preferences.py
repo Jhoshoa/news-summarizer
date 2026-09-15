@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Callable
 from typing import Any, Literal
@@ -8,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.api.db_errors import call_db as _call_db
+from src.api.email_validation import domain_can_receive_mail
 from src.db.repository import DEFAULT_CATEGORIES
 from src.db.telegram_links import TelegramLinkRepository
 
@@ -290,6 +292,17 @@ def create_preferences_router(get_app_instance: Callable[[], Any]) -> APIRouter:
         app_instance = get_app_instance()
         if not app_instance or not app_instance.db:
             raise HTTPException(status_code=503, detail="DB no disponible")
+
+        if request.channel == "email" and request.email:
+            domain = request.email.rsplit("@", 1)[-1]
+            # Corre en un thread aparte -- es una consulta DNS real (bloqueante),
+            # no debe frenar el event loop de FastAPI mientras espera.
+            can_receive_mail = await asyncio.to_thread(domain_can_receive_mail, domain)
+            if not can_receive_mail:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Ese dominio de email no existe o no puede recibir correos. Revisa que este bien escrito.",
+                )
 
         saved = await _call_db(
             app_instance.db.save_subscription(
