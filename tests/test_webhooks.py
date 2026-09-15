@@ -225,15 +225,51 @@ async def test_whatsapp_webhook_skips_signature_check_when_not_configured(fake_a
 
 
 @pytest.mark.asyncio
-async def test_telegram_webhook_forwards_payload_to_handler(fake_app_instance):
-    transport = httpx.ASGITransport(app=app)
+async def test_telegram_webhook_forwards_payload_to_handler():
+    telegram = FakeTelegram()
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        whatsapp=None,
+        telegram=telegram,
+        settings=SimpleNamespace(telegram_webhook_secret="super-secret"),
+    )
     payload = {"update_id": 1, "message": {"text": "/start"}}
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.post("/webhook/telegram", json=payload)
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post(
+                "/webhook/telegram",
+                json=payload,
+                headers={"X-Telegram-Bot-Api-Secret-Token": "super-secret"},
+            )
+    finally:
+        main_module.app_instance = original
 
     assert response.status_code == 200
     assert response.json() == {"ok": True}
-    assert fake_app_instance.telegram.payloads == [payload]
+    assert telegram.payloads == [payload]
+
+
+@pytest.mark.asyncio
+async def test_telegram_webhook_rejects_when_secret_not_configured():
+    """Si TELEGRAM_WEBHOOK_SECRET no esta seteado, el webhook debe fallar
+    cerrado (503) en vez de aceptar cualquier payload sin validar nada --
+    la misma variable ya se configuro mal por error en produccion una vez."""
+
+    original = main_module.app_instance
+    main_module.app_instance = SimpleNamespace(
+        whatsapp=None,
+        telegram=FakeTelegram(),
+        settings=SimpleNamespace(telegram_webhook_secret=None),
+    )
+    try:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            response = await client.post("/webhook/telegram", json={"update_id": 1})
+    finally:
+        main_module.app_instance = original
+
+    assert response.status_code == 503
 
 
 @pytest.mark.asyncio

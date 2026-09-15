@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import secrets
 import sys
 import traceback
 from contextlib import asynccontextmanager
@@ -1439,17 +1440,23 @@ async def telegram_webhook(
 ):
     """Webhook for Telegram bot updates.
 
-    Se valida el secret token (si esta configurado) contra el header que
-    Telegram reenvia en cada request cuando el webhook se registro con
-    `secret_token` — evita que cualquiera pueda mandar updates falsos
-    (des-suscribir gente, etc.) simplemente adivinando la URL del webhook.
+    Se valida el secret token contra el header que Telegram reenvia en cada
+    request cuando el webhook se registro con `secret_token` — evita que
+    cualquiera pueda mandar updates falsos (des-suscribir gente, etc.)
+    simplemente adivinando la URL del webhook. Si la variable no esta
+    configurada se rechaza el request (falla cerrado) en vez de aceptar
+    cualquier payload sin validar nada, igual que `require_cron_key`.
     """
 
     if not app_instance or not app_instance.telegram:
         raise HTTPException(status_code=500, detail="Telegram no configurado")
 
     expected_secret = app_instance.settings.telegram_webhook_secret
-    if expected_secret and x_telegram_bot_api_secret_token != expected_secret:
+    if not expected_secret:
+        raise HTTPException(status_code=503, detail="TELEGRAM_WEBHOOK_SECRET no configurado")
+    if not x_telegram_bot_api_secret_token or not secrets.compare_digest(
+        x_telegram_bot_api_secret_token, expected_secret
+    ):
         raise HTTPException(status_code=401, detail="Secret token invalido")
 
     payload = await request.json()
