@@ -691,3 +691,36 @@ async def test_noticias_marks_notified_with_newest_created_at_after_sending():
 
     assert result == "Brief enviado a demanda"
     assert db.notified == [{"telegram_id": "555", "when": newer}]
+
+
+@pytest.mark.asyncio
+async def test_ayuda_includes_the_site_link_when_site_base_url_is_set():
+    db = FakeDb()
+    settings = SimpleNamespace(telegram_bot_token="fake-token", site_base_url="https://ecobriefbolivia.online")
+    handler = TelegramHandler(db_repository=db, settings=settings)
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/ayuda", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    await handler.handle_message(update, None)
+
+    sent_text = update.message.reply_text.await_args.args[0]
+    assert "https://ecobriefbolivia.online" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_ayuda_omits_the_site_link_when_not_configured():
+    db = FakeDb()
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/ayuda", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    await handler.handle_message(update, None)
+
+    sent_text = update.message.reply_text.await_args.args[0]
+    assert "Visita" not in sent_text

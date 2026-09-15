@@ -237,6 +237,10 @@ class TelegramHandler:
         text += "/cancelar - Darse de baja\n"
         text += "/ayuda - Ver ayuda"
 
+        site_base_url = getattr(self.settings, "site_base_url", None) if self.settings else None
+        if site_base_url:
+            text += f"\n\nVisita {site_base_url.rstrip('/')} para ver todas las noticias"
+
         await update.message.reply_text(text, parse_mode="Markdown")
         return text
 
