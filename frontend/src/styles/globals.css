@@ -2849,6 +2849,11 @@ p {
   font-weight: 700;
 }
 
+.toast.success {
+  border-left-color: var(--success);
+  background: var(--success-soft);
+}
+
 .toast.error {
   border-left-color: var(--color-accent);
   background: var(--color-accent-soft);

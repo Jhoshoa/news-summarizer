@@ -110,6 +110,12 @@ export const SubscribePage = () => {
   const [toast, setToast] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   const selectedChannel = options?.channels.find((channel) => channel.slug === form.channel);
   const selectedFrequency = options?.frequencies.find((frequency) => frequency.slug === form.frequency);
   const selectedCategories = useMemo(
