@@ -1,6 +1,7 @@
+import ssl
 from email.message import EmailMessage
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 import sentry_sdk
@@ -133,7 +134,10 @@ def test_send_sync_uses_starttls_for_non_465_ports():
 
     smtp_cls.assert_called_once_with("smtp.gmail.com", 587, timeout=20)
     ssl_cls.assert_not_called()
-    smtp_instance.starttls.assert_called_once()
+    smtp_instance.starttls.assert_called_once_with(context=ANY)
+    used_context = smtp_instance.starttls.call_args.kwargs["context"]
+    assert used_context.verify_mode == ssl.CERT_REQUIRED
+    assert used_context.check_hostname is True
     smtp_instance.login.assert_called_once_with("sender@example.com", "app-password")
     smtp_instance.send_message.assert_called_once_with(message)
 
@@ -151,7 +155,10 @@ def test_send_sync_uses_implicit_ssl_for_port_465():
     ):
         handler._send_sync(message)
 
-    ssl_cls.assert_called_once_with("smtp.gmail.com", 465, timeout=20)
+    ssl_cls.assert_called_once_with("smtp.gmail.com", 465, timeout=20, context=ANY)
+    used_context = ssl_cls.call_args.kwargs["context"]
+    assert used_context.verify_mode == ssl.CERT_REQUIRED
+    assert used_context.check_hostname is True
     smtp_cls.assert_not_called()
     ssl_instance.starttls.assert_not_called()  # TLS ya es implicito en SMTP_SSL
     ssl_instance.login.assert_called_once_with("sender@example.com", "app-password")

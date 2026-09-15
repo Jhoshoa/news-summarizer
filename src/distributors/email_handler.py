@@ -1,5 +1,6 @@
 import asyncio
 import smtplib
+import ssl
 from email.message import EmailMessage
 from email.utils import formataddr
 
@@ -85,12 +86,20 @@ class EmailHandler:
         # otro puerto (587, 25, 2525...) usa conexion en claro + STARTTLS.
         # Confundir los dos falla silenciosamente contra proveedores que
         # solo ofrecen uno de los dos modos.
+        #
+        # Sin `context` explicito, tanto SMTP_SSL como starttls() usan
+        # ssl._create_stdlib_context() -- que NO verifica el certificado del
+        # servidor (CERT_NONE, sin chequeo de hostname). Eso deja el canal
+        # cifrado pero vulnerable a un MITM que presente cualquier
+        # certificado. ssl.create_default_context() si valida cadena y
+        # hostname, igual que hace un navegador.
+        context = ssl.create_default_context()
         if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=20) as smtp:
+            with smtplib.SMTP_SSL(host, port, timeout=20, context=context) as smtp:
                 smtp.login(username, password)
                 smtp.send_message(message)
         else:
             with smtplib.SMTP(host, port, timeout=20) as smtp:
-                smtp.starttls()
+                smtp.starttls(context=context)
                 smtp.login(username, password)
                 smtp.send_message(message)
