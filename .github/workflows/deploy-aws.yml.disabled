@@ -1,9 +1,19 @@
-# Deshabilitado: se migro el deploy de produccion a Dokploy (ver DEPLOYMENT.md).
-# Este workflow apuntaba a una instancia EC2 que ya no se usa -- por eso
-# fallaba en cada push a main con "Error: missing server host" (el secret
-# EC2_HOST ya no esta configurado). Se comenta entero en vez de borrarlo por
-# si se vuelve a necesitar AWS mas adelante; para reactivarlo, descomentar
-# todo el archivo y volver a configurar los secrets EC2_HOST/EC2_SSH_KEY.
+# Deshabilitado: decidimos deployar produccion en un VPS de Hostinger con
+# Dokploy en vez de AWS (ver DEPLOYMENT.md). Este workflow apuntaba a una
+# instancia EC2 que ya no se usa -- por eso fallaba en cada push a main con
+# "Error: missing server host" (el secret EC2_HOST ya no esta configurado).
+#
+# Se comento entero (en vez de borrarlo) y ademas se le cambio la extension
+# a ".disabled" -- GitHub Actions solo registra como workflow los archivos
+# ".yml"/".yaml" dentro de .github/workflows/, asi que comentarlo entero
+# pero dejandolo como ".yml" no alcanzaba: igual lo intentaba parsear en
+# cada push y fallaba con "This run likely failed because of a workflow
+# file issue" al no tener ni "on:" ni "jobs:" validos. Con la extension
+# ".disabled" GitHub lo ignora por completo.
+#
+# Para reactivarlo si se retoma AWS mas adelante: renombrar de vuelta a
+# "deploy-aws.yml", descomentar todo el archivo, y volver a configurar los
+# secrets EC2_HOST/EC2_SSH_KEY en el repo.
 #
 # name: Deploy to AWS
 #
