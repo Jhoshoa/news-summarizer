@@ -20,6 +20,15 @@ const RANGES: Array<{ key: RangeKey; label: string }> = [
   { key: "all", label: "Todo" },
 ];
 
+// Cuanto pedirle al backend por cada rango -- antes se pedian siempre 180
+// dias sin importar el boton activo y el recorte era solo visual (setVisibleRange
+// sobre el mismo dataset gigante), asi que cada carga bajaba y parseaba miles
+// de puntos (el par de Binance se recolecta cada 30 min) aunque solo se
+// fueran a mostrar los ultimos 7 dias. Ahora cada rango pide solo lo suyo.
+// "all" usa 365 porque es el maximo que el backend acepta (MAX_HISTORY_DAYS
+// en src/api/economic_indicators.py); alcanza de sobra dado el historico real.
+const RANGE_DAYS: Record<RangeKey, number> = { "7": 7, "30": 30, "90": 90, all: 365 };
+
 type Point = { time: UTCTimestamp; value: number };
 
 const toSeriesPoints = (rows: Array<{ value: number; collected_at: string }> | undefined): Point[] => {
@@ -40,11 +49,15 @@ export const EconomicHistoryChart = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
-  const [range, setRange] = useState<RangeKey>("30");
+  const [range, setRange] = useState<RangeKey>("7");
 
+  // data cae en el ultimo resultado exitoso (aunque sea de un rango
+  // distinto al actual) mientras el nuevo rango todavia esta cargando --
+  // asi el grafico sigue mostrando lo anterior en vez de irse a blanco al
+  // cambiar de boton, e isFetching sirve para mostrar un indicador chico.
   const { data, isFetching } = useGetEconomicIndicatorsHistoryQuery({
     codes: [OFICIAL_CODE, COMPRA_CODE, VENTA_CODE],
-    days: 180,
+    days: RANGE_DAYS[range],
   });
 
   const oficialPoints = useMemo(() => toSeriesPoints(data?.series[OFICIAL_CODE]), [data]);
@@ -120,36 +133,26 @@ export const EconomicHistoryChart = () => {
     chartRef.current.timeScale().fitContent();
   }, [oficialPoints, compraPoints, ventaPoints]);
 
-  useEffect(() => {
-    if (!chartRef.current) return;
-    if (range === "all") {
-      chartRef.current.timeScale().fitContent();
-      return;
-    }
-    const allPoints = [...compraPoints, ...oficialPoints];
-    if (allPoints.length === 0) return;
-    const maxTime = Math.max(...allPoints.map((p) => p.time));
-    const minTime = Math.min(...allPoints.map((p) => p.time));
-    const days = parseInt(range, 10);
-    const from = Math.max(maxTime - days * 86400, minTime);
-    chartRef.current.timeScale().setVisibleRange({ from: from as UTCTimestamp, to: maxTime as UTCTimestamp });
-  }, [range, compraPoints, oficialPoints]);
-
   return (
     <section className="data-panel economic-history-panel">
       <div className="panel-heading">
         <span className="panel-title">Historico del dolar</span>
-        <div className="chart-range-buttons" role="group" aria-label="Rango de fechas">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              className={r.key === range ? "active" : ""}
-              onClick={() => setRange(r.key)}
-            >
-              {r.label}
-            </button>
-          ))}
+        <div className="chart-range-controls">
+          {isFetching && (oficialPoints.length > 0 || compraPoints.length > 0) && (
+            <span className="chart-range-updating">Actualizando...</span>
+          )}
+          <div className="chart-range-buttons" role="group" aria-label="Rango de fechas">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                className={r.key === range ? "active" : ""}
+                onClick={() => setRange(r.key)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

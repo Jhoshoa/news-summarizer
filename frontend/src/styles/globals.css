@@ -287,6 +287,11 @@ p {
 
 .button.nav-mobile-cta {
   display: none;
+  /* .nav a (una clase + un tag) le gana en especificidad a .button (una sola
+     clase) y le pisa el color blanco con el ink oscuro de los links del nav
+     -- se repite aca con mas especificidad para que el boton se vea como
+     boton, no como un link mas del menu. */
+  color: var(--white);
 }
 
 .flag {
@@ -2075,6 +2080,18 @@ p {
 .economic-history-panel {
   grid-column: 1 / -1;
   margin-top: 16px;
+}
+
+.chart-range-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-range-updating {
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-style: italic;
 }
 
 .chart-range-buttons {
