@@ -5,6 +5,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from src.collectors.scraper import NewsScraper, NewsSource
+from src.db.repository import _now_bolivia
 
 
 def test_news_source_loads_body_selector_from_config():
@@ -199,7 +200,7 @@ def test_extract_body_content_uses_readable_text_fallback_after_title():
 @pytest.mark.asyncio
 async def test_unitel_listing_date_skips_non_today_detail_fetch():
     scraper = NewsScraper(sources=[])
-    today = datetime.now()
+    today = _now_bolivia()
     yesterday = today - timedelta(days=1)
     source = NewsSource(
         name="Unitel",
@@ -363,7 +364,7 @@ async def test_enrich_article_prefers_meta_description_over_generated_excerpt():
         "title": "Titulo de prueba",
         "url": "https://www.reduno.com.bo/noticias/test",
         "source": "RedUno",
-        "published_at": datetime.now(),
+        "published_at": _now_bolivia(),
         "description": "",
         "image": None,
     }
@@ -498,12 +499,12 @@ def test_filter_usable_articles_drops_future_publish_dates():
         {
             "title": "Noticia con fecha futura",
             "content": "Contenido suficiente para que el articulo sea usable dentro del pipeline.",
-            "published_at": datetime.now() + timedelta(days=10),
+            "published_at": _now_bolivia() + timedelta(days=10),
         },
         {
             "title": "Noticia valida",
             "content": "Contenido suficiente para que el articulo sea usable dentro del pipeline.",
-            "published_at": datetime.now(),
+            "published_at": _now_bolivia(),
         },
     ]
 
@@ -671,13 +672,13 @@ def test_filter_usable_articles_drops_non_today_detail_date_even_with_descriptio
             {
                 "title": "Noticia antigua con descripcion suficiente",
                 "description": "Descripcion suficientemente larga para pasar la validacion de texto util.",
-                "published_at": datetime.now() - timedelta(days=1),
+                "published_at": _now_bolivia() - timedelta(days=1),
                 "skipped_detail_reason": "non_today_detail_date",
             },
             {
                 "title": "Noticia actual con descripcion suficiente",
                 "description": "Descripcion suficientemente larga para pasar la validacion de texto util.",
-                "published_at": datetime.now(),
+                "published_at": _now_bolivia(),
             },
         ],
         source,
@@ -803,7 +804,7 @@ def test_eldeber_detail_date_extracts_articulo_fecha_text():
 @pytest.mark.asyncio
 async def test_lostiempos_url_date_skips_non_today_detail_fetch():
     scraper = NewsScraper(sources=[])
-    today = datetime.now()
+    today = _now_bolivia()
     yesterday = today - timedelta(days=1)
     source = NewsSource(
         name="LosTiempos",
@@ -926,7 +927,7 @@ def test_filter_usable_articles_drops_title_only_results():
     scraper = NewsScraper(sources=[])
     source = NewsSource(name="RedBolivision", url="https://www.redbolivision.tv.bo/")
 
-    now = datetime.now()
+    now = _now_bolivia()
     articles = scraper._filter_usable_articles(
         [
             {
@@ -1120,7 +1121,7 @@ async def test_enrich_article_adds_content_excerpt_word_count_and_description():
         "title": "Titulo de prueba",
         "url": "https://example.com/news/1",
         "source": "Example",
-        "published_at": datetime.now(),
+        "published_at": _now_bolivia(),
         "description": "",
         "image": None,
     }
