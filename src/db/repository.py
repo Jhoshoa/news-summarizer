@@ -659,11 +659,17 @@ class Database:
         limit: int = 5,
         since: datetime | None = None,
     ) -> list[dict]:
-        """Obtiene summaries recientes para previsualizar un brief sin llamar al LLM.
+        """Obtiene el brief del dia para previsualizar sin llamar al LLM.
+
+        Siempre trae summaries de un solo dia -- el de hoy si el cron ya
+        corrio, o si no el ultimo dia disponible (ej. antes de las 9am, que
+        es cuando corre la primera corrida del dia) -- para no mezclar
+        noticias de hoy con las de ayer en el mismo brief.
 
         `since`, si se pasa, solo trae summaries creadas despues de ese momento
-        -- lo usa /noticias para no repetir lo mismo si un chat lo pide dos
-        veces seguidas sin que haya salido nada nuevo en el medio.
+        dentro de ese dia -- lo usa /noticias para no repetir lo mismo si un
+        chat lo pide dos veces seguidas sin que haya salido nada nuevo en el
+        medio.
         """
 
         normalized_categories = [category for category in categories if category in DEFAULT_CATEGORIES]
@@ -671,10 +677,17 @@ class Database:
             return []
 
         async with self.session_maker() as session:
+            effective_date = await self._latest_summary_date_for_categories(
+                session, normalized_categories, before_or_on=_now_bolivia().date()
+            )
+            if effective_date is None:
+                return []
+
             query_limit = max(int(limit), 1) * 3
             conditions = [
                 NewsCategory.name.in_(normalized_categories),
                 or_(Story.id.is_(None), Story.current_status != "unpublished"),
+                NewsSummary.summary_date == effective_date,
             ]
             if since is not None:
                 conditions.append(NewsSummary.created_at > since)
@@ -684,7 +697,7 @@ class Database:
                 .outerjoin(Story, NewsSummary.story_cluster_id == Story.id)
                 .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
                 .where(*conditions)
-                .order_by(NewsSummary.summary_date.desc(), NewsSummary.created_at.desc())
+                .order_by(NewsSummary.created_at.desc())
                 .limit(query_limit)
             )
             result = await session.execute(stmt)
@@ -2537,6 +2550,30 @@ class Database:
             .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
             .outerjoin(NewsSource, NewsArticle.source_id == NewsSource.id)
             .where(*filters)
+        )
+        return await session.scalar(stmt)
+
+    async def _latest_summary_date_for_categories(
+        self,
+        session: AsyncSession,
+        categories: list[str],
+        *,
+        before_or_on: date,
+    ) -> date | None:
+        """Como `_latest_summary_date`, pero para varias categorias a la vez
+        (ej. el brief de un suscriptor con mas de una categoria elegida): el
+        ultimo dia, hasta `before_or_on`, en que cualquiera de esas categorias
+        tuvo al menos un summary publicado."""
+
+        stmt = (
+            select(func.max(NewsSummary.summary_date))
+            .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
+            .outerjoin(Story, NewsSummary.story_cluster_id == Story.id)
+            .where(
+                NewsCategory.name.in_(categories),
+                NewsSummary.summary_date <= before_or_on,
+                or_(Story.id.is_(None), Story.current_status != "unpublished"),
+            )
         )
         return await session.scalar(stmt)
 

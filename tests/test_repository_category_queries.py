@@ -36,22 +36,34 @@ class _FakeResult:
 
 
 class _FakeSession:
-    def __init__(self, rows):
+    def __init__(self, rows, scalar_result=None):
         self._rows = rows
         self.executed_statements = []
+        self.scalar_statements = []
+        self._scalar_result = scalar_result
 
     async def execute(self, stmt):
         self.executed_statements.append(stmt)
         return _FakeResult(self._rows)
+
+    async def scalar(self, stmt):
+        self.scalar_statements.append(stmt)
+        return self._scalar_result
 
 
 def _compiled_sql(stmt) -> str:
     return str(stmt.compile(compile_kwargs={"literal_binds": True}))
 
 
-def _database_with_session(rows) -> tuple[Database, _FakeSession]:
+def _database_with_session(rows, scalar_result=date(2026, 1, 1)) -> tuple[Database, _FakeSession]:
+    """`scalar_result` simula lo que devuelve la busqueda del 'ultimo dia con
+    summaries' (hoy si el cron ya corrio, si no el dia anterior disponible)
+    que get_preference_preview hace antes de traer las noticias -- por
+    defecto una fecha fija no-None para que las demas pruebas de esta clase,
+    que no dependen de esto, sigan llegando a la consulta principal."""
+
     db = object.__new__(Database)
-    session = _FakeSession(rows)
+    session = _FakeSession(rows, scalar_result=scalar_result)
     db.session_maker = lambda: _FakeSessionCtx(session)
     return db, session
 
@@ -135,6 +147,57 @@ async def test_get_preference_preview_deduplicates_by_normalized_title():
     assert len(items) == 2
     assert items[0]["title"] == "Suben precios del combustible"
     assert items[1]["title"] == "Otra noticia distinta"
+
+
+# --- get_preference_preview: nunca mezcla dias distintos en el mismo brief ---
+
+
+@pytest.mark.asyncio
+async def test_get_preference_preview_filters_to_a_single_effective_day():
+    """El brief filtra por un solo dia (el ultimo disponible hasta hoy) en
+    vez de solo ordenar por fecha -- asi nunca puede traer noticias de hoy
+    mezcladas con las de ayer para completar el limite."""
+
+    db, session = _database_with_session(rows=[], scalar_result=date(2026, 9, 10))
+
+    await db.get_preference_preview(["economia"])
+
+    sql = _compiled_sql(session.executed_statements[0])
+    assert "summary_date = '2026-09-10'" in sql
+    # nada de rango ni de ORDER BY por fecha -- un solo dia, ordenado por hora
+    assert "summary_date >" not in sql
+    assert "ORDER BY news_summaries.summary_date" not in sql
+
+
+@pytest.mark.asyncio
+async def test_get_preference_preview_returns_empty_without_querying_when_no_day_has_summaries():
+    """Si no hay summaries ni para hoy ni para ningun dia anterior, no tiene
+    sentido correr la consulta principal -- no hay nada que mostrar."""
+
+    db, session = _database_with_session(rows=[], scalar_result=None)
+
+    items = await db.get_preference_preview(["economia"])
+
+    assert items == []
+    assert session.executed_statements == []
+
+
+@pytest.mark.asyncio
+async def test_get_preference_preview_looks_up_the_latest_day_up_to_today_for_all_chosen_categories():
+    """El dia efectivo se resuelve entre TODAS las categorias elegidas juntas
+    (no una por una), y nunca mas alla de hoy (fecha de Bolivia)."""
+
+    from src.db.repository import _now_bolivia
+
+    db, session = _database_with_session(rows=[], scalar_result=None)
+
+    await db.get_preference_preview(["economia", "policiales"])
+
+    assert len(session.scalar_statements) == 1
+    sql = _compiled_sql(session.scalar_statements[0])
+    assert "'economia'" in sql
+    assert "'policiales'" in sql
+    assert f"<= '{_now_bolivia().date()}'" in sql
 
 
 # --- _category_counts_for: correct filters/group-by per view ---
