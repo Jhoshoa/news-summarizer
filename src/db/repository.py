@@ -93,6 +93,10 @@ class Subscriber(Base):
     )
     is_active = Column(Boolean, nullable=False, default=True)
     unsubscribed_at = Column(DateTime, nullable=True)
+    # Cursor para /noticias: solo se le manda al usuario summaries mas nuevas
+    # que esto, para no repetir el mismo brief si lo pide dos veces seguidas
+    # sin que haya salido nada nuevo entre medio.
+    last_notified_at = Column(DateTime, nullable=True)
 
     def __repr__(self):
         return f"<Subscriber {self.phone or self.telegram_id or self.email} active={self.is_active}>"
@@ -478,7 +482,22 @@ class Database:
                 "categories": list(subscriber.categories or []),
                 "frequency": subscriber.frequency,
                 "preferred_hour": subscriber.preferred_hour,
+                "last_notified_at": subscriber.last_notified_at,
             }
+
+    async def mark_telegram_notified(self, telegram_id: str, when: datetime) -> None:
+        """Guarda hasta que momento ya se le mando el brief a este chat, para
+        que /noticias no le repita lo mismo si lo pide de nuevo sin que haya
+        salido nada nuevo en el medio."""
+
+        async with self.session_maker() as session:
+            stmt = (
+                sql_update(Subscriber)
+                .where(Subscriber.telegram_id == telegram_id)
+                .values(last_notified_at=when)
+            )
+            await session.execute(stmt)
+            await session.commit()
 
     async def get_subscription_count(self) -> int:
         """Cuenta subscribers activos."""
@@ -638,8 +657,14 @@ class Database:
         categories: list[str],
         *,
         limit: int = 5,
+        since: datetime | None = None,
     ) -> list[dict]:
-        """Obtiene summaries recientes para previsualizar un brief sin llamar al LLM."""
+        """Obtiene summaries recientes para previsualizar un brief sin llamar al LLM.
+
+        `since`, si se pasa, solo trae summaries creadas despues de ese momento
+        -- lo usa /noticias para no repetir lo mismo si un chat lo pide dos
+        veces seguidas sin que haya salido nada nuevo en el medio.
+        """
 
         normalized_categories = [category for category in categories if category in DEFAULT_CATEGORIES]
         if not normalized_categories:
@@ -647,15 +672,18 @@ class Database:
 
         async with self.session_maker() as session:
             query_limit = max(int(limit), 1) * 3
+            conditions = [
+                NewsCategory.name.in_(normalized_categories),
+                or_(Story.id.is_(None), Story.current_status != "unpublished"),
+            ]
+            if since is not None:
+                conditions.append(NewsSummary.created_at > since)
             stmt = (
                 select(NewsSummary, NewsCategory.name, NewsArticle.image_url)
                 .join(NewsCategory, NewsSummary.category_id == NewsCategory.id)
                 .outerjoin(Story, NewsSummary.story_cluster_id == Story.id)
                 .outerjoin(NewsArticle, NewsSummary.article_id == NewsArticle.id)
-                .where(
-                    NewsCategory.name.in_(normalized_categories),
-                    or_(Story.id.is_(None), Story.current_status != "unpublished"),
-                )
+                .where(*conditions)
                 .order_by(NewsSummary.summary_date.desc(), NewsSummary.created_at.desc())
                 .limit(query_limit)
             )
@@ -677,6 +705,7 @@ class Database:
                         "summary_date": summary.summary_date,
                         "image_url": image_url,
                         "article_id": summary.article_id,
+                        "created_at": summary.created_at,
                     }
                 )
                 if len(items) >= limit:

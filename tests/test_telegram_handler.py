@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -22,6 +23,7 @@ class FakeDb:
         self.subscriptions: dict[str, dict] = {}
         self.preview_items: list[dict] = []
         self.preview_calls: list[dict] = []
+        self.notified: list[dict] = []
 
     async def save_subscription(self, **kwargs):
         self.saved.append(kwargs)
@@ -32,9 +34,15 @@ class FakeDb:
     async def get_subscriber_by_telegram_id(self, telegram_id):
         return self.subscriptions.get(telegram_id)
 
-    async def get_preference_preview(self, categories, *, limit=5):
-        self.preview_calls.append({"categories": categories, "limit": limit})
-        return self.preview_items[:limit]
+    async def get_preference_preview(self, categories, *, limit=5, since=None):
+        self.preview_calls.append({"categories": categories, "limit": limit, "since": since})
+        items = self.preview_items
+        if since is not None:
+            items = [item for item in items if item.get("created_at") and item["created_at"] > since]
+        return items[:limit]
+
+    async def mark_telegram_notified(self, telegram_id, when):
+        self.notified.append({"telegram_id": telegram_id, "when": when})
 
 
 @pytest.fixture
@@ -379,7 +387,7 @@ async def test_noticias_asks_for_at_most_five_items():
 
     await handler.handle_message(update, None)
 
-    assert db.preview_calls == [{"categories": ["deportes"], "limit": 5}]
+    assert db.preview_calls == [{"categories": ["deportes"], "limit": 5, "since": None}]
 
 
 @pytest.mark.asyncio
@@ -603,3 +611,83 @@ async def test_noticias_escapes_markdown_special_characters_in_titles():
 
     bodies = _all_reply_text_bodies(update.message.reply_text)
     assert any(r"Precio\_del\* dolar \`sube\` \[hoy]" in body for body in bodies)
+
+
+@pytest.mark.asyncio
+async def test_noticias_passes_last_notified_at_as_since():
+    """Si el suscriptor ya tiene un cursor guardado, /noticias solo debe pedir
+    lo que salio despues de eso -- para no repetir el mismo brief."""
+
+    last_notified = datetime(2026, 9, 14, 12, 0, 0)
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"], "last_notified_at": last_notified}
+    db.preview_items = [
+        {
+            "category": "deportes",
+            "title": "Bolivia gana",
+            "summary": "",
+            "fact": None,
+            "created_at": datetime(2026, 9, 15, 8, 0, 0),
+        }
+    ]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    await handler.handle_message(update, None)
+
+    assert db.preview_calls == [{"categories": ["deportes"], "limit": 5, "since": last_notified}]
+
+
+@pytest.mark.asyncio
+async def test_noticias_says_nothing_new_when_repeated_without_fresh_content():
+    """Segunda llamada a /noticias sin que haya salido nada nuevo desde la
+    ultima vez -- no debe repetir el mismo brief, sino avisar que no hay
+    novedades."""
+
+    last_notified = datetime(2026, 9, 14, 12, 0, 0)
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"], "last_notified_at": last_notified}
+    db.preview_items = []
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Sin noticias nuevas"
+    sent_text = update.message.reply_text.await_args.args[0]
+    assert "Ya te mande todo lo mas reciente" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_noticias_marks_notified_with_newest_created_at_after_sending():
+    """Despues de mandar el brief, hay que guardar el created_at mas nuevo
+    entre lo enviado, para que la proxima llamada no repita estas mismas
+    noticias."""
+
+    older = datetime(2026, 9, 15, 6, 0, 0)
+    newer = datetime(2026, 9, 15, 9, 0, 0)
+    db = FakeDb()
+    db.subscriptions["555"] = {"categories": ["deportes"]}
+    db.preview_items = [
+        {"category": "deportes", "title": "Noticia vieja", "summary": "", "fact": None, "created_at": older},
+        {"category": "deportes", "title": "Noticia nueva", "summary": "", "fact": None, "created_at": newer},
+    ]
+    handler = TelegramHandler(db_repository=db, settings=_settings())
+
+    update = SimpleNamespace(
+        callback_query=None,
+        message=SimpleNamespace(text="/noticias", chat=SimpleNamespace(id=555), reply_text=AsyncMock()),
+    )
+
+    result = await handler.handle_message(update, None)
+
+    assert result == "Brief enviado a demanda"
+    assert db.notified == [{"telegram_id": "555", "when": newer}]

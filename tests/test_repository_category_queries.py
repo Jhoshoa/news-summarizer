@@ -105,6 +105,7 @@ async def test_get_preference_preview_deduplicates_by_normalized_title():
         fact=None,
         summary_date=date_cls(2026, 8, 25),
         article_id=1,
+        created_at=None,
     )
     duplicate_b = SimpleNamespace(
         title="SUBEN PRECIOS DEL COMBUSTIBLE",
@@ -112,6 +113,7 @@ async def test_get_preference_preview_deduplicates_by_normalized_title():
         fact=None,
         summary_date=date_cls(2026, 8, 25),
         article_id=2,
+        created_at=None,
     )
     distinct = SimpleNamespace(
         title="Otra noticia distinta",
@@ -119,6 +121,7 @@ async def test_get_preference_preview_deduplicates_by_normalized_title():
         fact=None,
         summary_date=date_cls(2026, 8, 25),
         article_id=3,
+        created_at=None,
     )
     rows = [
         (duplicate_a, "economia", "https://example.com/a.jpg"),

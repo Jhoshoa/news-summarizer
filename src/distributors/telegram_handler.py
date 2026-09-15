@@ -259,12 +259,18 @@ class TelegramHandler:
             return "No suscripto"
 
         categories = subscription.get("categories") or ["general"]
-        items = await self.db.get_preference_preview(categories, limit=5)
+        last_notified_at = subscription.get("last_notified_at")
+        items = await self.db.get_preference_preview(categories, limit=5, since=last_notified_at)
 
         if not items:
-            await update.message.reply_text(
-                "No hay noticias nuevas en tus categorias por ahora. Proba mas tarde con /noticias."
-            )
+            if last_notified_at:
+                await update.message.reply_text(
+                    "Ya te mande todo lo mas reciente -- todavia no hay noticias nuevas desde la ultima vez."
+                )
+            else:
+                await update.message.reply_text(
+                    "No hay noticias nuevas en tus categorias por ahora. Proba mas tarde con /noticias."
+                )
             return "Sin noticias nuevas"
 
         await update.message.reply_text(
@@ -296,6 +302,13 @@ class TelegramHandler:
                 await update.message.reply_text(card, parse_mode="Markdown")
 
         await update.message.reply_text("/preferencias para cambiar categorias | /cancelar para darte de baja")
+
+        newest_created_at = max(
+            (item["created_at"] for item in items if item.get("created_at")), default=None
+        )
+        if newest_created_at:
+            await self.db.mark_telegram_notified(chat_id, newest_created_at)
+
         logger.info(f"Brief a demanda enviado a {chat_id}: {photos_sent}/{len(items)} con foto")
         return "Brief enviado a demanda"
 

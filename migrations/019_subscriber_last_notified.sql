@@ -1,0 +1,2 @@
+ALTER TABLE subscribers
+ADD COLUMN IF NOT EXISTS last_notified_at TIMESTAMP NULL;
