@@ -386,10 +386,11 @@ reports it as unavailable in the subscribe form and sends silently fail (logged,
 raised) rather than breaking delivery for other channels.
 
 **Email** — set `EMAIL_ENABLED=true` and `SMTP_HOST/PORT/USERNAME/PASSWORD/FROM_EMAIL`.
-With Gmail, use an App Password, not the account password, and rotate it if it was ever
-committed or shared. Gmail can rate-limit or spam-flag bulk sends without SPF/DKIM on a
-custom domain — consider a transactional provider (SES, Postmark, Resend) before scaling
-past a handful of daily subscribers.
+Uses Brevo's SMTP relay (`smtp-relay.brevo.com:587`): `SMTP_USERNAME`/`SMTP_PASSWORD` are
+the login/SMTP key from Brevo's Settings > SMTP & API > SMTP tab (not the account
+password), and `SMTP_FROM_EMAIL` must be a sender/domain verified in Brevo or it gets
+rejected or flagged as spam. If testing with Gmail instead, use an App Password, not the
+account password, and rotate it if it was ever committed or shared.
 
 **WhatsApp** — the app talks directly to the Meta WhatsApp Cloud API (no Twilio or other
 BSP in between; Twilio required mandatory auto-recharge or suspended the account, plus its
