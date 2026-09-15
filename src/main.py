@@ -1069,8 +1069,10 @@ class NewsSummarizerApp:
 
     def _format_email_summary(self, news: list[dict]) -> tuple[str, str, str]:
         subject = "EcoBrief Bolivia - Brief del dia"
-        body = "EcoBrief Bolivia - Brief del dia\n\n"
-        body += "Noticias locales resumidas con menos ruido.\n\n"
+        site_base_url = getattr(self.settings, "site_base_url", None) if self.settings else None
+        site_base_url = site_base_url.rstrip("/") if site_base_url else None
+
+        body_lines = ["EcoBrief Bolivia - Brief del dia", "", "Noticias locales resumidas con menos ruido.", ""]
         items_html = []
 
         for index, article in enumerate(news, 1):
@@ -1082,99 +1084,128 @@ class NewsSummarizerApp:
             category = str(article.get("category") or "general").strip()
             update_note = str(article.get("update_note") or "").strip()
 
-            body += f"{index}. {title}\n"
-            body += f"   {summary}\n"
-
+            body_lines.append(f"{index}. {title}")
+            body_lines.append(summary)
             if fact:
-                body += f"   Dato: {fact}\n"
+                body_lines.append(f"Dato: {fact}")
             if update_note:
-                body += f"   {update_note}\n"
+                body_lines.append(update_note)
             if source:
-                body += f"   Fuente: {source}\n"
+                body_lines.append(f"Fuente: {source}")
             if url:
-                body += f"   Link: {url}\n"
-            body += "\n"
+                body_lines.append(f"Link: {url}")
+            body_lines.append("")
 
             meta_parts = []
             if fact:
                 meta_parts.append(f"<strong>Dato:</strong> {html.escape(fact)}")
             if source:
-                meta_parts.append(f"<strong>Fuente:</strong> {html.escape(source)}")
+                meta_parts.append(html.escape(source))
+            meta_parts.append("Resumen generado con IA")
             if url:
                 safe_url = html.escape(url, quote=True)
                 meta_parts.append(
-                    '<a href="'
-                    f'{safe_url}" '
-                    'style="color:#00606a;text-decoration:none;font-weight:700;">Link</a>'
+                    f'<a href="{safe_url}" style="color:#1d4ed8;text-decoration:none;font-weight:600;">'
+                    "Leer completo &rarr;</a>"
                 )
             meta_html = " &middot; ".join(meta_parts)
-            source_label = html.escape(source or "EcoBrief Bolivia")
-            category_label = html.escape(category)
+            category_label = html.escape(category.capitalize())
             update_note_html = (
                 f"""
-                <p style="margin:0 0 10px;padding:8px 10px;border-left:3px solid #d97706;background:#fffbeb;color:#92400e;font:600 12px/1.5 Inter,Segoe UI,Arial,sans-serif;">
+                <p style="margin:0 0 10px;color:#b45309;font:italic 600 13px/1.5 Georgia,'Times New Roman',serif;">
                   {html.escape(update_note)}
                 </p>
                 """
                 if update_note
                 else ""
             )
+            divider_style = "" if index == len(news) else "border-bottom:1px solid #e8e8e8;"
 
             items_html.append(
                 f"""
                 <tr>
-                  <td style="padding:8px 0;">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border:1px solid rgba(34,34,34,0.12);border-top:4px solid #16a34a;border-radius:8px;">
-                      <tr>
-                        <td valign="top" width="42" style="padding:14px 0 14px 14px;">
-                          <div style="width:28px;height:28px;border-radius:8px;background:#bbf7d0;color:#14532d;font:700 13px Inter,Segoe UI,Arial,sans-serif;text-align:center;line-height:28px;">
-                            {index}
-                          </div>
-                        </td>
-                        <td style="padding:14px;">
-                          <p style="margin:0 0 6px;color:#666666;font:700 11px/1.3 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em;">
-                            {source_label} - {category_label}
-                            <span style="display:inline-block;margin-left:8px;border:1px solid rgba(22,163,74,.72);border-radius:999px;padding:3px 7px;background:#bbf7d0;color:#14532d;font:700 10px/1 Inter,Segoe UI,Arial,sans-serif;text-transform:none;letter-spacing:0;">
-                              Resumido IA
-                            </span>
-                          </p>
-                          <h2 style="margin:0 0 8px;color:#222222;font:700 19px/1.22 Georgia,'Times New Roman',serif;">
-                            {html.escape(title)}
-                          </h2>
-                          {update_note_html}
-                          <p style="margin:0 0 10px;color:#3f424c;font:400 14px/1.55 Inter,Segoe UI,Arial,sans-serif;">
-                            {html.escape(summary)}
-                          </p>
-                          <p style="margin:0;color:#666666;font:400 12px/1.55 Inter,Segoe UI,Arial,sans-serif;">
-                            {meta_html}
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
+                  <td style="padding:22px 0;{divider_style}">
+                    <p style="margin:0 0 6px;color:#8a8f98;font:700 11px/1.3 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.07em;">
+                      {category_label}
+                    </p>
+                    <h2 style="margin:0 0 8px;color:#1a1a1a;font:700 20px/1.32 Georgia,'Times New Roman',serif;">
+                      {html.escape(title)}
+                    </h2>
+                    {update_note_html}
+                    <p style="margin:0 0 10px;color:#3f424c;font:400 15px/1.6 Inter,Segoe UI,Arial,sans-serif;">
+                      {html.escape(summary)}
+                    </p>
+                    <p style="margin:0;color:#767a84;font:400 12.5px/1.6 Inter,Segoe UI,Arial,sans-serif;">
+                      {meta_html}
+                    </p>
                   </td>
                 </tr>
                 """
             )
 
-        body += "---\n"
-        body += "Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.\n"
-        html_body = self._format_email_html("".join(items_html))
+        news_url = f"{site_base_url}/news" if site_base_url else None
+        preferences_url = f"{site_base_url}/suscribirse" if site_base_url else None
+
+        body_lines.append("---")
+        if news_url:
+            body_lines.append(f"Ver todas las noticias: {news_url}")
+        if preferences_url:
+            body_lines.append(f"Cambiar tus preferencias o darte de baja: {preferences_url}")
+        else:
+            body_lines.append("Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.")
+        body = "\n".join(body_lines) + "\n"
+
+        html_body = self._format_email_html("".join(items_html), news_url, preferences_url)
         return subject, body, html_body
 
-    def _format_email_html(self, items_html: str) -> str:
+    def _format_email_html(
+        self, items_html: str, news_url: str | None, preferences_url: str | None
+    ) -> str:
+        links_html = ""
+        if news_url or preferences_url:
+            link_rows = ""
+            if news_url:
+                safe_news_url = html.escape(news_url, quote=True)
+                link_rows += f"""
+                <p style="margin:0 0 8px;">
+                  <a href="{safe_news_url}" style="color:#1d4ed8;text-decoration:none;font:600 13.5px Inter,Segoe UI,Arial,sans-serif;">
+                    Ver todas las noticias &rarr;
+                  </a>
+                </p>
+                """
+            if preferences_url:
+                safe_prefs_url = html.escape(preferences_url, quote=True)
+                link_rows += f"""
+                <p style="margin:0;">
+                  <a href="{safe_prefs_url}" style="color:#1d4ed8;text-decoration:none;font:600 13.5px Inter,Segoe UI,Arial,sans-serif;">
+                    Cambiar mis preferencias o darme de baja &rarr;
+                  </a>
+                </p>
+                """
+            links_html = f"""
+            <tr>
+              <td style="padding:22px 32px 4px;background:#ffffff;border-top:1px solid #e8e8e8;">
+                <p style="margin:0 0 10px;color:#1a1a1a;font:700 12px/1.4 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.05em;">
+                  Mas de EcoBrief Bolivia
+                </p>
+                {link_rows}
+              </td>
+            </tr>
+            """
+
         return f"""<!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#fafafa;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fafafa;padding:24px 12px;">
+  <body style="margin:0;padding:0;background:#f2f3f5;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f2f3f5;padding:32px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:720px;background:#ffffff;border:1px solid rgba(34,34,34,0.12);border-radius:8px;overflow:hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;">
             <tr>
-              <td style="background:#ffffff;border-top:6px solid #16a34a;padding:22px 24px 18px;">
-                <p style="margin:0 0 6px;color:#666666;font:700 12px/1.2 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;">
+              <td style="background:#ffffff;border-top:3px solid #1d4ed8;padding:26px 32px 20px;">
+                <p style="margin:0 0 8px;color:#8a8f98;font:700 12px/1.2 Inter,Segoe UI,Arial,sans-serif;text-transform:uppercase;letter-spacing:.08em;">
                   EcoBrief Bolivia
                 </p>
-                <h1 style="margin:0;color:#222222;font:700 30px/1.12 Georgia,'Times New Roman',serif;">
+                <h1 style="margin:0;color:#1a1a1a;font:700 28px/1.15 Georgia,'Times New Roman',serif;">
                   Brief del dia
                 </h1>
                 <p style="margin:10px 0 0;color:#3f424c;font:400 14px/1.5 Inter,Segoe UI,Arial,sans-serif;">
@@ -1183,16 +1214,18 @@ class NewsSummarizerApp:
               </td>
             </tr>
             <tr>
-              <td style="padding:8px 24px 12px;background:#fafafa;">
+              <td style="padding:0 32px;background:#ffffff;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   {items_html}
                 </table>
               </td>
             </tr>
+            {links_html}
             <tr>
-              <td style="padding:18px 24px 22px;background:#ffffff;border-top:1px solid rgba(34,34,34,0.12);">
-                <p style="margin:0;color:#666666;font:400 12px/1.6 Inter,Segoe UI,Arial,sans-serif;">
-                  Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.
+              <td style="padding:18px 32px 26px;background:#ffffff;">
+                <p style="margin:0;color:#8a8f98;font:400 11.5px/1.6 Inter,Segoe UI,Arial,sans-serif;">
+                  Recibis este correo porque te suscribiste en ecobriefbolivia.online. Si te resulta util,
+                  moverlo a la bandeja Principal de Gmail ayuda a que no te lo pierdas manana.
                 </p>
               </td>
             </tr>

@@ -634,18 +634,68 @@ async def test_email_delivery_sends_plain_text_brief():
         "EcoBrief Bolivia - Brief del dia\n\n"
         "Noticias locales resumidas con menos ruido.\n\n"
         "1. Titulo\n"
-        "   Resumen politico.\n"
-        "   Dato: Dato clave\n"
-        "   Fuente: Unitel\n"
-        "   Link: https://example.com/noticia\n\n"
+        "Resumen politico.\n"
+        "Dato: Dato clave\n"
+        "Fuente: Unitel\n"
+        "Link: https://example.com/noticia\n\n"
         "---\n"
         "Puedes cambiar tus preferencias o darte de baja desde EcoBrief Bolivia.\n"
     )
     assert 'href="https://example.com/noticia"' in html_body
-    assert ">Link</a>" in html_body
-    assert "background:#fafafa" in html_body
-    assert "border-top:4px solid #16a34a" in html_body
-    assert "Resumido IA" in html_body
+    assert "Leer completo" in html_body
+    assert "background:#f2f3f5" in html_body
+    assert "border-top:3px solid #1d4ed8" in html_body
+    assert "Resumen generado con IA" in html_body
+    # Sin SITE_BASE_URL configurado, no hay links reales que ofrecer al pie.
+    assert "Mas de EcoBrief Bolivia" not in html_body
+
+
+@pytest.mark.asyncio
+async def test_email_delivery_includes_site_links_when_site_base_url_is_set():
+    settings = SimpleNamespace(
+        summary_candidates_per_category=8,
+        summary_candidates_extended_limit=8,
+        summary_candidates_extended_categories="politica, economia",
+        categories_list=["politica"],
+        news_cache_ttl_minutes=60,
+        news_min_articles=20,
+        schedule_timezone="America/La_Paz",
+        site_base_url="https://ecobriefbolivia.online",
+    )
+    subscriber = SimpleNamespace(
+        channel="email",
+        phone=None,
+        telegram_id=None,
+        email="reader@example.com",
+        categories=["politica"],
+        frequency="diario",
+        preferred_hour=9,
+        timezone="America/La_Paz",
+    )
+    summaries = [
+        {
+            "title": "Titulo",
+            "summary": "Resumen politico.",
+            "fact": "Dato clave",
+            "source": "Unitel",
+            "url": "https://example.com/noticia",
+            "category": "politica",
+        }
+    ]
+    app = NewsSummarizerApp(settings)
+    app.db = CachedSummaryDatabase(summaries, [subscriber])
+    app.whatsapp = FakeWhatsApp()
+    app.telegram = FakeTelegram()
+    app.email = FakeEmail()
+
+    await app.send_summaries("morning")
+
+    _email, _subject, body, html_body = app.email.sent[0]
+    assert "Ver todas las noticias: https://ecobriefbolivia.online/news" in body
+    assert "Cambiar tus preferencias o darte de baja: https://ecobriefbolivia.online/suscribirse" in body
+    assert 'href="https://ecobriefbolivia.online/news"' in html_body
+    assert 'href="https://ecobriefbolivia.online/suscribirse"' in html_body
+    assert "Mas de EcoBrief Bolivia" in html_body
 
 
 @pytest.mark.asyncio

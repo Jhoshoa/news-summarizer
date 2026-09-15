@@ -139,4 +139,4 @@ def test_format_email_summary_omits_update_note_block_when_absent():
     app = _make_app()
     _subject, body, html_body = app._format_email_summary([{"title": "Titulo", "summary": "Resumen"}])
     assert "Actualizacion" not in body
-    assert "border-left:3px solid #d97706" not in html_body
+    assert "color:#b45309" not in html_body
