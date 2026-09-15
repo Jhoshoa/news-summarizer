@@ -41,9 +41,6 @@ export const EconomicHistoryChart = () => {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
   const [range, setRange] = useState<RangeKey>("30");
-  const [hover, setHover] = useState<{ oficial: number | null; compra: number | null; venta: number | null } | null>(
-    null,
-  );
 
   const { data, isFetching } = useGetEconomicIndicatorsHistoryQuery({
     codes: [OFICIAL_CODE, COMPRA_CODE, VENTA_CODE],
@@ -99,17 +96,6 @@ export const EconomicHistoryChart = () => {
       title: "Venta",
     });
 
-    chart.subscribeCrosshairMove((param) => {
-      if (!param.time) {
-        setHover(null);
-        return;
-      }
-      const o = param.seriesData.get(seriesRef.current.oficial) as { value: number } | undefined;
-      const c = param.seriesData.get(seriesRef.current.compra) as { value: number } | undefined;
-      const v = param.seriesData.get(seriesRef.current.venta) as { value: number } | undefined;
-      setHover({ oficial: o?.value ?? null, compra: c?.value ?? null, venta: v?.value ?? null });
-    });
-
     const handleResize = () => {
       if (containerRef.current) {
         chart.applyOptions({ width: containerRef.current.clientWidth });
@@ -149,10 +135,6 @@ export const EconomicHistoryChart = () => {
     chartRef.current.timeScale().setVisibleRange({ from: from as UTCTimestamp, to: maxTime as UTCTimestamp });
   }, [range, compraPoints, oficialPoints]);
 
-  const displayOficial = hover ? hover.oficial : lastOficial;
-  const displayCompra = hover ? hover.compra : lastCompra;
-  const displayVenta = hover ? hover.venta : lastVenta;
-
   return (
     <section className="data-panel economic-history-panel">
       <div className="panel-heading">
@@ -176,21 +158,21 @@ export const EconomicHistoryChart = () => {
           <span className="chart-swatch" style={{ background: COLOR_OFICIAL }} />
           <div>
             <span>Oficial BCB</span>
-            <strong>{fmtBs(displayOficial)}</strong>
+            <strong>{fmtBs(lastOficial)}</strong>
           </div>
         </div>
         <div className="chart-stat">
           <span className="chart-swatch" style={{ background: COLOR_COMPRA }} />
           <div>
             <span>Binance compra</span>
-            <strong>{fmtBs(displayCompra)}</strong>
+            <strong>{fmtBs(lastCompra)}</strong>
           </div>
         </div>
         <div className="chart-stat">
           <span className="chart-swatch" style={{ background: COLOR_VENTA }} />
           <div>
             <span>Binance venta</span>
-            <strong>{fmtBs(displayVenta)}</strong>
+            <strong>{fmtBs(lastVenta)}</strong>
           </div>
         </div>
         <div className="chart-stat">
