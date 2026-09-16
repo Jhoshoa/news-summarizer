@@ -224,10 +224,6 @@ class TelegramLinkResponse(BaseModel):
 
 def _channel_options(app_instance: Any) -> list[PreferenceOption]:
     settings = getattr(app_instance, "settings", None)
-    whatsapp_enabled = bool(
-        getattr(settings, "whatsapp_meta_access_token", None)
-        and getattr(settings, "whatsapp_meta_phone_number_id", None)
-    )
     telegram_enabled = bool(getattr(settings, "telegram_bot_token", None))
     email_enabled = bool(getattr(settings, "email_enabled", False))
     return [
@@ -240,11 +236,16 @@ def _channel_options(app_instance: Any) -> list[PreferenceOption]:
         PreferenceOption(
             slug="whatsapp",
             label="WhatsApp",
-            enabled=True,
+            # En desarrollo a proposito: Twilio tiene costo mensual y Meta Business
+            # exige NIT/empresa constituida para verificar el numero. En vez de
+            # dejar que la gente "se suscriba" a un canal que nunca va a entregar
+            # nada, el frontend usa esto para mostrar un mensaje y medir interes
+            # real (evento whatsapp_interest_expressed) antes de asumir ese costo.
+            enabled=False,
             note=(
-                "Disponible para demo; envio real requiere WhatsApp Business API (Meta) configurado."
-                if not whatsapp_enabled
-                else "Disponible para demo inicial; puede requerir plan premium despues."
+                "En desarrollo -- tiene costos reales (Twilio + verificacion de "
+                "Meta Business, que pide NIT). Elegi este canal para contarnos "
+                "si te interesaria igual."
             ),
         ),
         PreferenceOption(

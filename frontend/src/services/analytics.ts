@@ -14,7 +14,8 @@ export type AnalyticsEventName =
   | "story_shared"
   | "alert_created"
   | "feedback_submitted"
-  | "report_generated";
+  | "report_generated"
+  | "whatsapp_interest_expressed";
 
 export type AnalyticsEventProps = {
   category?: string;

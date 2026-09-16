@@ -27,6 +27,7 @@ ALLOWED_EVENT_NAMES = {
     "alert_created",
     "feedback_submitted",
     "report_generated",
+    "whatsapp_interest_expressed",
 }
 
 

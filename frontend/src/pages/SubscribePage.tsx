@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import { CategoryIcon } from "../components/icons/categoryIcons";
 import { TelegramConnect } from "../components/subscribe/TelegramConnect";
+import { trackEvent } from "../services/analytics";
 import {
   useGetPreferenceOptionsQuery,
   usePreviewPreferencesMutation,
@@ -13,9 +14,6 @@ import {
   buildSubscribePayload,
   getSubscribeApiErrorMessage,
   isValidEmail,
-  isValidInternationalPhone,
-  normalizePhone,
-  sanitizePhoneInput,
   type SubscribeFormState,
   validateSubscribeForm,
 } from "../utils/subscribe";
@@ -109,6 +107,7 @@ export const SubscribePage = () => {
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
+  const [whatsappInterestSent, setWhatsappInterestSent] = useState(false);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -166,10 +165,6 @@ export const SubscribePage = () => {
   const emailInputError =
     form.channel === "email" && touchedFields.email && !isValidEmail(form.email)
       ? "Ingresa un correo electronico valido."
-      : "";
-  const phoneInputError =
-    form.channel === "whatsapp" && touchedFields.phone && !isValidInternationalPhone(form.phone)
-      ? "Ingresa un numero de WhatsApp en formato internacional."
       : "";
   const previewTriggerRef = useRef(previewPreferences);
   previewTriggerRef.current = previewPreferences;
@@ -253,10 +248,7 @@ export const SubscribePage = () => {
   };
 
   const handleUnsubscribe = async () => {
-    const identifier =
-      form.channel === "whatsapp"
-        ? normalizePhone(unsubscribeIdentifier)
-        : unsubscribeIdentifier.trim();
+    const identifier = unsubscribeIdentifier.trim();
     setUnsubscribeMessage("");
 
     if (!identifier || identifier.length < 3) {
@@ -273,6 +265,13 @@ export const SubscribePage = () => {
     } catch {
       setUnsubscribeMessage("No se pudo procesar la baja. Revisa el backend e intenta de nuevo.");
     }
+  };
+
+  const handleWhatsappInterest = () => {
+    trackEvent("whatsapp_interest_expressed", {
+      metadata: { categories: form.categories },
+    });
+    setWhatsappInterestSent(true);
   };
 
   return (
@@ -316,7 +315,7 @@ export const SubscribePage = () => {
                 {(options?.channels ?? []).map((channel) => (
                   <button
                     className={form.channel === channel.slug ? "active" : ""}
-                    disabled={!channel.enabled && channel.slug !== "telegram"}
+                    disabled={!channel.enabled && channel.slug !== "telegram" && channel.slug !== "whatsapp"}
                     key={channel.slug}
                     type="button"
                     onClick={() =>
@@ -334,27 +333,15 @@ export const SubscribePage = () => {
             </label>
 
             {form.channel === "whatsapp" ? (
-              <label className="form-field form-field--full">
-                <span>Numero de WhatsApp</span>
-                <input
-                  aria-describedby={phoneInputError ? "phone-error" : undefined}
-                  aria-invalid={Boolean(phoneInputError)}
-                  className={phoneInputError ? "invalid" : ""}
-                  inputMode="tel"
-                  placeholder="+59170000000"
-                  type="tel"
-                  value={form.phone}
-                  onBlur={() => markFieldTouched("phone")}
-                  onChange={(event) => {
-                    markFieldTouched("phone");
-                    setForm((current) => ({
-                      ...current,
-                      phone: sanitizePhoneInput(event.target.value),
-                    }));
-                  }}
-                />
-                {phoneInputError && <small className="field-error" id="phone-error">{phoneInputError}</small>}
-              </label>
+              <div className="form-field form-field--full whatsapp-interest">
+                {whatsappInterestSent ? (
+                  <p className="success-notice">Gracias, ya anotamos tu interes.</p>
+                ) : (
+                  <button className="secondary-button" type="button" onClick={handleWhatsappInterest}>
+                    Me interesaria igual, aunque tenga un costo mensual
+                  </button>
+                )}
+              </div>
             ) : form.channel === "email" ? (
               <label className="form-field form-field--full">
                 <span>Correo electronico</span>
@@ -389,119 +376,123 @@ export const SubscribePage = () => {
             )}
           </div>
 
-          <fieldset className="category-fieldset">
-            <legend>Categorias</legend>
-            <div className="category-choice-grid">
-              {(options?.categories ?? []).map((category) => (
-                <label
-                  className={
-                    form.categories.includes(category.slug) ? "check-card active" : "check-card"
-                  }
-                  key={category.slug}
-                >
-                  <input
-                    checked={form.categories.includes(category.slug)}
-                    type="checkbox"
-                    onChange={() => toggleCategory(category.slug)}
-                  />
-                  <CategoryIcon category={category.slug} size={16} />
-                  <span>{category.label}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          {form.channel !== "whatsapp" && (
+            <>
+              <fieldset className="category-fieldset">
+                <legend>Categorias</legend>
+                <div className="category-choice-grid">
+                  {(options?.categories ?? []).map((category) => (
+                    <label
+                      className={
+                        form.categories.includes(category.slug) ? "check-card active" : "check-card"
+                      }
+                      key={category.slug}
+                    >
+                      <input
+                        checked={form.categories.includes(category.slug)}
+                        type="checkbox"
+                        onChange={() => toggleCategory(category.slug)}
+                      />
+                      <CategoryIcon category={category.slug} size={16} />
+                      <span>{category.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
 
-          {form.channel === "telegram" ? (
-            <p className="telegram-connect-hint">
-              Por Telegram el brief llega todos los dias a las 9:00, y ademas podes pedirlo
-              cuando quieras escribiendole /noticias al bot -- no hace falta elegir frecuencia
-              ni hora.
-            </p>
-          ) : (
-            <div className="form-grid">
-              <label className="form-field">
-                <span>Frecuencia</span>
-                <select
-                  value={form.frequency}
+              {form.channel === "telegram" ? (
+                <p className="telegram-connect-hint">
+                  Por Telegram el brief llega todos los dias a las 9:00, y ademas podes pedirlo
+                  cuando quieras escribiendole /noticias al bot -- no hace falta elegir frecuencia
+                  ni hora.
+                </p>
+              ) : (
+                <div className="form-grid">
+                  <label className="form-field">
+                    <span>Frecuencia</span>
+                    <select
+                      value={form.frequency}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          frequency: event.target.value,
+                        }))
+                      }
+                    >
+                      {(options?.frequencies ?? []).map((frequency) => (
+                        <option key={frequency.slug} value={frequency.slug}>
+                          {frequency.label}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedFrequency?.note && <small>{selectedFrequency.note}</small>}
+                  </label>
+
+                  <label className="form-field">
+                    <span>Hora preferida</span>
+                    <select
+                      value={form.preferredHour}
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          preferredHour: Number(event.target.value),
+                        }))
+                      }
+                    >
+                      {(options?.preferred_hours ?? []).map((hour) => (
+                        <option key={hour.slug} value={hour.slug}>
+                          {hour.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small>Entre 9:00 y 23:00 -- fuera de ese rango casi no hay noticias nuevas.</small>
+                  </label>
+                </div>
+              )}
+
+              <label className="consent-row">
+                <input
+                  checked={form.consentAccepted}
+                  type="checkbox"
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
-                      frequency: event.target.value,
+                      consentAccepted: event.target.checked,
                     }))
                   }
-                >
-                  {(options?.frequencies ?? []).map((frequency) => (
-                    <option key={frequency.slug} value={frequency.slug}>
-                      {frequency.label}
-                    </option>
-                  ))}
-                </select>
-                {selectedFrequency?.note && <small>{selectedFrequency.note}</small>}
+                />
+                <span>
+                  Acepto recibir briefs de EcoBrief segun mis preferencias y entiendo que puedo darme
+                  de baja cuando quiera. Acepto los{" "}
+                  <button
+                    className="inline-link"
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setIsTermsOpen(true);
+                    }}
+                  >
+                    terminos y condiciones
+                  </button>
+                  .
+                </span>
               </label>
 
-              <label className="form-field">
-                <span>Hora preferida</span>
-                <select
-                  value={form.preferredHour}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      preferredHour: Number(event.target.value),
-                    }))
-                  }
-                >
-                  {(options?.preferred_hours ?? []).map((hour) => (
-                    <option key={hour.slug} value={hour.slug}>
-                      {hour.label}
-                    </option>
+              {formErrors.length > 0 && (
+                <div className="form-notice">
+                  {formErrors.map((error) => (
+                    <p key={error}>{error}</p>
                   ))}
-                </select>
-                <small>Entre 9:00 y 23:00 -- fuera de ese rango casi no hay noticias nuevas.</small>
-              </label>
-            </div>
+                </div>
+              )}
+
+              {subscribeMessage && <p className="success-notice">{subscribeMessage}</p>}
+            </>
           )}
-
-          <label className="consent-row">
-            <input
-              checked={form.consentAccepted}
-              type="checkbox"
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  consentAccepted: event.target.checked,
-                }))
-              }
-            />
-            <span>
-              Acepto recibir briefs de EcoBrief segun mis preferencias y entiendo que puedo darme
-              de baja cuando quiera. Acepto los{" "}
-              <button
-                className="inline-link"
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  setIsTermsOpen(true);
-                }}
-              >
-                terminos y condiciones
-              </button>
-              .
-            </span>
-          </label>
-
-          {formErrors.length > 0 && (
-            <div className="form-notice">
-              {formErrors.map((error) => (
-                <p key={error}>{error}</p>
-              ))}
-            </div>
-          )}
-
-          {subscribeMessage && <p className="success-notice">{subscribeMessage}</p>}
 
           {form.channel === "telegram" ? (
             <TelegramConnect categories={form.categories} consentAccepted={form.consentAccepted} />
-          ) : (
+          ) : form.channel === "whatsapp" ? null : (
             <div className="form-actions">
               <button className="button" disabled={subscribeState.isLoading || isLoadingOptions} type="button" onClick={handleSubmit}>
                 {subscribeState.isLoading ? "Guardando" : "Guardar preferencias"}
@@ -510,6 +501,7 @@ export const SubscribePage = () => {
           )}
         </section>
 
+        {form.channel !== "whatsapp" && (
         <section className="data-panel unsubscribe-panel">
           <div className="panel-heading">
             <span className="panel-title">Cancelar suscripcion</span>
@@ -522,16 +514,10 @@ export const SubscribePage = () => {
           ) : (
             <div className="unsubscribe-row">
               <input
-                placeholder={form.channel === "whatsapp" ? "+59170000000" : "tu-correo@gmail.com"}
+                placeholder="tu-correo@gmail.com"
                 type="text"
                 value={unsubscribeIdentifier}
-                onChange={(event) =>
-                  setUnsubscribeIdentifier(
-                    form.channel === "whatsapp"
-                      ? sanitizePhoneInput(event.target.value)
-                      : event.target.value,
-                  )
-                }
+                onChange={(event) => setUnsubscribeIdentifier(event.target.value)}
               />
               <button
                 className="secondary-button"
@@ -545,6 +531,7 @@ export const SubscribePage = () => {
           )}
           {unsubscribeMessage && <p className="impact-section-copy">{unsubscribeMessage}</p>}
         </section>
+        )}
         </div>
 
         <aside className="data-context-sidebar subscribe-side-panel">
