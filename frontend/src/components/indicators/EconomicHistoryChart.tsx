@@ -69,7 +69,7 @@ export const EconomicHistoryChart = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
-  const [range, setRange] = useState<RangeKey>("1");
+  const [range, setRange] = useState<RangeKey>("7");
 
   // data cae en el ultimo resultado exitoso (aunque sea de un rango
   // distinto al actual) mientras el nuevo rango todavia esta cargando --
