@@ -9,6 +9,7 @@ from sqlalchemy import (
     Column,
     Date,
     DateTime,
+    Index,
     Integer,
     Numeric,
     String,
@@ -22,6 +23,17 @@ from .repository import Base, _now_bolivia
 
 class EconomicIndicatorValue(Base):
     __tablename__ = "economic_indicator_values"
+    __table_args__ = (
+        # get_history() filtra por indicator_code IN (...) AND collected_at
+        # >= :since y ordena por collected_at -- ver migrations/020_*.sql
+        # (esto es lo que crea el indice en una DB ya existente; esta
+        # declaracion es para que una DB nueva, ej. en tests, tambien lo tenga).
+        Index(
+            "ix_economic_indicator_values_code_collected_at",
+            "indicator_code",
+            "collected_at",
+        ),
+    )
 
     id = Column(Integer, primary_key=True)
     source = Column(String(50), nullable=False, index=True)

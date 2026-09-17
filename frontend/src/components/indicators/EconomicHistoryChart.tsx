@@ -12,8 +12,9 @@ const COLOR_OFICIAL = "#006d77";
 const COLOR_COMPRA = "#16a34a";
 const COLOR_VENTA = "#a94138";
 
-type RangeKey = "7" | "30" | "90" | "all";
+type RangeKey = "1" | "7" | "30" | "90" | "all";
 const RANGES: Array<{ key: RangeKey; label: string }> = [
+  { key: "1", label: "1D" },
   { key: "7", label: "7D" },
   { key: "30", label: "1M" },
   { key: "90", label: "3M" },
@@ -27,7 +28,7 @@ const RANGES: Array<{ key: RangeKey; label: string }> = [
 // fueran a mostrar los ultimos 7 dias. Ahora cada rango pide solo lo suyo.
 // "all" usa 365 porque es el maximo que el backend acepta (MAX_HISTORY_DAYS
 // en src/api/economic_indicators.py); alcanza de sobra dado el historico real.
-const RANGE_DAYS: Record<RangeKey, number> = { "7": 7, "30": 30, "90": 90, all: 365 };
+const RANGE_DAYS: Record<RangeKey, number> = { "1": 1, "7": 7, "30": 30, "90": 90, all: 365 };
 
 type Point = { time: UTCTimestamp; value: number };
 
@@ -68,7 +69,7 @@ export const EconomicHistoryChart = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Record<string, ISeriesApi<"Line">>>({});
-  const [range, setRange] = useState<RangeKey>("7");
+  const [range, setRange] = useState<RangeKey>("1");
 
   // data cae en el ultimo resultado exitoso (aunque sea de un rango
   // distinto al actual) mientras el nuevo rango todavia esta cargando --
