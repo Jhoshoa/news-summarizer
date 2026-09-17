@@ -197,17 +197,23 @@ async def test_fetch_binance_p2p_picks_best_price_per_side():
     por tomar siempre el minimo sin importar el lado.
     """
 
+    # Anunciante confiable de sobra (ordenes/tasa de completado por encima
+    # de MIN_ADVERTISER_ORDER_COUNT/MIN_ADVERTISER_FINISH_RATE) -- este test
+    # es sobre la direccion del min/max por lado, no sobre el filtro de
+    # confiabilidad (ver test_fetch_binance_p2p_* mas abajo para eso).
+    reliable_advertiser = {"monthOrderCount": 500, "monthFinishRate": 0.99}
+
     responses = {
         "BUY": {
             "data": [
-                {"adv": {"price": "9.95", "advNo": "high-buy"}},
-                {"adv": {"price": "9.93", "advNo": "low-buy"}},
+                {"adv": {"price": "9.95", "advNo": "high-buy"}, "advertiser": reliable_advertiser},
+                {"adv": {"price": "9.93", "advNo": "low-buy"}, "advertiser": reliable_advertiser},
             ]
         },
         "SELL": {
             "data": [
-                {"adv": {"price": "9.91", "advNo": "high-sell"}},
-                {"adv": {"price": "9.90", "advNo": "low-sell"}},
+                {"adv": {"price": "9.91", "advNo": "high-sell"}, "advertiser": reliable_advertiser},
+                {"adv": {"price": "9.90", "advNo": "low-sell"}, "advertiser": reliable_advertiser},
             ]
         },
     }
@@ -233,6 +239,92 @@ async def test_fetch_binance_p2p_picks_best_price_per_side():
     assert by_side["sell"].value == Decimal("9.91")
     assert by_side["sell"].raw_payload["advertisement"]["adv"]["advNo"] == "high-sell"
     assert by_side["sell"].raw_payload["selection"] == "highest_price"
+
+
+@pytest.mark.asyncio
+async def test_fetch_binance_p2p_discards_unreliable_outlier_advertiser():
+    """Caso real: un anuncio de venta a Bs 12.03 (vs. ~10.7-10.9 del resto)
+    vino de un anunciante con 4 ordenes en el mes y 36% de tasa de
+    completado -- ese anuncio no deberia poder mover el precio guardado."""
+
+    reliable = {"monthOrderCount": 500, "monthFinishRate": 0.99}
+    unreliable = {"monthOrderCount": 4, "monthFinishRate": 0.364}
+
+    responses = {
+        "BUY": {"data": [{"adv": {"price": "9.90", "advNo": "only-buy"}, "advertiser": reliable}]},
+        "SELL": {
+            "data": [
+                {"adv": {"price": "10.90", "advNo": "normal-sell"}, "advertiser": reliable},
+                {"adv": {"price": "12.03", "advNo": "outlier-sell"}, "advertiser": unreliable},
+            ]
+        },
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        return httpx.Response(200, json=responses[payload["tradeType"]])
+
+    collector = EconomicIndicatorCollector()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        indicators = await collector.fetch_binance_p2p(
+            client, snapshot_key="snapshot", collected_at=None
+        )
+
+    sell = next(i for i in indicators if i.side == "sell")
+    assert sell.value == Decimal("10.90")
+    assert sell.raw_payload["advertisement"]["adv"]["advNo"] == "normal-sell"
+    assert sell.raw_payload["selection"] == "highest_price"
+
+
+@pytest.mark.asyncio
+async def test_fetch_binance_p2p_falls_back_to_unfiltered_pool_when_nobody_is_reliable():
+    """Si un lote entero es de anunciantes poco confiables (mercado muy
+    delgado en ese momento), mejor guardar ese precio igual -- marcado como
+    fallback en `selection` para poder auditarlo -- que perder el dato."""
+
+    unreliable = {"monthOrderCount": 2, "monthFinishRate": 0.5}
+    responses = {
+        "BUY": {"data": [{"adv": {"price": "9.90", "advNo": "thin-buy"}, "advertiser": unreliable}]},
+        "SELL": {"data": [{"adv": {"price": "11.20", "advNo": "thin-sell"}, "advertiser": unreliable}]},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        return httpx.Response(200, json=responses[payload["tradeType"]])
+
+    collector = EconomicIndicatorCollector()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        indicators = await collector.fetch_binance_p2p(
+            client, snapshot_key="snapshot", collected_at=None
+        )
+
+    sell = next(i for i in indicators if i.side == "sell")
+    assert sell.value == Decimal("11.20")
+    assert sell.raw_payload["selection"] == "highest_price_unfiltered_fallback"
+
+
+@pytest.mark.asyncio
+async def test_fetch_binance_p2p_treats_missing_advertiser_fields_as_unreliable():
+    """Sin monthOrderCount/monthFinishRate no hay forma de saber si el
+    anunciante es confiable -- se trata como no confiable, no como valido."""
+
+    responses = {
+        "BUY": {"data": [{"adv": {"price": "9.90", "advNo": "no-advertiser-info"}}]},
+        "SELL": {"data": [{"adv": {"price": "9.90", "advNo": "no-advertiser-info"}}]},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        return httpx.Response(200, json=responses[payload["tradeType"]])
+
+    collector = EconomicIndicatorCollector()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        indicators = await collector.fetch_binance_p2p(
+            client, snapshot_key="snapshot", collected_at=None
+        )
+
+    sell = next(i for i in indicators if i.side == "sell")
+    assert sell.raw_payload["selection"] == "highest_price_unfiltered_fallback"
 
 
 def test_indicator_repository_same_day_requires_same_observed_or_collected_day():

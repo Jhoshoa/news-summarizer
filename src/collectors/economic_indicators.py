@@ -56,6 +56,17 @@ class EconomicIndicatorCollector:
     BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
+    # Un anunciante con pocas ordenes en el mes y/o mala tasa de completado
+    # puede publicar un precio fuera de mercado (carnada, error, o un
+    # anuncio que nunca llega a operarse) y desaparecer poco despues. Caso
+    # real: un anuncio de venta a Bs 12.03 (vs. ~10.7-10.9 del resto del
+    # lote) vino de un anunciante con 4 ordenes en el mes y 36% de tasa de
+    # completado -- tomar el maximo/minimo crudo de 20 anuncios sin filtrar
+    # por esto produce picos de un solo punto que no reflejan ningun precio
+    # real operable.
+    MIN_ADVERTISER_ORDER_COUNT = 10
+    MIN_ADVERTISER_FINISH_RATE = 0.80
+
     MONTHS_ES = {
         "enero": 1,
         "febrero": 2,
@@ -395,6 +406,24 @@ class EconomicIndicatorCollector:
         values = [self._clean_text(value) for value in card.select(".bcb-val")]
         return list(zip(labels, values, strict=False))
 
+    def _is_reliable_advertiser(self, item: dict[str, Any]) -> bool:
+        """Filtra anunciantes con poco historial o mal record de completado
+        -- ver MIN_ADVERTISER_ORDER_COUNT/MIN_ADVERTISER_FINISH_RATE arriba."""
+
+        advertiser = item.get("advertiser") or {}
+        order_count = advertiser.get("monthOrderCount")
+        finish_rate = advertiser.get("monthFinishRate")
+
+        if order_count is None or finish_rate is None:
+            return False
+        try:
+            return (
+                int(order_count) >= self.MIN_ADVERTISER_ORDER_COUNT
+                and float(finish_rate) >= self.MIN_ADVERTISER_FINISH_RATE
+            )
+        except (TypeError, ValueError):
+            return False
+
     def _best_binance_price(
         self, data: dict[str, Any], trade_type: str
     ) -> tuple[Decimal | None, dict[str, Any], str]:
@@ -409,6 +438,12 @@ class EconomicIndicatorCollector:
         mas bajo de los 20 anuncios). La propia API ya devuelve los anuncios
         ordenados "mejor primero" por lado, pero calculamos el extremo
         explicitamente en vez de confiar en el orden.
+
+        Antes de tomar ese extremo, se descartan anunciantes poco confiables
+        (_is_reliable_advertiser) -- si eso deja el lote vacio (mercado muy
+        delgado en ese momento), se cae de vuelta al lote completo sin
+        filtrar en vez de perder el dato de esa corrida; `selection` indica
+        cual de los dos casos paso, para poder auditarlo despues.
         """
 
         candidates = []
@@ -422,12 +457,25 @@ class EconomicIndicatorCollector:
         if not candidates:
             return None, {}, "none"
 
+        reliable_candidates = [
+            candidate for candidate in candidates if self._is_reliable_advertiser(candidate[1])
+        ]
+        used_fallback = not reliable_candidates
+        pool = candidates if used_fallback else reliable_candidates
+
         if trade_type == "SELL":
-            price, item = max(candidates, key=lambda candidate: candidate[0])
+            price, item = max(pool, key=lambda candidate: candidate[0])
             selection = "highest_price"
         else:
-            price, item = min(candidates, key=lambda candidate: candidate[0])
+            price, item = min(pool, key=lambda candidate: candidate[0])
             selection = "lowest_price"
+
+        if used_fallback:
+            selection += "_unfiltered_fallback"
+            logger.warning(
+                f"Ningun anunciante confiable para tradeType={trade_type}, "
+                f"usando el lote completo sin filtrar ({len(candidates)} anuncios)"
+            )
 
         return price, item, selection
 
