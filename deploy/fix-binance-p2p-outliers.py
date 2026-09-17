@@ -11,6 +11,13 @@ antes y despues de esa fecha (mismo indicator_code). Si falta un lado, usa
 el otro. Si no hay ningun valor confiable cerca (mercado muy delgado en
 ese tramo), no toca esa fila y lo reporta en vez de inventar un numero.
 
+Ademas del anunciante no confiable, exige que el valor se desvie mas de
+MIN_DEVIATION_RATIO del valor interpolado antes de corregirlo -- sin esto,
+un anunciante que no llega al umbral de confiabilidad por poco (ej. 9
+ordenes en vez de 10) pero cuyo precio ya era normal terminaba
+"corrigiendose" en centavos sin necesidad, generando ruido en vez de
+arreglar algo real.
+
 Uso (desde la raiz del repo, con el venv activado):
     python deploy/fix-binance-p2p-outliers.py            # dry-run, no escribe nada
     python deploy/fix-binance-p2p-outliers.py --apply    # aplica los cambios
@@ -41,6 +48,11 @@ from src.db.indicators import EconomicIndicatorValue  # noqa: E402
 from src.db.repository import Database  # noqa: E402
 
 CODES = ["binance_p2p_usdt_bob_buy", "binance_p2p_usdt_bob_sell"]
+
+# Un anuncio no confiable cuyo precio ya coincidia con el mercado (ej. 9 ordenes
+# en vez de 10, pero el mismo precio que todos los demas) no necesita
+# corregirse -- solo los que ademas se alejan de verdad del valor esperado.
+MIN_DEVIATION_RATIO = Decimal("0.03")
 
 
 def is_reliable(collector: EconomicIndicatorCollector, row: EconomicIndicatorValue) -> bool:
@@ -107,6 +119,16 @@ async def main(apply: bool) -> None:
                     skipped += 1
                     continue
 
+                deviation = abs(new_value - row.value) / row.value if row.value else Decimal(0)
+                if deviation <= MIN_DEVIATION_RATIO:
+                    print(
+                        f"SIN TOCAR  {code} id={row.id} {row.collected_at}: {row.value} ya esta cerca "
+                        f"del esperado {new_value} (desvio {deviation:.2%}, anunciante no confiable pero "
+                        "sin impacto real)"
+                    )
+                    skipped += 1
+                    continue
+
                 action = "APLICAR" if apply else "DRY-RUN"
                 print(f"{action}   {code} id={row.id} {row.collected_at}: {row.value} -> {new_value}")
 
@@ -124,11 +146,11 @@ async def main(apply: bool) -> None:
 
         if apply:
             await session.commit()
-            print(f"\nListo: {changed} corregidos, {skipped} sin vecino confiable (sin tocar).")
+            print(f"\nListo: {changed} corregidos, {skipped} sin tocar (sin vecino confiable o sin desvio real).")
         else:
             print(
-                f"\nDRY-RUN: {changed} se corregirian, {skipped} quedarian igual. "
-                "Corre con --apply para aplicar de verdad."
+                f"\nDRY-RUN: {changed} se corregirian, {skipped} quedarian igual "
+                "(sin vecino confiable o sin desvio real). Corre con --apply para aplicar de verdad."
             )
 
     await db.engine.dispose()
