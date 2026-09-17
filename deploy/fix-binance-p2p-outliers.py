@@ -23,15 +23,22 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
-from sqlalchemy import select
+# `python deploy/fix-binance-p2p-outliers.py` pone el directorio del script
+# (deploy/) primero en sys.path, no la raiz del repo -- sin esto, `import src`
+# falla con ModuleNotFoundError sin importar desde donde se lo corra.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.collectors.economic_indicators import EconomicIndicatorCollector
-from src.config import get_settings
-from src.db.indicators import EconomicIndicatorValue
-from src.db.repository import Database
+from sqlalchemy import select  # noqa: E402
+
+from src.collectors.economic_indicators import EconomicIndicatorCollector  # noqa: E402
+from src.config import get_settings  # noqa: E402
+from src.db.indicators import EconomicIndicatorValue  # noqa: E402
+from src.db.repository import Database  # noqa: E402
 
 CODES = ["binance_p2p_usdt_bob_buy", "binance_p2p_usdt_bob_sell"]
 
