@@ -31,11 +31,30 @@ const RANGE_DAYS: Record<RangeKey, number> = { "7": 7, "30": 30, "90": 90, all: 
 
 type Point = { time: UTCTimestamp; value: number };
 
+// El backend manda collected_at como hora de Bolivia "naive" (sin offset, ej.
+// "2026-09-16T21:00:00" -- ver _now_bolivia en src/db/repository.py). Lightweight
+// Charts SIEMPRE arma las etiquetas del eje con los getters UTC del Date que le
+// pases (getUTCFullYear/getUTCHours/etc, es como esta hecha la libreria). Si en
+// vez de esto se hace `new Date(collected_at).getTime()`, el navegador interpreta
+// ese string sin offset como su propia hora LOCAL -- en Bolivia eso da el epoch
+// UTC correcto, pero el grafico despues lo vuelve a mostrar con los getters UTC,
+// sumando 4 horas de mas y empujando todo a "manana" pasado cierta hora. La
+// solucion es tomar los numeros de Bolivia tal cual y meterlos directo como si
+// fueran UTC (Date.UTC), sin dejar que el navegador haga ninguna conversion de
+// huso horario -- asi el eje siempre muestra la hora de Bolivia real, sin
+// importar en que huso horario este el navegador de quien mira el grafico.
+export const parseBoliviaTimestamp = (value: string): number => {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return Math.floor(new Date(value).getTime() / 1000);
+  const [, year, month, day, hour, minute, second] = match.map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day, hour, minute, second) / 1000);
+};
+
 const toSeriesPoints = (rows: Array<{ value: number; collected_at: string }> | undefined): Point[] => {
   if (!rows || rows.length === 0) return [];
   const byTime = new Map<number, number>();
   for (const row of rows) {
-    const t = Math.floor(new Date(row.collected_at).getTime() / 1000);
+    const t = parseBoliviaTimestamp(row.collected_at);
     byTime.set(t, row.value);
   }
   return Array.from(byTime.entries())
