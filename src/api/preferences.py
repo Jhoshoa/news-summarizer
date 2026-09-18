@@ -244,7 +244,7 @@ def _channel_options(app_instance: Any) -> list[PreferenceOption]:
             enabled=False,
             note=(
                 "En desarrollo -- tiene costos reales (Twilio + verificacion de "
-                "Meta Business, que pide NIT). Elegi este canal para contarnos "
+                "Meta Business). Elegi este canal para contarnos "
                 "si te interesaria igual."
             ),
         ),
