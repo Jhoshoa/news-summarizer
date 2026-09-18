@@ -27,13 +27,17 @@ class Settings(BaseSettings):
     github_api_key: str | None = Field(default=None, alias="GITHUB_API_KEY")
     nvidia_api_key: str | None = Field(default=None, alias="NVIDIA_API_KEY")
     gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
-    # nvidia va al final (antes de openai, que casi nunca esta configurado):
-    # es el fallback mas lento y menos confiable de los que ya probamos en
-    # produccion (llamadas de 5+ minutos, a veces cuelga). gemini va segundo,
-    # justo despues de groq, porque tiene cuota diaria mas generosa y
-    # respuestas mas confiables.
+    kimi_api_key: str | None = Field(default=None, alias="KIMI_API_KEY")
+    # nvidia va casi al final (antes de openai, que casi nunca esta
+    # configurado): es el fallback mas lento y menos confiable de los que ya
+    # probamos en produccion (llamadas de 5+ minutos, a veces cuelga). gemini
+    # va segundo, justo despues de groq, porque tiene cuota diaria mas
+    # generosa y respuestas mas confiables. kimi va al final de todo a
+    # proposito: es el unico proveedor de pago (Tier1 de Moonshot, comprado
+    # 2026-09) -- solo debe usarse cuando los gratuitos ya fallaron, para no
+    # gastar credito pago en trafico que los gratuitos manejan bien.
     llm_fallback_order: str = Field(
-        default="groq,gemini,github,nvidia,openai", alias="LLM_FALLBACK_ORDER"
+        default="groq,gemini,github,nvidia,openai,kimi", alias="LLM_FALLBACK_ORDER"
     )
     llm_base_url: str | None = Field(default=None, alias="LLM_BASE_URL")
     # Timeout por llamada a un proveedor LLM, en segundos. El SDK de OpenAI
@@ -157,6 +161,7 @@ class Settings(BaseSettings):
             "nvidia": self.nvidia_api_key,
             "openai": self.openai_api_key,
             "gemini": self.gemini_api_key,
+            "kimi": self.kimi_api_key,
         }
         result: list[dict] = []
         for name in order:

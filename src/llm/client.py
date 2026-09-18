@@ -57,6 +57,27 @@ class LLMProvider:
                 "quality": "mistralai/mistral-nemotron",
             },
         },
+        "kimi": {
+            # Moonshot AI's international platform (api.moonshot.ai, not the
+            # .cn domestic one) -- OpenAI-compatible. Paid tier (Tier1, bought
+            # 2026-09), used as the last resort on purpose: it's the only
+            # provider here that costs real money per call, so it should only
+            # fire once every free provider (groq/gemini/nvidia) already
+            # failed, not compete with them for everyday traffic.
+            #
+            # kimi-latest, kimi-k2-*, and every moonshot-v1-* name are
+            # discontinued as of 2026-09 (confirmed against Moonshot's live
+            # docs, not from training-data memory) -- kimi-k2.6 is the
+            # current general-purpose model, used for all three tiers since
+            # this provider only exists as a fallback, not to fine-tune for
+            # speed vs quality.
+            "base_url": "https://api.moonshot.ai/v1",
+            "models": {
+                "fast": "kimi-k2.6",
+                "balanced": "kimi-k2.6",
+                "quality": "kimi-k2.6",
+            },
+        },
     }
 
     def __init__(
@@ -86,10 +107,21 @@ class LLMProvider:
         # un proveedor lento/caido se descarta rapido en vez de trabar todo
         # el pipeline (visto en vivo: /trigger/summary colgado ~11 min en
         # un solo provider tras el fallback de Gemini).
+        #
+        # kimi es la unica excepcion: incluso con "thinking" desactivado
+        # (ver chat()), el tiempo de respuesta escala con el tamano del lote
+        # -- confirmado en vivo, un lote de 8 noticias (el maximo real de
+        # SUMMARY_CANDIDATES_EXTENDED_LIMIT) tardo 63.6s de punta a punta,
+        # por encima de los 45s compartidos con el resto de proveedores. Como
+        # kimi es siempre el ultimo del LLMRouter (no hay a quien pasarle la
+        # posta despues), no tiene sentido cortarlo temprano como a los
+        # gratuitos: se le da mas margen en vez de fallar una categoria
+        # entera por un timeout evitable.
+        effective_timeout = 120.0 if provider == "kimi" else timeout
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=resolved_base_url,
-            timeout=timeout,
+            timeout=effective_timeout,
             max_retries=1,
         )
         self.models = config["models"].copy()
@@ -118,12 +150,33 @@ class LLMProvider:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        # kimi-k2.6 es un modelo "thinking" por defecto: gasta parte del
+        # presupuesto de max_tokens en un razonamiento interno
+        # (reasoning_content) que nunca se ve en la respuesta -- confirmado en
+        # vivo, con thinking habilitado una llamada real de resumen (quality,
+        # batch de 2 noticias) tardo mas de 90s y termino en timeout, y una
+        # clasificacion simple tardo entre 33 y 89s por el mismo motivo.
+        # Se desactiva "thinking" explicitamente (extra_body) en vez de darle
+        # presupuesto extra: confirmado en vivo que sin thinking la misma
+        # llamada baja de ~90s a ~2s y no gasta tokens en razonamiento oculto.
+        # Con thinking desactivado el modelo tambien exige otro temperature
+        # fijo -- confirmado en vivo: 400 "invalid temperature: only 0.6 is
+        # allowed for this model" (era 1 con thinking habilitado, asi que el
+        # valor fijo depende del modo, no es una preferencia arbitraria).
+        effective_temperature = temperature
+        effective_max_tokens = max_tokens
+        extra_body = None
+        if self.provider == "kimi":
+            effective_temperature = 0.6
+            extra_body = {"thinking": {"type": "disabled"}}
+
         try:
             response = await self._client.chat.completions.create(
                 model=model,
                 messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
+                temperature=effective_temperature,
+                max_tokens=effective_max_tokens,
+                extra_body=extra_body,
             )
 
             content = response.choices[0].message.content

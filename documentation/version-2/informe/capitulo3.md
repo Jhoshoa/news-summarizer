@@ -221,7 +221,7 @@ La inteligencia artificial se emplea en tres puntos del pipeline: revisión de c
 
 ### 3.5.1 Enrutador de proveedores LLM
 
-El cliente de IA pasó de una simple variable de entorno con 3 proveedores a un **`LLMRouter`** con conmutación automática entre **5 proveedores**: Groq, Gemini, GitHub Models, NVIDIA y OpenAI. Ante un error de cualquier proveedor (límite de tasa, timeout, respuesta inválida), el router pasa al siguiente en el orden configurado sin interrumpir la corrida, y recuerda cuál fue el último proveedor que funcionó para no volver a intentar uno caído innecesariamente.
+El cliente de IA pasó de una simple variable de entorno con 3 proveedores a un **`LLMRouter`** con conmutación automática entre **6 proveedores**: Groq, Gemini, GitHub Models, NVIDIA, OpenAI y Kimi (Moonshot AI). Ante un error de cualquier proveedor (límite de tasa, timeout, respuesta inválida), el router pasa al siguiente en el orden configurado sin interrumpir la corrida, y recuerda cuál fue el último proveedor que funcionó para no volver a intentar uno caído innecesariamente.
 
 | Proveedor | Fast | Balanced | Quality |
 |---|---|---|---|
@@ -230,8 +230,9 @@ El cliente de IA pasó de una simple variable de entorno con 3 proveedores a un 
 | GitHub Models | `gpt-4.1-mini` | `gpt-4.1-mini` | `gpt-4.1-mini` |
 | NVIDIA | `mistralai/mistral-nemotron` | `mistralai/mistral-nemotron` | `mistralai/mistral-nemotron` |
 | OpenAI | `gpt-4o-mini` | `gpt-4o` | `gpt-4o` |
+| Kimi (Moonshot) | `kimi-k2.6` | `kimi-k2.6` | `kimi-k2.6` |
 
-El orden de fallback por defecto es **Groq → Gemini → GitHub Models → NVIDIA → OpenAI**, elegido porque Gemini ofrece una cuota diaria más generosa que las alternativas gratuitas, y NVIDIA quedó último por observarse llamadas de más de 5 minutos en producción. Cada llamada usa un *timeout* de 45 segundos y un máximo de 1 reintento — deliberadamente más agresivo que los valores por defecto de los SDK (hasta 600s / 2 reintentos), para que un proveedor lento no cuelgue toda la corrida.
+El orden de fallback por defecto es **Groq → Gemini → GitHub Models → NVIDIA → OpenAI → Kimi**, elegido porque Gemini ofrece una cuota diaria más generosa que las alternativas gratuitas, NVIDIA quedó antes del final por observarse llamadas de más de 5 minutos en producción, y Kimi va al final de todo a propósito: es el único proveedor de pago (Tier1 de Moonshot, contratado en 2026-09) y solo debe activarse cuando los proveedores gratuitos ya fallaron, para no gastar crédito pago en tráfico que los gratuitos manejan bien. Cada llamada usa un *timeout* de 45 segundos y un máximo de 1 reintento — deliberadamente más agresivo que los valores por defecto de los SDK (hasta 600s / 2 reintentos), para que un proveedor lento no cuelgue toda la corrida.
 
 El catálogo de modelos se mantiene actualizado frente a retiros reales de los proveedores: el código documenta que `gemini-2.5-*` fue retirado el 27 de agosto de 2026 (confirmado con una respuesta 404 real) y que `mistral-small` llegó a fin de vida el 27 de julio de 2026 (confirmado con una respuesta 410) — evidencia de que el catálogo se corrige contra fallas observadas, no contra documentación desactualizada.
 

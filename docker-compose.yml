@@ -40,9 +40,11 @@ services:
       GITHUB_API_KEY: ${GITHUB_API_KEY:-}
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      KIMI_API_KEY: ${KIMI_API_KEY:-}
       # LLM_FALLBACK_ORDER intencionalmente no se pasa aca -- mismo motivo que
       # DEFAULT_CATEGORIES: sin la variable, settings.py cae al orden
-      # definido en codigo (src/config/settings.py), que ya incluye gemini.
+      # definido en codigo (src/config/settings.py), que ya incluye gemini
+      # y kimi (este ultimo, al final, ver src/config/settings.py).
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_TIMEOUT: ${LLM_TIMEOUT:-45}
       SUMMARY_CONCURRENCY: ${SUMMARY_CONCURRENCY:-4}

@@ -31,6 +31,7 @@ def test_llm_providers_list_includes_gemini_when_key_is_set(monkeypatch):
     monkeypatch.delenv("GITHUB_API_KEY", raising=False)
     monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("KIMI_API_KEY", raising=False)
 
     settings = Settings(_env_file=None)
 
@@ -47,7 +48,36 @@ def test_llm_providers_list_skips_gemini_without_a_key(monkeypatch):
     monkeypatch.delenv("GITHUB_API_KEY", raising=False)
     monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("KIMI_API_KEY", raising=False)
 
     settings = Settings(_env_file=None)
 
     assert settings.llm_providers_list == [{"provider": "groq", "api_key": "groq-key"}]
+
+
+def test_llm_providers_list_puts_kimi_last_by_default():
+    """Kimi es el unico proveedor de pago (Tier1 de Moonshot) -- tiene que
+    quedar al final del orden por defecto para que solo se use cuando todos
+    los gratuitos ya fallaron, no compitiendo por trafico normal."""
+
+    order = [name.strip() for name in Settings.model_fields["llm_fallback_order"].default.split(",")]
+
+    assert order[-1] == "kimi"
+    assert order.index("kimi") > order.index("nvidia")
+
+
+def test_llm_providers_list_includes_kimi_when_key_is_set(monkeypatch):
+    monkeypatch.delenv("LLM_FALLBACK_ORDER", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "groq-key")
+    monkeypatch.setenv("KIMI_API_KEY", "kimi-key")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GITHUB_API_KEY", raising=False)
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    settings = Settings(_env_file=None)
+
+    assert settings.llm_providers_list == [
+        {"provider": "groq", "api_key": "groq-key"},
+        {"provider": "kimi", "api_key": "kimi-key"},
+    ]
