@@ -234,6 +234,12 @@ def _channel_options(app_instance: Any) -> list[PreferenceOption]:
             note=None if email_enabled else "Guardado disponible; envio requiere SMTP configurado.",
         ),
         PreferenceOption(
+            slug="telegram",
+            label="Telegram",
+            enabled=telegram_enabled,
+            note=None if telegram_enabled else "Requiere bot de Telegram configurado.",
+        ),
+        PreferenceOption(
             slug="whatsapp",
             label="WhatsApp",
             # En desarrollo a proposito: Twilio tiene costo mensual y Meta Business
@@ -247,12 +253,6 @@ def _channel_options(app_instance: Any) -> list[PreferenceOption]:
                 "Meta Business). Elegi este canal para contarnos "
                 "si te interesaria igual."
             ),
-        ),
-        PreferenceOption(
-            slug="telegram",
-            label="Telegram",
-            enabled=telegram_enabled,
-            note=None if telegram_enabled else "Requiere bot de Telegram configurado.",
         ),
     ]
 

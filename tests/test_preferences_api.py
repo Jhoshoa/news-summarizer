@@ -121,14 +121,14 @@ async def test_preference_options_returns_categories_channels_and_frequencies(fa
     ]
     assert payload["channels"][0]["slug"] == "email"
     assert payload["channels"][0]["enabled"] is True
-    assert payload["channels"][1]["slug"] == "whatsapp"
+    assert payload["channels"][1]["slug"] == "telegram"
+    assert payload["channels"][1]["enabled"] is False
+    assert payload["channels"][2]["slug"] == "whatsapp"
     # WhatsApp esta marcado "en desarrollo" a proposito -- Twilio tiene costo y
     # Meta Business exige NIT/empresa constituida; el frontend usa este flag
     # para mostrar un mensaje de interes en vez del formulario real.
-    assert payload["channels"][1]["enabled"] is False
-    assert "En desarrollo" in payload["channels"][1]["note"]
-    assert payload["channels"][2]["slug"] == "telegram"
     assert payload["channels"][2]["enabled"] is False
+    assert "En desarrollo" in payload["channels"][2]["note"]
     assert {item["slug"] for item in payload["frequencies"]} == {
         "diario",
         "dias_habiles",
