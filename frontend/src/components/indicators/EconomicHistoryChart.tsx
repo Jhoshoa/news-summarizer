@@ -1,7 +1,7 @@
 import { createChart, CrosshairMode, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useGetEconomicIndicatorsHistoryQuery } from "../../services/api";
+import { useGetEconomicIndicatorsHistoryQuery, useGetEconomicIndicatorsQuery } from "../../services/api";
 import { formatNumber } from "./indicatorUtils";
 
 const OFICIAL_CODE = "bcb_tipo_de_cambio_oficial";
@@ -31,6 +31,7 @@ const RANGES: Array<{ key: RangeKey; label: string }> = [
 const RANGE_DAYS: Record<RangeKey, number> = { "1": 1, "7": 7, "30": 30, "90": 90, all: 365 };
 
 type Point = { time: UTCTimestamp; value: number };
+type LiveSeriesKey = "oficial" | "compra" | "venta";
 
 // El backend manda collected_at como hora de Bolivia "naive" (sin offset, ej.
 // "2026-09-16T21:00:00" -- ver _now_bolivia en src/db/repository.py). Lightweight
@@ -84,9 +85,67 @@ export const EconomicHistoryChart = () => {
   const compraPoints = useMemo(() => toSeriesPoints(data?.series[COMPRA_CODE]), [data]);
   const ventaPoints = useMemo(() => toSeriesPoints(data?.series[VENTA_CODE]), [data]);
 
-  const lastOficial = oficialPoints[oficialPoints.length - 1]?.value ?? null;
-  const lastCompra = compraPoints[compraPoints.length - 1]?.value ?? null;
-  const lastVenta = ventaPoints[ventaPoints.length - 1]?.value ?? null;
+  // Sondeo liviano del "ultimo valor conocido" (GET /api/economic-indicators,
+  // ~13 items chicos) para detectar datos nuevos sin volver a pedir el
+  // historial completo de `days` cada minuto -- ese pedido pesado solo se
+  // repite cuando cambia el rango (arriba). Cuando este sondeo trae un punto
+  // mas nuevo que el ultimo dibujado, se agrega directo a la serie existente
+  // via seriesRef.current[key].update(...) en vez de rehacer setData() con
+  // todo el dataset.
+  const { data: latestData } = useGetEconomicIndicatorsQuery(undefined, {
+    pollingInterval: 60_000,
+  });
+
+  const [liveLatest, setLiveLatest] = useState<Partial<Record<LiveSeriesKey, Point>>>({});
+  const liveLatestRef = useRef<Partial<Record<LiveSeriesKey, Point>>>({});
+  const basePointsRef = useRef<Record<LiveSeriesKey, Point[]>>({
+    oficial: [],
+    compra: [],
+    venta: [],
+  });
+
+  // Cada vez que llega un historial nuevo (carga inicial o cambio de rango),
+  // ese dataset ya incluye cualquier punto que el sondeo liviano hubiera
+  // agregado antes -- se resetea el estado "en vivo" para no arrastrar un
+  // valor viejo que quedo pisado por el fetch completo.
+  useEffect(() => {
+    basePointsRef.current = { oficial: oficialPoints, compra: compraPoints, venta: ventaPoints };
+    liveLatestRef.current = {};
+    setLiveLatest({});
+  }, [oficialPoints, compraPoints, ventaPoints]);
+
+  useEffect(() => {
+    if (!latestData) return;
+
+    const updates: Partial<Record<LiveSeriesKey, Point>> = {};
+    const consider = (code: string, key: LiveSeriesKey) => {
+      const item = latestData.items.find((entry) => entry.indicator_code === code);
+      if (!item) return;
+
+      const time = parseBoliviaTimestamp(item.collected_at) as UTCTimestamp;
+      const basePoints = basePointsRef.current[key];
+      const lastKnownTime = liveLatestRef.current[key]?.time ?? basePoints[basePoints.length - 1]?.time ?? 0;
+      if (time <= lastKnownTime) return;
+
+      updates[key] = { time, value: item.value };
+    };
+
+    consider(OFICIAL_CODE, "oficial");
+    consider(COMPRA_CODE, "compra");
+    consider(VENTA_CODE, "venta");
+
+    if (Object.keys(updates).length === 0) return;
+
+    for (const [key, point] of Object.entries(updates) as Array<[LiveSeriesKey, Point]>) {
+      seriesRef.current[key]?.update(point);
+    }
+    liveLatestRef.current = { ...liveLatestRef.current, ...updates };
+    setLiveLatest((prev) => ({ ...prev, ...updates }));
+  }, [latestData]);
+
+  const lastOficial = liveLatest.oficial?.value ?? oficialPoints[oficialPoints.length - 1]?.value ?? null;
+  const lastCompra = liveLatest.compra?.value ?? compraPoints[compraPoints.length - 1]?.value ?? null;
+  const lastVenta = liveLatest.venta?.value ?? ventaPoints[ventaPoints.length - 1]?.value ?? null;
   const gap = lastOficial != null && lastVenta != null ? lastVenta - lastOficial : null;
   const gapPct = gap != null && lastOficial ? (gap / lastOficial) * 100 : null;
 
