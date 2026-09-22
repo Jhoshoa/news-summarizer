@@ -1,4 +1,8 @@
 from .indicators import EconomicIndicatorRepository, EconomicIndicatorValue
+from .price_alert_subscribers import (
+    PriceAlertSubscriber,
+    PriceAlertSubscriberRepository,
+)
 from .price_alerts import PriceAlertRepository, PriceAlertState
 from .repository import (
     CollectionRun,
@@ -23,6 +27,8 @@ __all__ = [
     "NewsSummary",
     "PriceAlertRepository",
     "PriceAlertState",
+    "PriceAlertSubscriber",
+    "PriceAlertSubscriberRepository",
     "Subscriber",
     "SummaryRefreshJob",
     "TelegramLinkRepository",

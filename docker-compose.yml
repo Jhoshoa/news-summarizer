@@ -62,11 +62,11 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_WEBHOOK_URL: ${TELEGRAM_WEBHOOK_URL:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
-      # Bot separado del principal, solo para avisos de movimiento de precio
-      # P2P -- ver src/notifiers/price_alert_notifier.py. Sin token/chat_id,
-      # queda deshabilitado.
+      # Bot separado del principal, solo para alertas de movimiento de precio
+      # P2P -- ver src/notifiers/price_alert_notifier.py. Suscripcion abierta
+      # via /start (tabla price_alert_subscribers). Sin token queda
+      # deshabilitado.
       PRICE_ALERT_BOT_TOKEN: ${PRICE_ALERT_BOT_TOKEN:-}
-      PRICE_ALERT_CHAT_ID: ${PRICE_ALERT_CHAT_ID:-}
       PRICE_ALERT_THRESHOLD_PERCENT: ${PRICE_ALERT_THRESHOLD_PERCENT:-1.0}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       SMTP_HOST: ${SMTP_HOST:-}

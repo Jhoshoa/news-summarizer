@@ -73,16 +73,16 @@ class Settings(BaseSettings):
     # completo si ya paso este numero de horas desde su publicacion -- antes
     # de eso se sigue re-chequeando por si la nota se actualiza (comun en
     # coberturas "en desarrollo").
-    scraper_detail_refresh_hours: int = Field(
-        default=3, alias="SCRAPER_DETAIL_REFRESH_HOURS"
-    )
+    scraper_detail_refresh_hours: int = Field(default=3, alias="SCRAPER_DETAIL_REFRESH_HOURS")
 
     # WhatsApp via la API directa de Meta (WhatsApp Cloud API), sin Twilio
     # ni otro intermediario -- Twilio exigia auto-recharge obligatorio o
     # suspendia la cuenta, ademas de cobrar su propio markup encima de la
     # tarifa de Meta.
     whatsapp_meta_access_token: str | None = Field(default=None, alias="WHATSAPP_META_ACCESS_TOKEN")
-    whatsapp_meta_phone_number_id: str | None = Field(default=None, alias="WHATSAPP_META_PHONE_NUMBER_ID")
+    whatsapp_meta_phone_number_id: str | None = Field(
+        default=None, alias="WHATSAPP_META_PHONE_NUMBER_ID"
+    )
     whatsapp_meta_api_version: str = Field(default="v21.0", alias="WHATSAPP_META_API_VERSION")
     # Verifica la suscripcion del webhook (handshake GET de Meta).
     whatsapp_meta_verify_token: str | None = Field(default=None, alias="WHATSAPP_META_VERIFY_TOKEN")
@@ -95,14 +95,17 @@ class Settings(BaseSettings):
 
     # Bot de Telegram separado del principal a proposito -- avisa cuando
     # compra/venta P2P se mueve mas de price_alert_threshold_percent desde
-    # la ultima alerta (ver src/notifiers/price_alert_notifier.py). Sin
-    # token/chat_id configurados, el notifier queda deshabilitado (no rompe
-    # el refresh de indicadores, simplemente no hace nada).
+    # la ultima alerta (ver src/notifiers/price_alert_notifier.py). El bot
+    # es de suscripcion abierta: /start registra al chat y /baja lo quita.
+    # Sin token configurado, el notifier queda deshabilitado (no rompe el
+    # refresh de indicadores, simplemente no hace nada).
     price_alert_bot_token: str | None = Field(default=None, alias="PRICE_ALERT_BOT_TOKEN")
+    # DEPRECADO: antes se enviaban las alertas a un unico chat y se ignoraban
+    # mensajes de cualquiera otro. Ahora el bot es publico y guarda los chat
+    # suscriptos en price_alert_subscribers, asi que esta variable ya no se
+    # usa. Se deja la definicion por compatibilidad con `.env` existentes.
     price_alert_chat_id: str | None = Field(default=None, alias="PRICE_ALERT_CHAT_ID")
-    price_alert_threshold_percent: float = Field(
-        default=1.0, alias="PRICE_ALERT_THRESHOLD_PERCENT"
-    )
+    price_alert_threshold_percent: float = Field(default=1.0, alias="PRICE_ALERT_THRESHOLD_PERCENT")
 
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
     smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
@@ -126,24 +129,18 @@ class Settings(BaseSettings):
     database_max_overflow: int = Field(default=20, alias="DATABASE_MAX_OVERFLOW")
     news_cache_ttl_minutes: int = Field(default=60, alias="NEWS_CACHE_TTL_MINUTES")
     news_min_articles: int = Field(default=20, alias="NEWS_MIN_ARTICLES")
-    news_summary_retention_days: int = Field(
-        default=30, alias="NEWS_SUMMARY_RETENTION_DAYS"
-    )
+    news_summary_retention_days: int = Field(default=30, alias="NEWS_SUMMARY_RETENTION_DAYS")
 
     schedule_timezone: str = Field(default="America/La_Paz", alias="SCHEDULE_TIMEZONE")
     schedule_summary_morning: str = Field(default="09:00", alias="SCHEDULE_SUMMARY_MORNING")
     api_auth_key: str | None = Field(default=None, alias="API_AUTH_KEY")
-    cors_origins: str = Field(
-        default="http://localhost:5173", alias="CORS_ORIGINS"
-    )
+    cors_origins: str = Field(default="http://localhost:5173", alias="CORS_ORIGINS")
 
     default_categories: str = Field(
         default=_DEFAULT_CATEGORIES_ENV_VALUE,
         alias="DEFAULT_CATEGORIES",
     )
-    summary_candidates_per_category: int = Field(
-        default=5, alias="SUMMARY_CANDIDATES_PER_CATEGORY"
-    )
+    summary_candidates_per_category: int = Field(default=5, alias="SUMMARY_CANDIDATES_PER_CATEGORY")
     summary_candidates_extended_limit: int = Field(
         default=8, alias="SUMMARY_CANDIDATES_EXTENDED_LIMIT"
     )
