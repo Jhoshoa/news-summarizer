@@ -93,6 +93,17 @@ class Settings(BaseSettings):
     telegram_webhook_url: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_URL")
     telegram_webhook_secret: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_SECRET")
 
+    # Bot de Telegram separado del principal a proposito -- avisa cuando
+    # compra/venta P2P se mueve mas de price_alert_threshold_percent desde
+    # la ultima alerta (ver src/notifiers/price_alert_notifier.py). Sin
+    # token/chat_id configurados, el notifier queda deshabilitado (no rompe
+    # el refresh de indicadores, simplemente no hace nada).
+    price_alert_bot_token: str | None = Field(default=None, alias="PRICE_ALERT_BOT_TOKEN")
+    price_alert_chat_id: str | None = Field(default=None, alias="PRICE_ALERT_CHAT_ID")
+    price_alert_threshold_percent: float = Field(
+        default=1.0, alias="PRICE_ALERT_THRESHOLD_PERCENT"
+    )
+
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
     smtp_host: str | None = Field(default=None, alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")

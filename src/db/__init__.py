@@ -1,4 +1,5 @@
 from .indicators import EconomicIndicatorRepository, EconomicIndicatorValue
+from .price_alerts import PriceAlertRepository, PriceAlertState
 from .repository import (
     CollectionRun,
     Database,
@@ -20,6 +21,8 @@ __all__ = [
     "NewsCategory",
     "NewsSource",
     "NewsSummary",
+    "PriceAlertRepository",
+    "PriceAlertState",
     "Subscriber",
     "SummaryRefreshJob",
     "TelegramLinkRepository",

@@ -108,6 +108,14 @@ def create_economic_indicators_router(get_app_instance: Callable[[], Any]) -> AP
             f"unchanged={stats['unchanged']} skipped={stats['skipped']}"
         )
         latest = await call_db(repository.get_latest_values(), action="get_latest_values")
+
+        price_alert = getattr(app_instance, "price_alert", None)
+        if price_alert:
+            try:
+                await price_alert.check_and_notify(latest)
+            except Exception as exc:
+                logger.error(f"Error chequeando alertas de precio: {exc}")
+
         return {
             "status": "success",
             "collected": len(indicators),

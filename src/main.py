@@ -35,9 +35,10 @@ from src.api.preferences import MAX_PREFERRED_HOUR, MIN_PREFERRED_HOUR
 from src.api.security import require_cron_key
 from src.collectors import NewsScraper
 from src.config import Settings, get_settings
-from src.db import Database
+from src.db import Database, PriceAlertRepository
 from src.distributors import EmailHandler, TelegramHandler, WhatsAppHandler
 from src.llm import LLMRouter
+from src.notifiers import PriceAlertNotifier
 from src.processors import (
     AIStoryDeduplicator,
     Deduplicator,
@@ -60,6 +61,7 @@ class NewsSummarizerApp:
         self.whatsapp: WhatsAppHandler | None = None
         self.telegram: TelegramHandler | None = None
         self.email: EmailHandler | None = None
+        self.price_alert: PriceAlertNotifier | None = None
         # Fallback en memoria del candado contra /trigger/summary superpuestos,
         # usado solo cuando no hay DB disponible (sin DB no se puede consultar
         # el job compartido -- ver get_active_summary_refresh_job en
@@ -147,6 +149,8 @@ class NewsSummarizerApp:
         self.whatsapp = WhatsAppHandler(self.db, self.settings)
         self.telegram = TelegramHandler(self.db, self.settings)
         self.email = EmailHandler(self.db, self.settings)
+        price_alert_repo = PriceAlertRepository(self.db.session_maker) if self.db else None
+        self.price_alert = PriceAlertNotifier(self.settings, price_alert_repo)
 
         await self._register_telegram_webhook()
 

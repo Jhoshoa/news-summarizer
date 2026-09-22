@@ -394,6 +394,54 @@ async def test_economic_refresh_accepts_valid_cron_key(fake_economic_app_instanc
     assert payload["inserted"] == 1
 
 
+@pytest.mark.asyncio
+async def test_economic_refresh_checks_price_alerts_with_latest_values(fake_economic_app_instance):
+    """El endpoint debe pasarle los items recien refrescados a
+    price_alert.check_and_notify -- sin esto, PriceAlertNotifier nunca se
+    entera de un valor nuevo (ver src/notifiers/price_alert_notifier.py)."""
+
+    calls: list[list[dict]] = []
+
+    class FakePriceAlert:
+        async def check_and_notify(self, indicators):
+            calls.append(indicators)
+
+    main_module.app_instance.price_alert = FakePriceAlert()
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/economic-indicators/refresh",
+            headers={"X-API-Key": API_AUTH_KEY},
+        )
+
+    assert response.status_code == 200
+    assert calls == [[{"indicator_code": "bcb_unidad_de_fomento_a_la_vivienda_ufv", "value": 3.27232}]]
+
+
+@pytest.mark.asyncio
+async def test_economic_refresh_survives_price_alert_failure(fake_economic_app_instance):
+    """Un error en el chequeo de alertas de precio no debe tumbar la
+    respuesta del refresh -- es una notificacion best-effort, no parte del
+    contrato principal del endpoint."""
+
+    class BrokenPriceAlert:
+        async def check_and_notify(self, indicators):
+            raise RuntimeError("bot caido")
+
+    main_module.app_instance.price_alert = BrokenPriceAlert()
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post(
+            "/api/economic-indicators/refresh",
+            headers={"X-API-Key": API_AUTH_KEY},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["inserted"] == 1
+
+
 def test_private_refresh_endpoints_document_cron_header():
     schema = app.openapi()
     operations = (
