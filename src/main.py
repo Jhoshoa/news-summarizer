@@ -150,7 +150,12 @@ class NewsSummarizerApp:
         self.telegram = TelegramHandler(self.db, self.settings)
         self.email = EmailHandler(self.db, self.settings)
         price_alert_repo = PriceAlertRepository(self.db.session_maker) if self.db else None
-        self.price_alert = PriceAlertNotifier(self.settings, price_alert_repo)
+        self.price_alert = PriceAlertNotifier(
+            self.settings,
+            price_alert_repo,
+            session_maker=self.db.session_maker if self.db else None,
+        )
+        await self.price_alert.start_polling()
 
         await self._register_telegram_webhook()
 
@@ -183,6 +188,9 @@ class NewsSummarizerApp:
 
         if self.whatsapp:
             await self.whatsapp.close()
+
+        if self.price_alert:
+            await self.price_alert.stop()
 
         if self.db:
             await self.db.close()

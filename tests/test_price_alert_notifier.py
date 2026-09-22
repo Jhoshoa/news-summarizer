@@ -32,7 +32,7 @@ def _settings(
 
 
 @pytest.fixture
-async def repository():
+async def session_maker():
     engine = create_async_engine(
         "sqlite+aiosqlite://",
         connect_args={"check_same_thread": False},
@@ -42,8 +42,13 @@ async def repository():
         await conn.run_sync(Base.metadata.create_all)
 
     maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    yield PriceAlertRepository(maker)
+    yield maker
     await engine.dispose()
+
+
+@pytest.fixture
+async def repository(session_maker):
+    yield PriceAlertRepository(session_maker)
 
 
 def _items(buy=None, sell=None) -> list[dict]:
@@ -181,3 +186,150 @@ async def test_ignores_untracked_indicator_codes(repository):
 
     mock_send.assert_not_awaited()
     assert await repository.get_reference("bcb_tipo_de_cambio_oficial") is None
+
+
+@pytest.mark.asyncio
+async def test_start_command_replies_with_welcome(repository):
+    """El bot debe responder /start (no quedar mudo como antes) con una
+    bienvenida que explique las alertas y los comandos disponibles."""
+
+    notifier = PriceAlertNotifier(_settings(), repository)
+
+    with patch("telegram.Bot.send_message", new=AsyncMock()) as mock_send:
+        await notifier.handle_message("123456", "/start")
+
+    mock_send.assert_awaited_once()
+    text = mock_send.call_args.kwargs["text"]
+    assert "Alertas de precio" in text
+    assert "/precio" in text
+    assert "1%" in text
+
+
+@pytest.mark.asyncio
+async def test_message_from_unconfigured_chat_is_ignored(repository):
+    """El bot es personal: un mensaje desde un chat distinto al configurado
+    se ignora por completo (no responde nada)."""
+
+    notifier = PriceAlertNotifier(_settings(), repository)
+
+    with patch("telegram.Bot.send_message", new=AsyncMock()) as mock_send:
+        await notifier.handle_message("999999", "/start")
+
+    mock_send.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_help_command_replies_with_command_list(repository):
+    notifier = PriceAlertNotifier(_settings(), repository)
+
+    with patch("telegram.Bot.send_message", new=AsyncMock()) as mock_send:
+        await notifier.handle_message("123456", "/ayuda")
+
+    mock_send.assert_awaited_once()
+    assert "/precio" in mock_send.call_args.kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_price_command_returns_current_prices(session_maker):
+    """/precio responde el oficial del BCB y la compra/venta P2P con el
+    ultimo valor guardado, en ese orden."""
+
+    from src.db.indicators import EconomicIndicatorRepository
+
+    repo = EconomicIndicatorRepository(session_maker)
+    await repo.save_values(
+        [
+            {
+                "source": "bcb",
+                "indicator_code": "bcb_tipo_de_cambio_oficial",
+                "indicator_name": "Tipo de cambio oficial",
+                "indicator_group": "dolar",
+                "value": 12.55,
+            },
+            {
+                "source": "binance",
+                "indicator_code": "binance_p2p_usdt_bob_buy",
+                "indicator_name": "P2P compra",
+                "indicator_group": "dolar",
+                "value": 12.20,
+            },
+            {
+                "source": "binance",
+                "indicator_code": "binance_p2p_usdt_bob_sell",
+                "indicator_name": "P2P venta",
+                "indicator_group": "dolar",
+                "value": 12.40,
+            },
+        ]
+    )
+
+    notifier = PriceAlertNotifier(_settings(), PriceAlertRepository(session_maker), session_maker)
+
+    with patch("telegram.Bot.send_message", new=AsyncMock()) as mock_send:
+        await notifier.handle_message("123456", "/precio")
+
+    mock_send.assert_awaited_once()
+    text = mock_send.call_args.kwargs["text"]
+    assert text.index("Dolar oficial BCB: Bs 12.55") < text.index("Binance P2P compra: Bs 12.20")
+    assert "Binance P2P compra: Bs 12.20" in text
+    assert "Binance P2P venta: Bs 12.40" in text
+    assert "Actualizado:" in text
+
+
+@pytest.mark.asyncio
+async def test_price_command_without_db_replies_unavailable(repository):
+    notifier = PriceAlertNotifier(_settings(), repository, session_maker=None)
+
+    with patch("telegram.Bot.send_message", new=AsyncMock()) as mock_send:
+        await notifier.handle_message("123456", "/precio")
+
+    mock_send.assert_awaited_once()
+    assert "no esta disponible" in mock_send.call_args.kwargs["text"]
+
+
+class _FakeBot:
+    def __init__(self, notifier, updates):
+        self.notifier = notifier
+        self.updates = list(updates)
+        self.calls = []
+        self.sent = []
+
+    async def get_updates(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.updates:
+            return [self.updates.pop(0)]
+        self.notifier._stopped = True
+        return []
+
+    async def send_message(self, **kwargs):
+        self.sent.append(kwargs)
+
+
+@pytest.mark.asyncio
+async def test_polling_loop_processes_incoming_message_and_tracks_offset(repository):
+    """El long-polling lee updates, responde los comandos y mantiene el
+    offset para no volver a procesar los mismos mensajes."""
+
+    notifier = PriceAlertNotifier(_settings(), repository)
+    fake = _FakeBot(
+        notifier,
+        [
+            SimpleNamespace(
+                update_id=5,
+                message=SimpleNamespace(
+                    text="/start",
+                    chat=SimpleNamespace(id="123456"),
+                    from_user=None,
+                ),
+            )
+        ],
+    )
+    notifier.bot = fake
+    notifier._stopped = False
+
+    await notifier._poll_loop()
+
+    assert fake.sent
+    assert "Alertas de precio" in fake.sent[0]["text"]
+    assert fake.calls[0]["offset"] is None
+    assert fake.calls[1]["offset"] == 6
