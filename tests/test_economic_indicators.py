@@ -201,7 +201,7 @@ async def test_fetch_binance_p2p_picks_best_price_per_side():
     # de MIN_ADVERTISER_ORDER_COUNT/MIN_ADVERTISER_FINISH_RATE) -- este test
     # es sobre la direccion del min/max por lado, no sobre el filtro de
     # confiabilidad (ver test_fetch_binance_p2p_* mas abajo para eso).
-    reliable_advertiser = {"monthOrderCount": 500, "monthFinishRate": 0.99}
+    reliable_advertiser = {"monthOrderCount": 500, "monthFinishRate": 0.99, "userType": "merchant"}
 
     responses = {
         "BUY": {
@@ -242,12 +242,42 @@ async def test_fetch_binance_p2p_picks_best_price_per_side():
 
 
 @pytest.mark.asyncio
+async def test_fetch_binance_p2p_requests_only_verified_merchants():
+    """publisherType="merchant" es el mismo filtro "cajeros verificados" de
+    la UI de Binance -- confirmado en vivo contra la API real: con
+    publisherType=None, 4 de 20 anuncios eran usuarios sin verificar; con
+    "merchant", los 20 eran mercaderes certificados. Un pico real (Bs 12,03
+    de venta vs ~10,7-10,9 del resto) salio de un usuario no verificado con
+    pocas ordenes -- operar sin verificar ya es mas riesgoso de por si, asi
+    que ni siquiera deberian entrar al pool de candidatos."""
+
+    advertiser = {"monthOrderCount": 500, "monthFinishRate": 0.99}
+    seen_payloads: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        seen_payloads.append(payload)
+        return httpx.Response(
+            200,
+            json={"data": [{"adv": {"price": "10.00", "advNo": "x"}, "advertiser": advertiser}]},
+        )
+
+    collector = EconomicIndicatorCollector()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await collector.fetch_binance_p2p(client, snapshot_key="snapshot", collected_at=None)
+
+    assert len(seen_payloads) == 2
+    assert {payload["tradeType"] for payload in seen_payloads} == {"BUY", "SELL"}
+    assert all(payload["publisherType"] == "merchant" for payload in seen_payloads)
+
+
+@pytest.mark.asyncio
 async def test_fetch_binance_p2p_discards_unreliable_outlier_advertiser():
     """Caso real: un anuncio de venta a Bs 12.03 (vs. ~10.7-10.9 del resto)
     vino de un anunciante con 4 ordenes en el mes y 36% de tasa de
     completado -- ese anuncio no deberia poder mover el precio guardado."""
 
-    reliable = {"monthOrderCount": 500, "monthFinishRate": 0.99}
+    reliable = {"monthOrderCount": 500, "monthFinishRate": 0.99, "userType": "merchant"}
     unreliable = {"monthOrderCount": 4, "monthFinishRate": 0.364}
 
     responses = {
@@ -274,6 +304,54 @@ async def test_fetch_binance_p2p_discards_unreliable_outlier_advertiser():
     assert sell.value == Decimal("10.90")
     assert sell.raw_payload["advertisement"]["adv"]["advNo"] == "normal-sell"
     assert sell.raw_payload["selection"] == "highest_price"
+
+
+@pytest.mark.asyncio
+async def test_fetch_binance_p2p_discards_unverified_user_even_with_good_stats():
+    """Caso real (id=2438 en produccion): un anunciante tipo "user" (no
+    mercader verificado) con 129 ordenes en el mes y 99.3% de completado --
+    numeros que superan de sobra MIN_ADVERTISER_ORDER_COUNT/
+    MIN_ADVERTISER_FINISH_RATE -- publico Bs 11.12 de compra, un solo punto
+    aislado muy por debajo de los ~12.16-12.18 de antes y despues. Buen
+    historial no alcanza si no esta verificado: el filtro de userType debe
+    descartarlo igual, dejando pasar al mercader aunque su precio sea peor
+    para nosotros."""
+
+    good_but_unverified_user = {
+        "monthOrderCount": 129,
+        "monthFinishRate": 0.993,
+        "userType": "user",
+    }
+    verified_merchant = {
+        "monthOrderCount": 500,
+        "monthFinishRate": 0.99,
+        "userType": "merchant",
+    }
+
+    responses = {
+        "BUY": {
+            "data": [
+                {"adv": {"price": "12.17", "advNo": "merchant-buy"}, "advertiser": verified_merchant},
+                {"adv": {"price": "11.12", "advNo": "unverified-buy"}, "advertiser": good_but_unverified_user},
+            ]
+        },
+        "SELL": {"data": [{"adv": {"price": "12.20", "advNo": "only-sell"}, "advertiser": verified_merchant}]},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        return httpx.Response(200, json=responses[payload["tradeType"]])
+
+    collector = EconomicIndicatorCollector()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        indicators = await collector.fetch_binance_p2p(
+            client, snapshot_key="snapshot", collected_at=None
+        )
+
+    buy = next(i for i in indicators if i.side == "buy")
+    assert buy.value == Decimal("12.17")
+    assert buy.raw_payload["advertisement"]["adv"]["advNo"] == "merchant-buy"
+    assert buy.raw_payload["selection"] == "lowest_price"
 
 
 @pytest.mark.asyncio

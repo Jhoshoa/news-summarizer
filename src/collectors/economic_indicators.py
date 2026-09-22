@@ -182,7 +182,16 @@ class EconomicIndicatorCollector:
                 "asset": "USDT",
                 "tradeType": trade_type,
                 "fiat": "BOB",
-                "publisherType": None,
+                # "merchant" = el mismo filtro "cajeros verificados" de la UI de
+                # Binance -- confirmado en vivo: con publisherType=None, 4 de 20
+                # anuncios eran usuarios sin verificar; con "merchant", los 20
+                # son mercaderes certificados por Binance. Un pico real (Bs
+                # 12,03 de venta vs ~10,7-10,9 del resto) salio de un usuario no
+                # verificado con pocas ordenes -- operar con alguien sin
+                # verificar ya es mas riesgoso de por si, asi que ni siquiera
+                # deberian entrar al pool de candidatos, mas alla de si
+                # ademas pasan el filtro de _is_reliable_advertiser.
+                "publisherType": "merchant",
             }
             response = await client.post(self.BINANCE_P2P_URL, json=payload, headers=headers)
             response.raise_for_status()
@@ -407,14 +416,28 @@ class EconomicIndicatorCollector:
         return list(zip(labels, values, strict=False))
 
     def _is_reliable_advertiser(self, item: dict[str, Any]) -> bool:
-        """Filtra anunciantes con poco historial o mal record de completado
-        -- ver MIN_ADVERTISER_ORDER_COUNT/MIN_ADVERTISER_FINISH_RATE arriba."""
+        """Filtra anunciantes con poco historial, mal record de completado, o
+        sin el badge de mercader verificado de Binance -- ver
+        MIN_ADVERTISER_ORDER_COUNT/MIN_ADVERTISER_FINISH_RATE arriba.
+
+        El request en vivo ya pide solo publisherType="merchant" (ver
+        fetch_binance_p2p), asi que para datos nuevos este chequeo de
+        userType es redundante con eso. Pero este mismo metodo tambien lo
+        reusa deploy/fix-binance-p2p-outliers.py para evaluar filas viejas
+        de antes de ese cambio -- ahi si hace falta, porque un "user" sin
+        verificar puede tener buen historial de ordenes y aun asi publicar
+        un precio que nadie mas sostiene (caso real: id=2438, Bs 11,12,
+        usuario con 129 ordenes y 99,3% de completado, un solo punto aislado
+        rodeado de ~12,16-12,18 antes y despues).
+        """
 
         advertiser = item.get("advertiser") or {}
         order_count = advertiser.get("monthOrderCount")
         finish_rate = advertiser.get("monthFinishRate")
 
         if order_count is None or finish_rate is None:
+            return False
+        if advertiser.get("userType") != "merchant":
             return False
         try:
             return (

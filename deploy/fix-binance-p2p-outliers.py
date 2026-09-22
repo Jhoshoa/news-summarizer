@@ -3,7 +3,8 @@ vinieron de un anunciante poco confiable (ver el fix real en
 src/collectors/economic_indicators.py, _is_reliable_advertiser). Ese fix
 solo evita que vuelva a pasar en la recoleccion de ahora en adelante --
 este script limpia lo que ya quedo guardado de antes, con el mismo
-criterio (monthOrderCount / monthFinishRate) para no duplicar logica.
+criterio (monthOrderCount / monthFinishRate / userType == "merchant")
+para no duplicar logica.
 
 Cada valor de un anunciante no confiable se reemplaza por una
 interpolacion lineal en el tiempo entre el valor confiable mas cercano
@@ -22,12 +23,13 @@ Uso (desde la raiz del repo, con el venv activado):
     python deploy/fix-binance-p2p-outliers.py            # dry-run, no escribe nada
     python deploy/fix-binance-p2p-outliers.py --apply    # aplica los cambios
 
-Un anunciante confiable (>=10 ordenes, >=80% completado) puede igual publicar
-un precio raro alguna vez -- el criterio automatico no lo va a agarrar, a
-proposito, para no tocar volatilidad real de mercado en cuentas que si
-cumplen. Para esos casos puntuales, revisados y confirmados a mano, se puede
-forzar por id (se salta el chequeo de confiabilidad SOLO para esos ids, pero
-sigue exigiendo el desvio minimo e interpolando igual que el resto):
+Un anunciante confiable (mercader verificado, >=10 ordenes, >=80% completado)
+puede igual publicar un precio raro alguna vez -- el criterio automatico no lo
+va a agarrar, a proposito, para no tocar volatilidad real de mercado en
+cuentas que si cumplen. Para esos casos puntuales, revisados y confirmados a
+mano, se puede forzar por id (se salta el chequeo de confiabilidad SOLO para
+esos ids, pero sigue exigiendo el desvio minimo e interpolando igual que el
+resto):
     python deploy/fix-binance-p2p-outliers.py --force-id 1683
 
 Antes de correr con --apply en produccion, se recomienda un pg_dump de
