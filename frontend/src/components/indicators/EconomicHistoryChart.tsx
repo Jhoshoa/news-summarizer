@@ -33,6 +33,20 @@ const RANGE_DAYS: Record<RangeKey, number> = { "1": 1, "7": 7, "30": 30, "90": 9
 type Point = { time: UTCTimestamp; value: number };
 type LiveSeriesKey = "oficial" | "compra" | "venta";
 
+// Cada cuanto se sondea el "ultimo valor conocido" para el update() en vivo
+// (ver el efecto de latestData mas abajo). VITE_* se resuelve en build time
+// (ver frontend/Dockerfile), asi que un valor ausente/invalido cae en el
+// default en vez de romper en runtime.
+const DEFAULT_LIVE_POLL_SECONDS = 60;
+
+const parsePollSeconds = (raw: string | undefined): number => {
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_LIVE_POLL_SECONDS;
+};
+
+const LIVE_POLL_INTERVAL_MS =
+  parsePollSeconds(import.meta.env.VITE_ECONOMIC_INDICATORS_POLL_SECONDS) * 1000;
+
 // El backend manda collected_at como hora de Bolivia "naive" (sin offset, ej.
 // "2026-09-16T21:00:00" -- ver _now_bolivia en src/db/repository.py). Lightweight
 // Charts SIEMPRE arma las etiquetas del eje con los getters UTC del Date que le
@@ -93,7 +107,7 @@ export const EconomicHistoryChart = () => {
   // via seriesRef.current[key].update(...) en vez de rehacer setData() con
   // todo el dataset.
   const { data: latestData } = useGetEconomicIndicatorsQuery(undefined, {
-    pollingInterval: 60_000,
+    pollingInterval: LIVE_POLL_INTERVAL_MS,
   });
 
   const [liveLatest, setLiveLatest] = useState<Partial<Record<LiveSeriesKey, Point>>>({});

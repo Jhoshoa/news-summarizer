@@ -98,6 +98,7 @@ services:
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_ENABLE_MANUAL_REFRESH: ${VITE_ENABLE_MANUAL_REFRESH:-false}
+        VITE_ECONOMIC_INDICATORS_POLL_SECONDS: ${VITE_ECONOMIC_INDICATORS_POLL_SECONDS:-60}
     container_name: news-summarizer-new-frontend
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
